@@ -8,6 +8,9 @@ See [the web page](https://uofa-cmput404.github.io/general/project.html) for a d
 
 Make a distributed social network!
 
+## Team Members
+Kaitlin Fong CCID: krfong
+
 ## License
 
 * Choose an OSI approved license, name it here, and copy the license text to a file called `LICENSE`.
