@@ -11,6 +11,7 @@ Make a distributed social network!
 ## Team Members
 Kaitlin Fong CCID: krfong
 Sean Carson CCID: swcarson
+Humza Aziz CCID: haziz
 
 ## License
 
