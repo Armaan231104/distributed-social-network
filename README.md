@@ -16,10 +16,10 @@ Aaron Mramba, CCID: mramba
 
 ## License
 
-* Choose an OSI approved license, name it here, and copy the license text to a file called `LICENSE`.
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE) file for details.
 
 ## Copyright
 
-The authors claiming copyright, if they wish to be known, can list their names here...
+2026 CMPUT404 Social Distribution Project - Team Crimson
 
 * 
