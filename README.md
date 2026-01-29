@@ -16,10 +16,8 @@ Aaron Mramba, CCID: mramba
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE) file for details.
+This project is licensed under the MIT License . See the [LICENSE.md](LICENSE) file for details.
 
 ## Copyright
 
 2026 CMPUT404 Social Distribution Project - Team Crimson
-
-* 
