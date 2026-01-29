@@ -12,7 +12,7 @@ Make a distributed social network!
 Kaitlin Fong CCID: krfong
 Sean Carson CCID: swcarson
 Nikhil Joshi: njoshi4
-Aaron Mramba: mramba
+Aaron Mramba, CCID: mramba
 
 ## License
 
