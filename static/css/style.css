@@ -1,0 +1,39 @@
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: #f4f6f8;
+}
+
+.navbar {
+    background-color: #111;
+    padding: 15px 40px;
+}
+
+.nav-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.navbar a {
+    color: white;
+    text-decoration: none;
+    margin-left: 20px;
+}
+
+.logo a {
+    font-weight: bold;
+    font-size: 20px;
+}
+
+.main-content {
+    padding: 40px;
+    min-height: 80vh;
+}
+
+.footer {
+    text-align: center;
+    padding: 20px;
+    background-color: #111;
+    color: white;
+}
