@@ -1,19 +1,19 @@
-   1 {% extends "base.html" %}
-   2                                         
-   3 {% block title %}My Stream{% endblock %}
-   4                    
-   5 {% block content %}
-   6 <h1>My Stream</h1>
-   7               
-   8 {% if posts %}             
-   9     {% for post in posts %}      
-  10     <article class="stream-post">
-  11         <h2>{{ post.title }}</h2>                                           
-  12         <p class="stream-post-meta">{{ post.published_at|date:"N j, Y, g:i a" }}</p>
-  13         <p>{{ post.content }}</p>
-  14     </article>
-  15     {% endfor %}
-  16 {% else %}
-  17     <p>No posts yet.</p>
-  18 {% endif %}
-  19 {% endblock %}
+{% extends "base.html" %}
+                                        
+{% block title %}My Stream{% endblock %}
+                   
+{% block content %}
+<h1>My Stream</h1>
+              
+{% if posts %}             
+    {% for post in posts %}      
+    <article class="stream-post">
+        <h2>{{ post.title }}</h2>                                           
+        <p class="stream-post-meta">{{ post.published_at|date:"N j, Y, g:i a" }}</p>
+        <p>{{ post.content }}</p>
+    </article>
+    {% endfor %}
+{% else %}
+    <p>No posts yet.</p>
+{% endif %}
+{% endblock %}
