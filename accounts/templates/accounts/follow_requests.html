@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+
+{% block title %}Follow Requests - SocialDistribution{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Follow Requests</h1>
+    <p class="subtitle">Authors who want to follow you.</p>
+    
+    {% if pending_requests %}
+        <div class="requests-list">
+            {% for req in pending_requests %}
+                <div class="request-card">
+                    <div class="request-info">
+                        {% if req.actor.profileImage %}
+                            <img src="{{ req.actor.profileImage }}" alt="{{ req.actor.displayName }}" class="request-avatar">
+                        {% else %}
+                            <div class="request-avatar-placeholder">{{ req.actor.displayName|make_list|first }}</div>
+                        {% endif %}
+                        
+                        <div class="request-details">
+                            <h3>{{ req.actor.displayName }}</h3>
+                            <p class="request-summary">{{ req.summary }}</p>
+                            <p class="request-time">Requested {{ req.created_at|timesince }} ago</p>
+                        </div>
+                    </div>
+                    
+                    <div class="request-actions">
+                        <a href="{% url 'accept-follow-request' request_id=req.id %}" class="btn btn-accept">Accept</a>
+                        <a href="{% url 'reject-follow-request' request_id=req.id %}" class="btn btn-reject">Reject</a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <p>No pending follow requests.</p>
+            <p class="empty-subtitle">When someone wants to follow you, their request will appear here.</p>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1 {
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    color: #666;
+    margin-bottom: 30px;
+}
+
+.requests-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.request-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.request-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.request-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.request-avatar-placeholder {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #4a90d9;
+    color: white;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.request-details h3 {
+    margin: 0 0 5px;
+    font-size: 1.1rem;
+}
+
+.request-summary {
+    margin: 0 0 5px;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.request-time {
+    margin: 0;
+    color: #999;
+    font-size: 0.8rem;
+}
+
+.request-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+}
+
+.btn-accept {
+    background: #28a745;
+    color: white;
+}
+
+.btn-accept:hover {
+    background: #218838;
+}
+
+.btn-reject {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-reject:hover {
+    background: #c82333;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.empty-state p {
+    margin: 0;
+    color: #666;
+}
+
+.empty-subtitle {
+    margin-top: 10px !important;
+    color: #999 !important;
+}
+</style>
+{% endblock %}
