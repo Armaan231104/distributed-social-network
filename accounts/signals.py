@@ -13,11 +13,13 @@ def create_author(sender, instance, created, **kwargs):
     """
     if created:
         host_url = settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else 'localhost:8000'
+        # Use http for localhost/127.0.0.1 (dev), https for production
         if 'localhost' in host_url or '127.0.0.1' in host_url:
             host_url = f'http://{host_url}/api/'
         else:
             host_url = f'https://{host_url}/api/'
         
+        # Create FQID like http://127.0.0.1/api/authors/1/
         author_id = f'{host_url}authors/{instance.id}/'
         
         Author.objects.create(

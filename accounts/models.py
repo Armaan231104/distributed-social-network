@@ -9,6 +9,7 @@ class Author(models.Model):
     Remote authors from other nodes also have FQIDs pointing to their servers.
     """
     id = models.URLField(max_length=255, unique=True, primary_key=True)
+    # user is null for remote authors - they don't have local accounts
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='author', null=True, blank=True)
     host = models.URLField(max_length=255)
     displayName = models.CharField(max_length=255)
@@ -27,8 +28,10 @@ class Author(models.Model):
 
     @property
     def is_local(self):
+        """Check if this author is from this node (not a remote author)."""
         from django.conf import settings
         allowed = settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else '127.0.0.1'
+        # Strip protocol for comparison
         allowed = allowed.replace('https://', '').replace('http://', '').rstrip('/')
         host = self.host.replace('https://', '').replace('http://', '').rstrip('/')
         return allowed in host or host in allowed

@@ -43,6 +43,45 @@ def get_or_create_author(author_data):
     )
 
 
+# --- Helpers for author lookup ---
+# These handle the difference between local authors (user_id) and remote authors (FQID)
+
+def get_current_author(request):
+    """Get Author for the logged-in user."""
+    return Author.objects.get(user=request.user)
+
+
+def get_author_by_id(author_id):
+    """
+    Look up author by user_id (local) or FQID (remote).
+    
+    Local authors: user_id is an integer (e.g., "1")
+    Remote authors: FQID URL (e.g., "http://remote.com/api/authors/abc/")
+    Detection: if it starts with 'http', it's a remote FQID.
+    """
+    is_remote = str(author_id).startswith('http')
+    if is_remote:
+        return Author.objects.get(id=str(author_id))
+    return Author.objects.get(user_id=author_id)
+
+
+def get_or_create_remote_author(foreign_id):
+    """
+    Create remote author on first follow.
+    Extracts host from the FQID (everything before /api/authors/).
+    """
+    return Author.objects.get_or_create(
+        id=str(foreign_id),
+        defaults={
+            'host': str(foreign_id).split('/api/authors/')[0] + '/api/',
+            'displayName': 'Remote Author',
+            'is_approved': True,
+        }
+    )
+
+
+# API Views
+
 class AuthorListView(APIView):
     """List all authors on this node."""
     permission_classes = [AllowAny]
@@ -140,43 +179,29 @@ class FollowView(APIView):
     User story: As an author, I want to follow remote authors, so that I can see their entries. (Part 3-5)
     User story: As an author, I want to unfollow authors I am following, so that I don't have to see their entries anymore.
     
-    Note: Per the spec, follow requests go to inbox first. The actual "following" relationship
-    is only created after the target author approves the request.
+    Note: Follow requests go to inbox first, Follow only created after approval.
     """
     permission_classes = [IsAuthenticated]
 
     def put(self, request, author_id, foreign_id):
         """Send a follow request to another author."""
-        try:
-            author = Author.objects.get(user=request.user)
-        except Author.DoesNotExist:
-            return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        if str(author.user_id) != str(author_id):
+        current_author = get_current_author(request)
+        
+        if str(current_author.user_id) != str(author_id):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
         is_remote = str(foreign_id).startswith('http')
         
         if is_remote:
-            foreign_author, _ = Author.objects.get_or_create(
-                id=str(foreign_id),
-                defaults={
-                    'host': str(foreign_id).split('/api/authors/')[0] + '/api/',
-                    'displayName': 'Remote Author',
-                    'is_approved': True,
-                }
-            )
+            foreign_author, _ = get_or_create_remote_author(foreign_id)
         else:
-            try:
-                foreign_author = Author.objects.get(user_id=foreign_id)
-            except Author.DoesNotExist:
-                return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
+            foreign_author = get_author_by_id(foreign_id)
 
-        if author.is_following(foreign_author):
+        if current_author.is_following(foreign_author):
             return Response({'error': 'Already following'}, status=status.HTTP_400_BAD_REQUEST)
 
         existing_request = FollowRequest.objects.filter(
-            actor=author,
+            actor=current_author,
             object=foreign_author,
             status=FollowRequest.Status.PENDING
         ).first()
@@ -185,9 +210,9 @@ class FollowView(APIView):
             return Response({'error': 'Follow request already pending'}, status=status.HTTP_400_BAD_REQUEST)
 
         FollowRequest.objects.create(
-            actor=author,
+            actor=current_author,
             object=foreign_author,
-            summary=f'{author.displayName} wants to follow {foreign_author.displayName}',
+            summary=f'{current_author.displayName} wants to follow {foreign_author.displayName}',
             status=FollowRequest.Status.PENDING
         )
 
@@ -196,8 +221,8 @@ class FollowView(APIView):
             try:
                 follow_data = {
                     'type': 'follow',
-                    'summary': f'{author.displayName} wants to follow {foreign_author.displayName}',
-                    'actor': AuthorSerializer(author).data,
+                    'summary': f'{current_author.displayName} wants to follow {foreign_author.displayName}',
+                    'actor': AuthorSerializer(current_author).data,
                     'object': AuthorSerializer(foreign_author).data
                 }
                 requests.post(inbox_url, json=follow_data, timeout=10)
@@ -208,26 +233,15 @@ class FollowView(APIView):
 
     def delete(self, request, author_id, foreign_id):
         """Unfollow an author."""
-        try:
-            author = Author.objects.get(user=request.user)
-        except Author.DoesNotExist:
-            return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        if str(author.user_id) != str(author_id):
+        current_author = get_current_author(request)
+        
+        if str(current_author.user_id) != str(author_id):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
-        is_remote = str(foreign_id).startswith('http')
-        
-        try:
-            if is_remote:
-                foreign_author = Author.objects.get(id=str(foreign_id))
-            else:
-                foreign_author = Author.objects.get(user_id=foreign_id)
-        except Author.DoesNotExist:
-            return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
+        foreign_author = get_author_by_id(foreign_id)
 
-        Follow.objects.filter(follower=author, followee=foreign_author).delete()
-        FollowRequest.objects.filter(actor=author, object=foreign_author).delete()
+        Follow.objects.filter(follower=current_author, followee=foreign_author).delete()
+        FollowRequest.objects.filter(actor=current_author, object=foreign_author).delete()
 
         return Response({'status': 'unfollowed'}, status=status.HTTP_200_OK)
 
@@ -238,35 +252,21 @@ class AcceptFollowView(APIView):
     
     User story: As an author, I want to be able to approve or deny other authors following me, 
     so that I don't get followed by people I don't like.
-    
-    When you approve, a Follow relationship is created. When you reject, only the request
-    status is updated to rejected.
     """
     permission_classes = [IsAuthenticated]
 
     def put(self, request, author_id, foreign_id):
         """Accept a follow request."""
-        try:
-            author = Author.objects.get(user=request.user)
-        except Author.DoesNotExist:
-            return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        if str(author.user_id) != str(author_id):
+        current_author = get_current_author(request)
+        
+        if str(current_author.user_id) != str(author_id):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
-        is_remote = str(foreign_id).startswith('http')
-        
-        try:
-            if is_remote:
-                foreign_author = Author.objects.get(id=str(foreign_id))
-            else:
-                foreign_author = Author.objects.get(user_id=foreign_id)
-        except Author.DoesNotExist:
-            return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
+        foreign_author = get_author_by_id(foreign_id)
 
         follow_request = FollowRequest.objects.filter(
             actor=foreign_author,
-            object=author,
+            object=current_author,
             status=FollowRequest.Status.PENDING
         ).first()
 
@@ -276,34 +276,23 @@ class AcceptFollowView(APIView):
         follow_request.status = FollowRequest.Status.ACCEPTED
         follow_request.save()
 
-        Follow.objects.get_or_create(follower=foreign_author, followee=author)
+        Follow.objects.get_or_create(follower=foreign_author, followee=current_author)
 
         return Response({'status': 'follow request accepted'}, status=status.HTTP_200_OK)
 
     def delete(self, request, author_id, foreign_id):
         """Reject or remove a follower."""
-        try:
-            author = Author.objects.get(user=request.user)
-        except Author.DoesNotExist:
-            return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        if str(author.user_id) != str(author_id):
+        current_author = get_current_author(request)
+        
+        if str(current_author.user_id) != str(author_id):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
-        is_remote = str(foreign_id).startswith('http')
-        
-        try:
-            if is_remote:
-                foreign_author = Author.objects.get(id=str(foreign_id))
-            else:
-                foreign_author = Author.objects.get(user_id=foreign_id)
-        except Author.DoesNotExist:
-            return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
+        foreign_author = get_author_by_id(foreign_id)
 
-        Follow.objects.filter(follower=foreign_author, followee=author).delete()
+        Follow.objects.filter(follower=foreign_author, followee=current_author).delete()
         FollowRequest.objects.filter(
             actor=foreign_author, 
-            object=author
+            object=current_author
         ).update(status=FollowRequest.Status.REJECTED)
 
         return Response({'status': 'follower removed'}, status=status.HTTP_200_OK)
@@ -318,19 +307,16 @@ class FollowRequestListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, author_id):
-        try:
-            author = Author.objects.get(user=request.user)
-        except Author.DoesNotExist:
-            return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        if str(author.user_id) != str(author_id):
+        current_author = get_current_author(request)
+        
+        if str(current_author.user_id) != str(author_id):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
         page = int(request.query_params.get('page', 1))
         size = int(request.query_params.get('size', 50))
         
         all_requests = list(FollowRequest.objects.filter(
-            object=author,
+            object=current_author,
             status=FollowRequest.Status.PENDING
         ))
         total = len(all_requests)
@@ -399,7 +385,7 @@ class InboxView(APIView):
         return Response({'error': 'Unknown inbox item type'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-# UI Views
+# --- UI Views ---
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden
