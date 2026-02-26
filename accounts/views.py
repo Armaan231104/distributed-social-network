@@ -1,24 +1,20 @@
 import requests
 from urllib.parse import unquote
 from django.conf import settings
-from django.db import IntegrityError
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 
 from .models import Author, FollowRequest, Follow
 from .serializers import (
     AuthorSerializer, AuthorListSerializer, 
-    FollowRequestSerializer, FollowSerializer,
-    FollowersSerializer, FollowingSerializer,
-    InboxFollowSerializer
+    FollowRequestSerializer
 )
 
 
 def get_host_url():
-    """Returns the base URL for this node for constructing FQIDs."""
+    """Get this node's base URL for constructing FQIDs."""
     allowed_host = settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else 'localhost:8000'
     if 'localhost' in allowed_host:
         return f'http://{allowed_host}'
@@ -26,24 +22,18 @@ def get_host_url():
 
 
 def get_or_create_author(author_data):
-    """
-    Gets an existing author by ID or creates a new one from data.
-    Used when receiving remote authors via follow requests or federation.
-    Remote authors don't have local User accounts, so we allow user_id to be null.
-    """
+    """Create or retrieve an author from remote data (e.g., from another node)."""
     author_id = author_data.get('id')
     if not author_id:
         return None
     
-    # Check if author already exists
     existing = Author.objects.filter(id=author_id).first()
     if existing:
         return existing
     
-    # Create new remote author (without local User)
     return Author.objects.create(
         id=author_id,
-        user=None,  # Remote authors don't have local accounts
+        user=None,
         host=author_data.get('host', ''),
         displayName=author_data.get('displayName', 'Unknown'),
         github=author_data.get('github'),
@@ -54,12 +44,7 @@ def get_or_create_author(author_data):
 
 
 class AuthorListView(APIView):
-    """
-    GET /api/authors/ - List all authors on the node.
-    
-    Per spec: "As an author, I want to browse the public entries of everyone"
-    This enables discovering local authors to follow.
-    """
+    """List all authors on this node."""
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -72,11 +57,7 @@ class AuthorListView(APIView):
 
 
 class AuthorDetailView(APIView):
-    """
-    GET /api/authors/{id}/ - Get a single author's details.
-    
-    Returns full author object with profile information.
-    """
+    """Get details for a specific author."""
     permission_classes = [AllowAny]
 
     def get(self, request, author_id):
@@ -90,11 +71,7 @@ class AuthorDetailView(APIView):
 
 
 class FollowingListView(APIView):
-    """
-    GET /api/authors/{id}/following/ - List authors that this author follows.
-    
-    Per spec: "my node will know about my followers, who I am following, and my friends"
-    """
+    """Get list of authors this author is following."""
     permission_classes = [AllowAny]
 
     def get(self, request, author_id):
@@ -125,11 +102,7 @@ class FollowingListView(APIView):
 
 
 class FollowersListView(APIView):
-    """
-    GET /api/authors/{id}/followers/ - List authors that follow this author.
-    
-    Per spec: "my node will know about my followers, who I am following, and my friends"
-    """
+    """Get list of authors who follow this author."""
     permission_classes = [AllowAny]
 
     def get(self, request, author_id):
@@ -161,20 +134,19 @@ class FollowersListView(APIView):
 
 class FollowView(APIView):
     """
-    PUT /api/authors/{id}/following/{foreign_id}/ - Create a follow request.
-    DELETE /api/authors/{id}/following/{foreign_id}/ - Unfollow an author.
+    Handle following and unfollowing authors.
     
-    Per spec:
-    - "As an author, I want to follow local authors"
-    - "As an author, I want to follow remote authors" (Part 3-5)
-    - "As an author, I want to unfollow authors I am following"
+    User story: As an author, I want to follow local authors, so that I can see their entries.
+    User story: As an author, I want to follow remote authors, so that I can see their entries. (Part 3-5)
+    User story: As an author, I want to unfollow authors I am following, so that I don't have to see their entries anymore.
     
-    Note: Per spec, follow requests go to inbox first and require approval.
-    The Follow relationship is only created after the request is accepted.
+    Note: Per the spec, follow requests go to inbox first. The actual "following" relationship
+    is only created after the target author approves the request.
     """
     permission_classes = [IsAuthenticated]
 
     def put(self, request, author_id, foreign_id):
+        """Send a follow request to another author."""
         try:
             author = Author.objects.get(user=request.user)
         except Author.DoesNotExist:
@@ -183,7 +155,6 @@ class FollowView(APIView):
         if str(author.user_id) != str(author_id):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
-        # Check if foreign_id is remote (contains http) or local (integer)
         is_remote = str(foreign_id).startswith('http')
         
         if is_remote:
@@ -201,11 +172,9 @@ class FollowView(APIView):
             except Author.DoesNotExist:
                 return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Check if already following (has accepted follow request)
         if author.is_following(foreign_author):
             return Response({'error': 'Already following'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Check if there's already a pending request
         existing_request = FollowRequest.objects.filter(
             actor=author,
             object=foreign_author,
@@ -215,7 +184,6 @@ class FollowView(APIView):
         if existing_request:
             return Response({'error': 'Follow request already pending'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create follow request (per spec - requests go to inbox first)
         FollowRequest.objects.create(
             actor=author,
             object=foreign_author,
@@ -223,7 +191,6 @@ class FollowView(APIView):
             status=FollowRequest.Status.PENDING
         )
 
-        # For remote authors, notify their inbox
         if is_remote:
             inbox_url = f"{foreign_author.host.rstrip('/')}/api/authors/{foreign_id}/inbox/"
             try:
@@ -240,6 +207,7 @@ class FollowView(APIView):
         return Response({'status': 'follow request sent'}, status=status.HTTP_201_CREATED)
 
     def delete(self, request, author_id, foreign_id):
+        """Unfollow an author."""
         try:
             author = Author.objects.get(user=request.user)
         except Author.DoesNotExist:
@@ -258,9 +226,7 @@ class FollowView(APIView):
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Remove follow relationship if exists
         Follow.objects.filter(follower=author, followee=foreign_author).delete()
-        # Also remove any pending follow request
         FollowRequest.objects.filter(actor=author, object=foreign_author).delete()
 
         return Response({'status': 'unfollowed'}, status=status.HTTP_200_OK)
@@ -268,22 +234,23 @@ class FollowView(APIView):
 
 class AcceptFollowView(APIView):
     """
-    PUT /api/authors/{id}/followers/{foreign_id}/ - Accept a follow request.
-    DELETE /api/authors/{id}/followers/{foreign_id}/ - Reject/remove a follower.
+    Handle approving or rejecting follow requests.
     
-    Per spec:
-    - "As an author, I want to be able to approve or deny other authors following me"
-    - Follow requests must be approved before the follower is added.
+    User story: As an author, I want to be able to approve or deny other authors following me, 
+    so that I don't get followed by people I don't like.
+    
+    When you approve, a Follow relationship is created. When you reject, only the request
+    status is updated to rejected.
     """
     permission_classes = [IsAuthenticated]
 
     def put(self, request, author_id, foreign_id):
+        """Accept a follow request."""
         try:
             author = Author.objects.get(user=request.user)
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Check authorization - compare string versions
         if str(author.user_id) != str(author_id):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -297,7 +264,6 @@ class AcceptFollowView(APIView):
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Find pending follow request from this author
         follow_request = FollowRequest.objects.filter(
             actor=foreign_author,
             object=author,
@@ -307,7 +273,6 @@ class AcceptFollowView(APIView):
         if not follow_request:
             return Response({'error': 'No pending follow request'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Accept the follow request - create the Follow relationship
         follow_request.status = FollowRequest.Status.ACCEPTED
         follow_request.save()
 
@@ -316,6 +281,7 @@ class AcceptFollowView(APIView):
         return Response({'status': 'follow request accepted'}, status=status.HTTP_200_OK)
 
     def delete(self, request, author_id, foreign_id):
+        """Reject or remove a follower."""
         try:
             author = Author.objects.get(user=request.user)
         except Author.DoesNotExist:
@@ -334,9 +300,7 @@ class AcceptFollowView(APIView):
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Remove follower relationship
         Follow.objects.filter(follower=foreign_author, followee=author).delete()
-        # Reject any pending follow request
         FollowRequest.objects.filter(
             actor=foreign_author, 
             object=author
@@ -347,10 +311,9 @@ class AcceptFollowView(APIView):
 
 class FollowRequestListView(APIView):
     """
-    GET /api/authors/{id}/follow_requests/ - Get pending follow requests.
+    Get pending follow requests for an author.
     
-    Per spec: "As an author, I want to know if I have 'follow requests,' 
-    so I can approve them."
+    User story: As an author, I want to know if I have "follow requests," so I can approve them.
     """
     permission_classes = [IsAuthenticated]
 
@@ -388,11 +351,10 @@ class FollowRequestListView(APIView):
 
 class InboxView(APIView):
     """
-    POST /api/authors/{id}/inbox/ - Receive remote follow requests.
+    Receive follow requests from remote nodes.
     
-    Per spec, remote nodes send follow requests to this endpoint.
-    This is how remote authors initiate following - their node contacts
-    our inbox to create the follow request.
+    When a remote author wants to follow you, their node contacts this endpoint
+    to create a follow request in your inbox.
     """
     permission_classes = [AllowAny]
 
@@ -408,7 +370,6 @@ class InboxView(APIView):
             actor_data = data.get('actor', {})
             object_data = data.get('object', {})
             
-            # Check if this is for this author
             object_id = object_data.get('id', '')
             if str(author_id) not in object_id and author.id not in object_id:
                 return Response({'error': 'Not the intended recipient'}, status=status.HTTP_400_BAD_REQUEST)
@@ -438,26 +399,14 @@ class InboxView(APIView):
         return Response({'error': 'Unknown inbox item type'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-# UI Views below
+# UI Views
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
 from django.http import HttpResponseForbidden
 
 
-def get_host_url():
-    from django.conf import settings
-    allowed_host = settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else 'localhost:8000'
-    if 'localhost' in allowed_host:
-        return f'http://{allowed_host}'
-    return f'https://{allowed_host}'
-
-
 def authors_list(request):
-    """
-    Display a list of all authors on the local node.
-    Per spec: "As an author, I want to browse the public entries of everyone"
-    """
+    """Show all authors on the node."""
     authors = Author.objects.filter(is_approved=True)
     current_user_author = None
     if request.user.is_authenticated:
@@ -473,10 +422,7 @@ def authors_list(request):
 
 
 def author_profile(request, author_id):
-    """
-    Display an author's profile page with their public entries.
-    Per spec: "As an author, I want a public page with my profile information"
-    """
+    """Show an author's profile."""
     author = get_object_or_404(Author, id=author_id)
     
     current_user_author = None
@@ -505,10 +451,7 @@ def author_profile(request, author_id):
 
 @login_required
 def follow_author(request, author_id):
-    """
-    Follow an author (local or remote).
-    Per spec: "As an author, I want to follow local authors"
-    """
+    """Follow an author from the UI."""
     author_id = unquote(author_id)
     
     try:
@@ -568,10 +511,7 @@ def follow_author(request, author_id):
 
 @login_required
 def unfollow_author(request, author_id):
-    """
-    Unfollow an author.
-    Per spec: "As an author, I want to unfollow authors I am following"
-    """
+    """Unfollow an author from the UI."""
     author_id = unquote(author_id)
     
     try:
@@ -592,11 +532,7 @@ def unfollow_author(request, author_id):
 
 @login_required
 def follow_requests(request):
-    """
-    Display pending follow requests for the current user.
-    Per spec: "As an author, I want to know if I have 'follow requests,' 
-    so I can approve them."
-    """
+    """Show pending follow requests."""
     try:
         current_author = request.user.author
     except Author.DoesNotExist:
@@ -614,11 +550,7 @@ def follow_requests(request):
 
 @login_required
 def accept_follow_request(request, request_id):
-    """
-    Accept a follow request.
-    Per spec: "As an author, I want to be able to approve or deny other 
-    authors following me"
-    """
+    """Accept a follow request."""
     follow_request = get_object_or_404(FollowRequest, id=request_id)
     
     try:
@@ -642,11 +574,7 @@ def accept_follow_request(request, request_id):
 
 @login_required
 def reject_follow_request(request, request_id):
-    """
-    Reject a follow request.
-    Per spec: "As an author, I want to be able to approve or deny other 
-    authors following me"
-    """
+    """Reject a follow request."""
     follow_request = get_object_or_404(FollowRequest, id=request_id)
     
     try:
@@ -665,9 +593,7 @@ def reject_follow_request(request, request_id):
 
 @login_required
 def my_profile(request):
-    """
-    Redirect to current user's profile.
-    """
+    """Go to current user's profile."""
     try:
         current_author = request.user.author
         return redirect('author-profile', author_id=current_author.id)

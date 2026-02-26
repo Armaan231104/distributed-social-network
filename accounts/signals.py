@@ -8,11 +8,8 @@ from .models import Author
 @receiver(post_save, sender=User)
 def create_author(sender, instance, created, **kwargs):
     """
-    Automatically create an Author instance when a new User is created.
-    
-    This ensures every user has an associated author profile with a unique
-    FQID (Fully Qualified ID) for the distributed social network.
-    For local authors, we use a simple serial format that can be used in URLs.
+    When a new User is created, automatically create an Author profile.
+    This links Django's auth system with our distributed social network.
     """
     if created:
         host_url = settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else 'localhost:8000'
@@ -21,8 +18,6 @@ def create_author(sender, instance, created, **kwargs):
         else:
             host_url = f'https://{host_url}/api/'
         
-        # For local authors, use simple serial format (e.g., /api/authors/1/)
-        # The serializer will add the host prefix when returning via API
         author_id = f'{host_url}authors/{instance.id}/'
         
         Author.objects.create(

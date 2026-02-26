@@ -1,20 +1,12 @@
-import uuid
 from django.db import models
 from django.contrib.auth.models import User
 
 
-def generate_author_id():
-    return str(uuid.uuid4())
-
-
 class Author(models.Model):
     """
-    Author model represents a user in the distributed social network.
-    
-    The id field uses a fully qualified URL (FQID) to uniquely identify
-    authors across different nodes in the federation. This prevents
-    ID collisions when different nodes have authors with the same local ID.
-    Per spec: "all API objects are identified using fully qualified URLs (FQIDs)"
+    Represents a user in the distributed social network.
+    Each author has a unique FQID (Fully Qualified ID) like http://127.0.0.1/api/authors/1/
+    Remote authors from other nodes also have FQIDs pointing to their servers.
     """
     id = models.URLField(max_length=255, unique=True, primary_key=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='author', null=True, blank=True)
@@ -60,12 +52,8 @@ class Author(models.Model):
 class FollowRequest(models.Model):
     """
     Tracks follow requests between authors.
-    
-    Separating FollowRequest from Follow allows the system to support
-    approval workflows - authors can approve or deny follow requests
-    rather than having all follows be automatic.
-    Per spec: "As an author, I want to be able to approve or deny other 
-    authors following me"
+    Status can be: pending, accepted, rejected.
+    When an author wants to follow you, you get a request you can approve or deny.
     """
     class Status(models.TextChoices):
         PENDING = 'pending', 'Pending'
@@ -101,13 +89,8 @@ class FollowRequest(models.Model):
 
 class Follow(models.Model):
     """
-    Represents an accepted follow relationship between two authors.
-    
-    Using a separate model for accepted follows (vs pending requests)
-    enables efficient queries for followers/following lists and
-    simplifies the "friends" detection (mutual follows).
-    Per spec: "my node will know about my followers, who I am following, 
-    and my friends"
+    An accepted follow relationship between two authors.
+    When someone follows you and you approve, this is created.
     """
     follower = models.ForeignKey(
         Author, 
