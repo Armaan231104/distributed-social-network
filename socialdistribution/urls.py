@@ -25,6 +25,7 @@ urlpatterns = [
     path("api/", include("accounts.api_urls")),
     path("", include("accounts.ui_urls")),
     path("", include("core.urls")),
+    path("posts/", include("posts.urls"))
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
