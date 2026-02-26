@@ -1,9 +1,13 @@
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.http import JsonResponse, HttpResponseForbidden
 from django.contrib.auth.decorators import login_required
 from .models import Entry
 import json
 
+@login_required
+def stream(request):
+    posts = Entry.objects.filter(author=request.user)
+    return render(request, 'posts/stream.html', {'posts': posts})
 
 @login_required
 def create_entry(request):
