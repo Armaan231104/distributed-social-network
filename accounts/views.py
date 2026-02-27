@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from .models import Author, FollowRequest, Follow
+from posts.models import Entry
 from .serializers import (
     AuthorSerializer, AuthorListSerializer, 
     FollowRequestSerializer
@@ -405,16 +406,14 @@ def authors_list(request):
         'authors': authors,
         'current_user_author': current_user_author,
     })
-
-
 def author_profile(request, author_id):
-    """Show an author's profile."""
+    """Show an author's profile along with their posts."""
     author = get_object_or_404(Author, id=author_id)
-    
+
     current_user_author = None
     is_following = False
     has_pending_request = False
-    
+
     if request.user.is_authenticated:
         try:
             current_user_author = request.user.author
@@ -426,14 +425,19 @@ def author_profile(request, author_id):
             ).exists()
         except Author.DoesNotExist:
             pass
-    
+
+    # For local authors, get their posts
+    posts = []
+    if author.user:  # only if this author has a local User
+        posts = Entry.objects.filter(author=author.user).exclude(visibility="DELETED")
+
     return render(request, 'accounts/profile.html', {
         'profile_author': author,
         'current_user_author': current_user_author,
         'is_following': is_following,
         'has_pending_request': has_pending_request,
+        'posts': posts,
     })
-
 
 @login_required
 def follow_author(request, author_id):
