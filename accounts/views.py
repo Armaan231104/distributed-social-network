@@ -429,8 +429,17 @@ def author_profile(request, author_id):
     # For local authors, get their posts
     posts = []
     if author.user:  # only if this author has a local User
-        posts = Entry.objects.filter(author=author.user).exclude(visibility="DELETED")
-
+        if current_user_author == author:
+            # Viewing your own profile → show all except deleted
+            posts = Entry.objects.filter(
+                author=author.user
+            ).exclude(visibility="DELETED")
+        else:
+            # Viewing someone else's profile → only public
+            posts = Entry.objects.filter(
+                author=author.user,
+                visibility="PUBLIC"
+            )
     return render(request, 'accounts/profile.html', {
         'profile_author': author,
         'current_user_author': current_user_author,

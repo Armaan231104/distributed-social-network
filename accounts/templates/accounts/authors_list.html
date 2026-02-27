@@ -12,8 +12,8 @@
             {% for author in authors %}
                 <div class="author-card">
                     {% if author.profileImage %}
-                        <img src="{{ author.profileImage }}" alt="{{ author.displayName }}" class="author-avatar">
-                    {% else %}
+                        <img src="{{ author.profileImage.url }}" alt="{{ author.displayName }}" class="profile-avatar">
+        {% else %}
                         <div class="author-avatar-placeholder">{{ author.displayName|make_list|first }}</div>
                     {% endif %}
                     
