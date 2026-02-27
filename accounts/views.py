@@ -585,3 +585,27 @@ def my_profile(request):
         return redirect('author-profile', author_id=current_author.id)
     except Author.DoesNotExist:
         return redirect('authors-list')
+
+from .forms import AuthorUpdateForm
+
+@login_required
+def edit_profile(request):
+    try:
+        author = request.user.author
+    except Author.DoesNotExist:
+        return redirect('authors-list')  # fallback if user has no author
+
+    # Optional: prevent editing remote authors
+    if not author.is_local:
+        return redirect('author-profile', author_id=author.id)
+
+    if request.method == "POST":
+        # Pass request.FILES to handle uploaded images
+        form = AuthorUpdateForm(request.POST, request.FILES, instance=author)
+        if form.is_valid():
+            form.save()
+            return redirect('author-profile', author_id=author.id)
+    else:
+        form = AuthorUpdateForm(instance=author)
+
+    return render(request, "accounts/edit_profile.html", {"form": form})

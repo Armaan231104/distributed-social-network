@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
-
+import os
 
 class Author(models.Model):
     """
@@ -13,8 +13,9 @@ class Author(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='author', null=True, blank=True)
     host = models.URLField(max_length=255)
     displayName = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
     github = models.URLField(max_length=255, blank=True, null=True)
-    profileImage = models.URLField(max_length=255, blank=True, null=True)
+
     web = models.URLField(max_length=255, blank=True, null=True)
     is_approved = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -23,6 +24,13 @@ class Author(models.Model):
     class Meta:
         ordering = ['-created_at']
 
+    def profile_static_path(instance, filename):
+        return os.path.join('static/profile_images/', filename)
+
+    profileImage = models.ImageField(upload_to=profile_static_path,
+        blank=True,
+        null=True,)
+    
     def __str__(self):
         return self.displayName
 

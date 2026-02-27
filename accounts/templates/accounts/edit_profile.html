@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Profile{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="edit-header">
+        <h1>Edit Your Profile</h1>
+        <p>Update your information below and click Save.</p>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" class="edit-form">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label for="id_displayName">Name</label>
+            {{ form.displayName }}
+        </div>
+
+        <div class="form-group">
+            <label for="id_description">Description</label>
+            {{ form.description }}
+        </div>
+
+        <div class="form-group">
+            <label for="id_github">GitHub URL</label>
+            {{ form.github }}
+        </div>
+
+        <div class="form-group">
+            <label for="id_profileImage">Profile Picture</label>
+            {% if request.user.author.profileImage %}
+                <img src="{{ request.user.author.profileImage.url }}" alt="Current Profile" class="profile-preview">
+            {% endif %}
+            {{ form.profileImage }}
+        </div>
+
+        <div class="form-group">
+            <label for="id_web">Website</label>
+            {{ form.web }}
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="{% url 'author-profile' request.user.author.id %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<style>
+.container {
+    max-width: 700px;
+    margin: 40px auto;
+    padding: 30px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+}
+
+.edit-header h1 {
+    margin-bottom: 5px;
+    font-size: 28px;
+    color: #333;
+}
+
+.edit-header p {
+    margin-bottom: 20px;
+    color: #666;
+}
+
+.edit-form .form-group {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.edit-form label {
+    font-weight: 500;
+    margin-bottom: 6px;
+    color: #444;
+}
+
+.edit-form input,
+.edit-form textarea {
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 16px;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.edit-form textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.edit-form input:focus,
+.edit-form textarea:focus {
+    border-color: #4a90d9;
+    box-shadow: 0 0 0 2px rgba(74,144,217,0.2);
+}
+
+.profile-preview {
+    max-width: 150px;
+    max-height: 150px;
+    margin-bottom: 10px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #4a90d9;
+}
+
+.form-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.btn {
+    padding: 10px 20px;
+    font-weight: 500;
+    border-radius: 6px;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    text-align: center;
+    transition: background 0.2s;
+}
+
+.btn-primary {
+    background: #4a90d9;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #357abd;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+@media (max-width: 600px) {
+    .form-actions {
+        flex-direction: column;
+    }
+}
+</style>
+{% endblock %}

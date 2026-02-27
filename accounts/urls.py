@@ -23,6 +23,7 @@ uiurlpatterns = [
     path('follow-requests/<int:request_id>/accept/', views.accept_follow_request, name='accept-follow-request'),
     path('follow-requests/<int:request_id>/reject/', views.reject_follow_request, name='reject-follow-request'),
     path('me/', views.my_profile, name='my-profile'),
+    path('me/edit/', views.edit_profile, name='edit-profile'),
 ]
 
 urlpatterns = apiurlpatterns + uiurlpatterns

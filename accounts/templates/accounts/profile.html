@@ -6,7 +6,7 @@
 <div class="container">
     <div class="profile-header">
         {% if profile_author.profileImage %}
-            <img src="{{ profile_author.profileImage }}" alt="{{ profile_author.displayName }}" class="profile-avatar">
+            <img src="{{ profile_author.profileImage.url }}" alt="{{ profile_author.displayName }}" class="profile-avatar">
         {% else %}
             <div class="profile-avatar-placeholder">{{ profile_author.displayName|make_list|first }}</div>
         {% endif %}
@@ -29,8 +29,13 @@
             </div>
         </div>
         
-        <div class="profile-actions">
-            {% if current_user_author and current_user_author != profile_author %}
+    <div class="profile-actions">
+        {% if current_user_author %}
+            {% if current_user_author == profile_author %}
+                <!-- Show edit button for self -->
+                <a href="{% url 'edit-profile' %}" class="btn btn-primary">Edit Profile</a>
+            {% else %}
+                <!-- Show follow/unfollow for others -->
                 {% if is_following %}
                     <a href="{% url 'unfollow-author' author_id=profile_author.id %}" class="btn btn-secondary">Unfollow</a>
                 {% elif has_pending_request %}
@@ -39,7 +44,8 @@
                     <a href="{% url 'follow-author' author_id=profile_author.id %}" class="btn btn-primary">Follow</a>
                 {% endif %}
             {% endif %}
-        </div>
+        {% endif %}
+    </div>
     </div>
     
     <div class="profile-content">
