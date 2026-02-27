@@ -434,6 +434,11 @@ def author_profile(request, author_id):
             posts = Entry.objects.filter(
                 author=author.user
             ).exclude(visibility="DELETED")
+        elif is_following: # added additional elif statement so that followers of an author can view public AND unlisted posts
+            posts = Entry.objects.filter(
+                author=author.user,
+                visibility__in=["PUBLIC", "UNLISTED"]
+            )
         else:
             # Viewing someone else's profile → only public
             posts = Entry.objects.filter(

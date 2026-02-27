@@ -6,7 +6,7 @@ import json
 
 @login_required
 def stream(request):
-    posts = Entry.objects.filter(author=request.user)
+    posts = Entry.objects.filter(author=request.user).exclude(visibility="DELETED")
     return render(request, 'posts/stream.html', {'posts': posts})
 
 @login_required
