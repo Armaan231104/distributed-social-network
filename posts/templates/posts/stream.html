@@ -1,21 +1,22 @@
 {% extends "base.html" %}
 {% load markdown_extras %}
-                                        
+
 {% block title %}My Stream{% endblock %}
-                   
+
 {% block content %}
 <h1>My Stream</h1>
-              
-{% if posts %}             
-    {% for post in posts %}      
+
+{% if posts %}
+    {% for post in posts %}
     <article class="stream-post">
-        <h2>{{ post.title }}</h2>                                           
+        <h2>{{ post.title }}</h2>
         <p class="stream-post-meta">{{ post.published_at|date:"N j, Y, g:i a" }}</p>
+
         {% if post.content_type == "image" and post.image %}
             <figure class="stream-post-media">
                 <img src="{{ post.image.url }}" alt="{{ post.title }}">
                 {% if post.content %}
-                <figcaption>{{ post.content }}</figcaption>
+                    <figcaption>{{ post.content }}</figcaption>
                 {% endif %}
             </figure>
 

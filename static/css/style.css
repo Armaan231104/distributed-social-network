@@ -168,3 +168,53 @@ body::before {
         width: 180px;
     }
 }
+
+/* New post form */
+
+.new-post-btn {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal-content {
+  background: white;
+  max-width: 520px;
+  width: 90%;
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.modal-content input,
+.modal-content select,
+.modal-content textarea {
+  width: 100%;
+  margin: 10px 0;
+  padding: 10px;
+}
+
+.modal-content textarea {
+  min-height: 120px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
