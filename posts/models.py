@@ -11,12 +11,26 @@ class Entry(models.Model):
         ("DELETED", "Deleted"),
     ]
 
+    CONTENT_TYPES = [
+        ("text/plaintext", "Plain Text"),
+        ("text/commommark", "CommonMark"),
+        ("image", "Image"),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
     title = models.CharField(max_length=200)
     content = models.TextField(blank=True)
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default="PUBLIC")
     published_at = models.DateTimeField(auto_now_add=True)
+    
+    content_type = models.CharField(
+        max_length = 20,
+        choices=CONTENT_TYPES,
+        default = "text/plaintext"
+    )
+    
+    image = models.ImageField(upload_to="entries/", blank=True, null=True)
 
     class Meta:
         ordering = ['-published_at']
