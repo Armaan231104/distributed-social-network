@@ -1,128 +1,93 @@
 {% extends 'base.html' %}
-
-{% block title %}Explore Authors - SocialDistribution{% endblock %}
+{% load static %}
+{% block title %}Explore Authors{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h1>Explore Authors</h1>
-    <p class="subtitle">Discover authors on this node and see their public posts.</p>
-    
+
+<div class="authors-wrapper">
+
     {% if authors %}
-        <div class="authors-grid">
-            {% for author in authors %}
-                <div class="author-card">
-                    {% if author.profileImage %}
-                        <img src="{{ author.profileImage.url }}" alt="{{ author.displayName }}" class="profile-avatar">
-        {% else %}
-                        <div class="author-avatar-placeholder">{{ author.displayName|make_list|first }}</div>
-                    {% endif %}
-                    
-                    <h3>{{ author.displayName }}</h3>
-                    
-                    {% if author.github %}
-                        <p class="author-github">GitHub: <a href="{{ author.github }}">{{ author.github|slice:"19:" }}</a></p>
-                    {% endif %}
-                    
-                    <a href="{% url 'author-profile' author_id=author.id %}" class="btn btn-primary">View Profile</a>
+        {% for author in authors %}
+            <div class="profile-hero author-card">
+
+                <!-- LEFT SIDE (60%) -->
+                <div class="profile-main">
+
+                    <div class="profile-avatar-wrapper">
+                        {% if author.profileImage %}
+                            <img src="{{ author.profileImage.url }}"
+                                 alt="{{ author.displayName }}"
+                                 class="profile-avatar">
+                        {% else %}
+                            <div class="profile-avatar-placeholder">
+                                {{ author.displayName|make_list|first }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="profile-info">
+                        <h2 class="author-name">{{ author.displayName }}</h2>
+
+                        {% if author.github %}
+                        <div class="profile-github">
+                            <i class="fab fa-github"></i>
+                            <a href="{{ author.github }}" target="_blank">
+                                {{ author.github|slice:"19:" }}
+                            </a>
+                        </div>
+                        {% endif %}
+
+                        <div class="profile-actions">
+                            <a href="{% url 'author-profile' author_id=author.id %}"
+                               class="btn btn-primary">
+                               View Profile
+                            </a>
+                        </div>
+                    </div>
+
                 </div>
-            {% endfor %}
-        </div>
+
+                <!-- RIGHT SIDE (40%) -->
+                <div class="profile-description-side">
+                    <h3>About</h3>
+                    {% if author.description %}
+                        <p>{{ author.description|truncatewords:40 }}</p>
+                    {% else %}
+                        <p class="empty-desc">No description provided.</p>
+                    {% endif %}
+                </div>
+
+            </div>
+            <br><br>
+        {% endfor %}
     {% else %}
-        <p class="empty-state">No authors found. Be the first to join!</p>
+        <div class="empty-state">
+            No authors found.
+        </div>
     {% endif %}
+
 </div>
 
 <style>
-.container {
-    max-width: 1200px;
+/* Only layout-specific overrides, everything else is in profile.css */
+
+/* Wrapper spacing */
+.authors-wrapper {
+    max-width: 1100px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 0 20px;
 }
 
-h1 {
-    margin-bottom: 10px;
-}
-
-.subtitle {
-    color: #666;
-    margin-bottom: 30px;
-}
-
-.authors-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 20px;
-}
-
-.author-card {
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 20px;
-    text-align: center;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.author-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-.author-avatar {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 15px;
-}
-
-.author-avatar-placeholder {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: #4a90d9;
-    color: white;
-    font-size: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 15px;
-}
-
-.author-card h3 {
-    margin: 0 0 10px;
-    font-size: 1.2rem;
-}
-
-.author-github {
-    font-size: 0.85rem;
-    color: #666;
-    margin-bottom: 15px;
-}
-
-.btn {
-    display: inline-block;
-    padding: 10px 20px;
-    border-radius: 4px;
-    text-decoration: none;
-    font-weight: 500;
-    cursor: pointer;
-    border: none;
-}
-
-.btn-primary {
-    background: #4a90d9;
-    color: white;
-}
-
-.btn-primary:hover {
-    background: #357abd;
-}
-
+/* Empty state styling */
 .empty-state {
     text-align: center;
+    font-size: 16px;
     color: #666;
-    padding: 40px;
+    padding: 60px 20px;
+    border-radius: 14px;
 }
 </style>
+
+<link rel="stylesheet" href="{% static 'css/accounts/profile.css' %}">
+
 {% endblock %}
