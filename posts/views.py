@@ -41,9 +41,9 @@ def create_entry(request):
 
     title = data.get("title", "")
     content = data.get("content", "")
-    content_type = data.get("contentType", "text/plain")
+    content_type = data.get("contentType", "text/plaintext")
 
-    if content_type not in ["text/plain", "text/markdown"]:
+    if content_type not in ["text/plaintext", "text/markdown"]:
         return JsonResponse({"error": "Invalid contentType for JSON post"}, status=400)
 
     entry = Entry.objects.create(
@@ -76,7 +76,7 @@ def my_entries(request):
             "id": str(e.id),
             "title": e.title,
             "content": e.content,
-            "contentType": getattr(e, "content_type", "text/plain"),
+            "contentType": getattr(e, "content_type", "text/plaintext"),
             "image": image_url,
             "visibility": e.visibility,
             "published": e.published_at.isoformat(),
@@ -104,8 +104,8 @@ def edit_entry(request, entry_id):
         entry.title = request.POST.get("title", entry.title)
         entry.content = request.POST.get("content", entry.content)
 
-        ct = request.POST.get("contentType", getattr(entry, "content_type", "text/plain"))
-        if ct not in ["text/plain", "text/markdown", "image"]:
+        ct = request.POST.get("contentType", getattr(entry, "content_type", "text/plaintext"))
+        if ct not in ["text/plaintext", "text/markdown", "image"]:
             return JsonResponse({"error": "Invalid contentType"}, status=400)
         entry.content_type = ct
 
@@ -130,7 +130,7 @@ def edit_entry(request, entry_id):
 
     if "contentType" in data:
         ct = data["contentType"]
-        if ct not in ["text/plain", "text/markdown", "image"]:
+        if ct not in ["text/plaintext", "text/markdown", "image"]:
             return JsonResponse({"error": "Invalid contentType"}, status=400)
         entry.content_type = ct
 

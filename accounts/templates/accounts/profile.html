@@ -3,6 +3,10 @@
 
 {% block title %}{{ profile_author.displayName }} - SocialDistribution{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/accounts/profile.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="profile-container">
 
@@ -14,8 +18,8 @@
 
             <div class="profile-avatar-wrapper">
                 {% if profile_author.profileImage %}
-                    <img src="{{ profile_author.profileImage.url }}" 
-                         alt="{{ profile_author.displayName }}" 
+                    <img src="{{ profile_author.profileImage.url }}"
+                         alt="{{ profile_author.displayName }}"
                          class="profile-avatar">
                 {% else %}
                     <div class="profile-avatar-placeholder">
@@ -30,7 +34,7 @@
                 {% if profile_author.github %}
                 <p class="profile-github">
                     <i class="fa-brands fa-github"></i>
-                    <a href="{{ profile_author.github }}" target="_blank">
+                    <a href="{{ profile_author.github }}" target="_blank" rel="noopener">
                         {{ profile_author.github|slice:"19:" }}
                     </a>
                 </p>
@@ -53,9 +57,15 @@
                             <a href="{% url 'edit-profile' %}" class="btn btn-primary">
                                 Edit Profile
                             </a>
+
+                            <!-- ✅ NEW: Create Post button only on your own profile -->
+                            <button id="open-create-post" class="btn btn-secondary" type="button">
+                                + Create Post
+                            </button>
+
                         {% else %}
                             {% if is_following %}
-                                <a href="{% url 'unfollow-author' author_id=profile_author.id %}" 
+                                <a href="{% url 'unfollow-author' author_id=profile_author.id %}"
                                    class="btn btn-secondary">
                                     Unfollow
                                 </a>
@@ -64,7 +74,7 @@
                                     Request Pending
                                 </span>
                             {% else %}
-                                <a href="{% url 'follow-author' author_id=profile_author.id %}" 
+                                <a href="{% url 'follow-author' author_id=profile_author.id %}"
                                    class="btn btn-primary">
                                     Follow
                                 </a>
@@ -96,7 +106,16 @@
             {% for post in posts %}
             <div class="post-card">
                 <h3>{{ post.title }}</h3>
-                <p>{{ post.content|truncatewords:50 }}</p>
+
+                {% if post.content_type == "image" and post.image %}
+                    <img src="{{ post.image.url }}" alt="{{ post.title }}" style="max-width:100%; border-radius:12px;">
+                    {% if post.content %}
+                        <p>{{ post.content|truncatewords:30 }}</p>
+                    {% endif %}
+                {% else %}
+                    <p>{{ post.content|truncatewords:50 }}</p>
+                {% endif %}
+
                 <span class="post-date">
                     Published on {{ post.published_at|date:"M d, Y H:i" }}
                 </span>
@@ -110,5 +129,39 @@
 
 </div>
 
-<link rel="stylesheet" href="{% static 'css/accounts/profile.css' %}">
+<!-- ✅ NEW: Modal only on your own profile -->
+{% if current_user_author and current_user_author == profile_author %}
+<div id="new-post-modal" class="modal hidden">
+    <div class="modal-content">
+        <h2>New Post</h2>
+
+        <form id="new-post-form" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <input type="text" name="title" placeholder="Title" required>
+
+            <select name="contentType" id="content-type-select">
+                <option value="text/plain">Plain Text</option>
+                <option value="text/markdown">Markdown</option>
+                <option value="image">Image</option>
+            </select>
+
+            <textarea name="content" placeholder="Write your post..."></textarea>
+
+            <input type="file" name="image" id="image-input" style="display:none;">
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Post</button>
+                <button type="button" id="close-create-post" class="btn btn-secondary">Discard</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if current_user_author and current_user_author == profile_author %}
+<script src="{% static 'js/posts.js' %}"></script>
+{% endif %}
 {% endblock %}
