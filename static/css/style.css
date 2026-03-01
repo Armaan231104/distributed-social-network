@@ -218,3 +218,46 @@ body::before {
   gap: 10px;
   justify-content: flex-end;
 }
+
+/* Logout button in sidebar styled like links */
+.sidebar-links form {
+    width: 100%;
+}
+.sidebar-links .logout-button {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    height: 48px;
+    padding-left: 10px;
+    color: #222;
+    border-radius: 10px;
+    transition: background 0.25s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    width: 100%;
+    text-align: left;
+    position: relative;
+}
+.sidebar-links .logout-button:hover {
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(10px);
+    transform: translateX(4px);
+    box-shadow: 0 8px 20px rgba(74,144,217,0.1);
+}
+.sidebar-links .logout-button i {
+    font-size: 24px;
+    width: 24px;
+    min-width: 24px;
+    text-align: center;
+}
+.sidebar-links .logout-button span {
+    position: absolute;
+    left: 50px;
+    opacity: 0;
+    transform: translateX(-10px);
+    white-space: nowrap;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.sidebar:hover .sidebar-links .logout-button span {
+    opacity: 1;
+    transform: translateX(0);
+}

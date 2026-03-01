@@ -264,6 +264,7 @@
     background: linear-gradient(45deg, #ff1a62, #f41717, #ffa023);
     opacity: 0;
     transition: opacity 0.4s ease;
+    pointer-events: none;
 }
 
 .post-card:hover::before {
@@ -277,7 +278,8 @@
 
 .post-card h3,
 .post-card p,
-.post-card .post-date {
+.post-card .post-date 
+.post-card button {
     position: relative;
     z-index: 1;
 }

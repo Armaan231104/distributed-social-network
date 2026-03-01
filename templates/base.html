@@ -42,10 +42,13 @@
                     <span>Requests</span>
                 </a>
 
-                <a href="{% url 'logout' %}">
-                    <i class="fa-regular fa-right-from-bracket"></i>
-                    <span>Logout</span>
-                </a>
+                <form action="{% url 'logout' %}" method="post" style="display:inline">
+                    {% csrf_token %}
+                    <button type="submit" class="logout-button">
+                        <i class="fa-regular fa-right-from-bracket"></i>
+                        <span>Logout</span>
+                    </button>
+                </form>
             {% else %}
                 <a href="{% url 'login' %}">
                     <i class="fa-regular fa-user"></i>

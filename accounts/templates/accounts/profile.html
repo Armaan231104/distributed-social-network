@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load interaction_tags %}
 
 {% block title %}{{ profile_author.displayName }} - SocialDistribution{% endblock %}
 
@@ -103,6 +104,7 @@
 
         {% if posts %}
         <div class="posts-grid">
+            <script src="{% static 'js/interactions.js' %}"></script>
             {% for post in posts %}
             <div class="post-card">
                 <h3>{{ post.title }}</h3>
@@ -115,10 +117,14 @@
                 {% else %}
                     <p>{{ post.content|truncatewords:50 }}</p>
                 {% endif %}
-
                 <span class="post-date">
                     Published on {{ post.published_at|date:"M d, Y H:i" }}
                 </span>
+                {% user_has_liked post request.user as liked %}
+                <button id="like-btn-{{ post.id }}" onclick="toggleLike('{{ post.id }}')">
+                    {% if liked %}Unlike{% else %}Like{% endif %}
+                    (<span id="like-count-{{ post.id }}">{{ post.likes.count }}</span>)
+                </button>
             </div>
             {% endfor %}
         </div>
