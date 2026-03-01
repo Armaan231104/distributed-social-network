@@ -105,7 +105,7 @@
         <div class="posts-grid">
             {% for post in posts %}
             <div class="post-card">
-                <h3>{{ post.title }}</h3>
+                <h3><a href="{% url 'entry_detail' post.id %}">{{ post.title }}</a></h3>
 
                 {% if post.content_type == "image" and post.image %}
                     <img src="{{ post.image.url }}" alt="{{ post.title }}" style="max-width:100%; border-radius:12px;">

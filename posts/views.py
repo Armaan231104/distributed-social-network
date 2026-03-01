@@ -1,13 +1,55 @@
-from django.shortcuts import get_object_or_404, render
-from django.http import JsonResponse, HttpResponseForbidden
+from django.shortcuts import get_object_or_404, render, redirect
+from django.http import JsonResponse, HttpResponseForbidden, HttpResponseNotFound
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from .models import Entry
 import json
 
+# -------------------------
+# Author sees their own entries until deleted
+# -------------------------
 @login_required
 def stream(request):
-    posts = Entry.objects.filter(author=request.user)
-    return render(request, 'posts/stream.html', {'posts': posts})
+    if request.user.is_staff:
+        posts = Entry.objects.filter(author=request.user)
+    else:
+        posts = Entry.objects.filter(author=request.user).exclude(visibility="DELETED")
+
+    return render(request, "posts/stream.html", {"posts": posts})
+
+# -------------------------
+# Entry detail page
+# -------------------------
+def entry_detail(request, entry_id):
+    entry = get_object_or_404(Entry, id=entry_id)
+
+    # Deleted entries: only admin can view
+    if entry.visibility == "DELETED":
+        if not request.user.is_authenticated or not request.user.is_staff:
+            return HttpResponseNotFound("Entry not found.")
+
+    # Friends only: only the author
+    if entry.visibility == "FRIENDS":
+        if not request.user.is_authenticated or request.user != entry.author:
+            return HttpResponseForbidden("Forbidden.")
+
+    # Public (Accessible by link)
+    return render(request, "posts/detail.html", {"entry": entry})
+
+# -------------------------
+# Author can delete their own entries
+# -------------------------
+@login_required
+@require_POST
+def delete_entry_ui(request, entry_id):
+    entry = get_object_or_404(Entry, id=entry_id)
+
+    # Other authors cannot modify/delete my entries
+    if entry.author != request.user:
+        return HttpResponseForbidden("You cannot delete this entry.")
+
+    entry.soft_delete()
+    return redirect("stream")
 
 @login_required
 def create_entry(request):
@@ -41,24 +83,46 @@ def create_entry(request):
 
     title = data.get("title", "")
     content = data.get("content", "")
-    content_type = data.get("contentType", "text/plaintext")
+    content_type = data.get("contentType", "text/plain")
 
-    if content_type not in ["text/plaintext", "text/markdown"]:
+    if content_type not in dict(Entry.CONTENT_TYPES).keys():
         return JsonResponse({"error": "Invalid contentType for JSON post"}, status=400)
+
+    visibility = data.get("visibility", "PUBLIC")
 
     entry = Entry.objects.create(
         author=request.user,
         title=title,
         content=content,
-        content_type=content_type
+        content_type=content_type,
+        visibility=visibility
     )
     return JsonResponse({"id": str(entry.id)}, status=201)
 
-    
+def get_entry(request, entry_id):
+    entry = get_object_or_404(Entry, id=entry_id)
 
+    if entry.visibility == "DELETED":
+        if not request.user.is_authenticated or not request.user.is_staff:
+            return JsonResponse({"error": "Not found"}, status=404)
 
-  
+    if entry.visibility in ["PUBLIC", "UNLISTED"]:
+        pass    
 
+    elif entry.visibility == "FRIENDS":
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Forbidden"}, status=403)
+        if request.user != entry.author:
+            return JsonResponse({"error": "Forbidden"}, status=403)
+
+    return JsonResponse({
+        "id": str(entry.id),
+        "title": entry.title,
+        "content": entry.content,
+        "contentType": entry.content_type,
+        "visibility": entry.visibility,
+        "published": entry.published_at.isoformat(),
+    })  
 
 @login_required
 def my_entries(request):
@@ -76,7 +140,7 @@ def my_entries(request):
             "id": str(e.id),
             "title": e.title,
             "content": e.content,
-            "contentType": getattr(e, "content_type", "text/plaintext"),
+            "contentType": getattr(e, "content_type", "text/plain"),
             "image": image_url,
             "visibility": e.visibility,
             "published": e.published_at.isoformat(),
@@ -104,8 +168,8 @@ def edit_entry(request, entry_id):
         entry.title = request.POST.get("title", entry.title)
         entry.content = request.POST.get("content", entry.content)
 
-        ct = request.POST.get("contentType", getattr(entry, "content_type", "text/plaintext"))
-        if ct not in ["text/plaintext", "text/markdown", "image"]:
+        ct = request.POST.get("contentType", getattr(entry, "content_type", "text/plain"))
+        if ct not in dict(Entry.CONTENT_TYPES).keys():
             return JsonResponse({"error": "Invalid contentType"}, status=400)
         entry.content_type = ct
 
@@ -130,7 +194,7 @@ def edit_entry(request, entry_id):
 
     if "contentType" in data:
         ct = data["contentType"]
-        if ct not in ["text/plaintext", "text/markdown", "image"]:
+        if ct not in dict(Entry.CONTENT_TYPES).keys():
             return JsonResponse({"error": "Invalid contentType"}, status=400)
         entry.content_type = ct
 
@@ -141,10 +205,11 @@ def edit_entry(request, entry_id):
 def delete_entry(request, entry_id):
     entry = get_object_or_404(Entry, id=entry_id)
 
-    # story 3
     if entry.author != request.user:
         return HttpResponseForbidden()
+    
+    if request.method != "DELETE":
+        return JsonResponse({"error": "DELETE required"}, status=400)
 
-    # story 1
     entry.soft_delete()
     return JsonResponse({"deleted": True})

@@ -12,8 +12,8 @@ class Entry(models.Model):
     ]
 
     CONTENT_TYPES = [
-        ("text/plaintext", "Plain Text"),
-        ("text/commommark", "CommonMark"),
+        ("text/plain", "Plain Text"),
+        ("text/markdown", "CommonMark"),
         ("image", "Image"),
     ]
 
@@ -27,7 +27,7 @@ class Entry(models.Model):
     content_type = models.CharField(
         max_length = 20,
         choices=CONTENT_TYPES,
-        default = "text/plaintext"
+        default = "text/plain"
     )
     
     image = models.ImageField(upload_to="entries/", blank=True, null=True)
