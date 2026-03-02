@@ -67,9 +67,10 @@
                                     Unfollow
                                 </a>
                             {% elif has_pending_request %}
-                                <span class="btn btn-disabled">
-                                    Request Pending
-                                </span>
+                                <a href="{% url 'cancel-follow-request' author_id=profile_author.id %}" 
+                                   class="btn btn-secondary">
+                                    Cancel Request
+                                </a>
                             {% else %}
                                 <a href="{% url 'follow-author' author_id=profile_author.id %}" 
                                    class="btn btn-primary">

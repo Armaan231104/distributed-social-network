@@ -34,12 +34,22 @@ The following endpoints return paginated results. Pagination is required by the 
 ```json
 {
     "type": "following",
-    "items": [
+    "following": [
         { "type": "author", "id": "...", ... }
     ],
     "page_number": 1,
     "size": 50,
     "count": 150
+}
+```
+
+For authors list (not paginated):
+```json
+{
+    "type": "authors",
+    "authors": [
+        { "type": "author", "id": "...", ... }
+    ]
 }
 ```
 
@@ -125,7 +135,31 @@ For local authors, pass the integer ID (e.g., `2`). For remote authors, pass the
 
 ### DELETE /api/authors/{author_id}/following/{foreign_id}/
 
-Removes a follow relationship between two authors. This completely severs the connection.
+Removes a follow relationship between two authors. This completely severs the connection. Also clears any pending follow request between the two authors.
+
+**Auth:** Required. The authenticated user must be `{author_id}`.
+
+**Pagination:** Not applicable.
+
+**Response:** 200 OK on success
+
+**User Stories:**
+- **#5 (Unfollow):** Call this endpoint with the authenticated user's ID and the target author's ID to stop following them. This also withdraws any pending follow request. Example: Alice (ID 1) unfollows Bob (ID 2) → DELETE /api/authors/1/following/2/
+
+---
+
+### DELETE /api/authors/{author_id}/follow_requests/{foreign_id}/
+
+Withdraws a pending follow request. This cancels a follow request that has been sent but not yet approved. The follow relationship is not affected (if already following).
+
+**Auth:** Required.
+
+**Pagination:** Not applicable.
+
+**Response:** 200 OK on success
+
+**User Stories:**
+- **(Withdraw request):** Call this endpoint to cancel a pending follow request before it's approved. This is useful when the user changes their mind. After withdrawing, they can follow again later if they want.
 
 When called, it deletes any existing Follow object and also clears any pending FollowRequest between these two authors. After unfollowing, the target author's posts will no longer appear in your stream.
 
@@ -186,6 +220,25 @@ The response includes the actor (who wants to follow) and object (who they're fo
 
 **Pagination:** Supported. Use `page` and `size` query parameters to navigate through multiple pages of requests.
 
+**Response:**
+```json
+{
+    "type": "follow_requests",
+    "follow_requests": [
+        {
+            "type": "follow",
+            "summary": "Charlie wants to follow Bob",
+            "actor": { ...author object... },
+            "object": { ...author object... },
+            "status": "pending"
+        }
+    ],
+    "page_number": 1,
+    "size": 50,
+    "count": 1
+}
+```
+
 **User Stories:**
 - **#4 (See follow requests):** Call this endpoint to display all pending follow requests to the user. Present each request showing who wants to follow you, then provide buttons or links to approve (PUT /followers/{id}/) or reject (DELETE /followers/{id}/) each request. Call this when the user visits their "Follow Requests" page or when displaying a notification badge for pending requests.
 
@@ -209,19 +262,22 @@ When a remote author wants to follow you, their node sends a POST request to you
 
 ---
 
-## User Story Implementation Guide
+## User Story Implementation
 
 ### Story #1: Follow Local Authors
 1. Call GET /api/authors/ to retrieve available authors on the node
 2. Display these authors to the user so they can choose someone to follow
 3. Call PUT /api/authors/{user_id}/following/{target_id}/ with the user's ID and the selected author's ID
 4. Display a confirmation message indicating the request was sent
+5. The user sees "Request Pending" with option to cancel until approved
+6. When target approves (story #3), user sees "Unfollow" button
 
 ### Story #2: Follow Remote Authors
 1. Discover remote authors (from other nodes or the local author list)
 2. Call PUT /api/authors/{user_id}/following/{remote_fqid}/ using the remote author's FQID
 3. Your node also POSTs the follow request to the remote author's inbox endpoint
-4. The request appears in their follow_requests (story #4) for them to approve
+4. The user sees "Request Pending" with option to cancel
+5. The request appears in their follow_requests (story #4) for them to approve
 
 ### Story #3: Approve or Deny Follow Requests
 1. Call GET /api/authors/{user_id}/follow_requests/ to retrieve pending requests
@@ -235,37 +291,8 @@ When a remote author wants to follow you, their node sends a POST request to you
 3. Provide approve/deny buttons that link to the appropriate endpoints
 
 ### Story #5: Unfollow Authors
-1. Call GET /api/authors/{user_id}/following/ to see who you currently follow
-2. Display this list to the user with an unfollow option for each author
-3. When user clicks unfollow: Call DELETE /api/authors/{user_id}/following/{target_id}/
+1. After being approved (story #3), you follow the author
+2. Call GET /api/authors/{user_id}/following/ to see who you currently follow
+3. Display this list to the user with an unfollow option for each author
+4. When user clicks unfollow: Call DELETE /api/authors/{user_id}/following/{target_id}/
 
----
-
-## Testing Examples
-
-```bash
-# Login to get session cookie
-curl -c cookies.txt -X POST http://localhost:8000/login/ \
-  -d "username=alice&password=test123"
-
-# List all authors on the node
-curl http://localhost:8000/api/authors/
-
-# Alice (id=1) sends follow request to Bob (id=2)
-curl -b cookies.txt -X PUT http://localhost:8000/api/authors/1/following/2/
-
-# Check Alice's follow requests
-curl -b cookies.txt http://localhost:8000/api/authors/1/follow_requests/
-
-# Bob accepts Alice's request
-curl -b cookies.txt -X PUT http://localhost:8000/api/authors/2/followers/1/
-
-# Alice unfollows Bob
-curl -b cookies.txt -X DELETE http://localhost:8000/api/authors/1/following/2/
-```
-
----
-
-## Response Format Note
-
-This implementation uses `items` as the key for paginated lists rather than specific keys like `followers` or `following` as shown in the spec example. This provides consistency across all list endpoints - the key name stays the same while the `type` field indicates what type of objects are returned. This is a minor deviation from the spec example but improves API consistency.

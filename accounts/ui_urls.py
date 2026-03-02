@@ -7,6 +7,7 @@ urlpatterns = [
     path('authors/<path:author_id>/profile/', views.author_profile, name='author-profile'),
     path('follow/<path:author_id>/', views.follow_author, name='follow-author'),
     path('unfollow/<path:author_id>/', views.unfollow_author, name='unfollow-author'),
+    path('cancel-request/<path:author_id>/', views.cancel_follow_request, name='cancel-follow-request'),
     path('follow-requests/', views.follow_requests, name='follow-requests'),
     path('follow-requests/<int:request_id>/accept/', views.accept_follow_request, name='accept-follow-request'),
     path('follow-requests/<int:request_id>/reject/', views.reject_follow_request, name='reject-follow-request'),
