@@ -14,6 +14,7 @@
 
         <!-- POST CONTENT -->
         <h2>{{ entry.title }}</h2>
+        <strong>{{ entry.author.username }}</strong>
         {% if entry.content_type == "image" and entry.image %}
             <img src="{{ entry.image.url }}" alt="{{ entry.title }}">
         {% endif %}
