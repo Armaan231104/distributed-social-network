@@ -59,7 +59,18 @@ class Author(models.Model):
     def is_friend(self, author):
         return self.is_following(author) and author.is_following(self)
 
-
+    @property
+    def get_friends_count(self):
+        """
+        Returns the number of friends (mutual followers).
+        A friend is someone you follow AND who follows you back.
+        """
+        # 'following' is the related_name for Follow.follower -> followee
+        # 'followers' is the related_name for Follow.followee <- follower
+        following_ids = set(self.following.values_list('followee_id', flat=True))
+        follower_ids = set(self.followers.values_list('follower_id', flat=True))
+        mutual_ids = following_ids & follower_ids  # intersection = friends
+        return len(mutual_ids)
 class FollowRequest(models.Model):
     """
     Tracks follow requests between authors.

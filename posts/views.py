@@ -64,9 +64,12 @@ def entry_detail(request, entry_id):
     if not user_can_access_entry(request.user, entry):
         return JsonResponse({'error': 'Forbidden'}, status=403)
     comments = entry.comments.all()
+    author_path = entry.author.id
     return render(request, 'interactions/entry_detail.html', {
         'entry': entry,
         'comments': comments,
+        'author_path': author_path,
+        
     })
 
 @login_required

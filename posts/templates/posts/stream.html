@@ -1,54 +1,111 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
+{% load static %}
+{% load interaction_tags %}
 {% load markdown_extras %}
+
 {% block title %}My Stream{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/accounts/profile.css' %}">
+{% endblock %}
+
 {% block content %}
-<h1>My Stream</h1>
+<div class="profile-container">
+    <h1>My Stream</h1>
 
-{% if posts %}
-    {% for post in posts %}
-    <article class="stream-post">
-        <h2><a href="{% url 'entry_detail' post.id %}">{{ post.title }}</a></h2>
-        <p class="stream-post-meta">{{ post.published_at|date:"N j, Y, g:i a" }}</p>
+    {% if posts %}
+    <div class="posts-grid">
+        {% for post in posts %}
+        <div class="post-card" onclick="window.location.href='{% url 'entry_detail' post.id %}'">
 
-        <p>
-            <strong>Visibility:</strong> {{ post.visibility }}
-        </p>
+            <!-- POST HEADER -->
+            <div class="post-header">
 
-        <p>
-            <a href="{% url 'entry_detail' post.id %}">View link</a>
-        </p>
+                <!-- Top row: avatar + author name -->
+                <div class="post-header-top">
+                    <div class="post-avatar-wrapper">
+                        {% if post.author.author and post.author.author.profileImage %}
+                            <img src="{{ post.author.author.profileImage.url }}"
+                                 alt="{{ post.author.author.displayName }}"
+                                 class="post-avatar">
+                        {% else %}
+                            <div class="post-avatar-placeholder">
+                                <i class="fa-regular fa-user"></i>
+                            </div>
+                        {% endif %}
+                    </div>
 
-        {% if post.visibility != "DELETED" %}
-            <form method="POST" action="{% url 'delete_entry_ui' post.id %}">
-                {% csrf_token %}
-                <button type="submit">Delete</button>
-            </form>
-        {% else %}
-            {% if user.is_staff %}
-                <p><em>This entry is deleted (admin can see it).</em></p>
+                    <span class="post-author-name">
+                        {{ post.author.author.displayName|default:post.author.username }}
+                    </span>
+                </div>
+
+                <!-- Title row -->
+                <div class="post-title-row">
+                    <h3 class="post-title">{{ post.title }}</h3>
+                </div>
+
+            </div>
+
+            <!-- POST CONTENT -->
+            {% if post.content_type == "image" and post.image %}
+                <figure class="stream-post-media">
+                    <img src="{{ post.image.url }}" alt="{{ post.title }}" class="post-content-image">
+                    {% if post.content %}
+                        <figcaption>{{ post.content }}</figcaption>
+                    {% endif %}
+                </figure>
+
+            {% elif post.content_type == "text/markdown" %}
+                <section class="stream-post-body">
+                    {{ post.content | render_markdown }}
+                </section>
+
+            {% else %}
+                <p class="stream-post-body">{{ post.content }}</p>
             {% endif %}
-        {% endif %}
 
-        {% if post.content_type == "image" and post.image %}
-            <figure class="stream-post-media">
-                <img src="{{ post.image.url }}" alt="{{ post.title }}">
-                {% if post.content %}
-                    <figcaption>{{ post.content }}</figcaption>
-                {% endif %}
-            </figure>
+            <!-- POST DATE -->
+            <span class="post-date">
+                Published on {{ post.published_at|date:"M d, Y H:i" }}
+            </span>
 
-        {% elif post.content_type == "text/markdown" %}
-            <section class="stream-post-body">
-                {{ post.content | render_markdown }}
-            </section>
+            <!-- POST INTERACTIONS -->
+            <div class="post-interactions">
+                <!-- COMMENT BUTTON -->
+                <button class="comment-btn">
+                    <i class="fa-regular fa-comment"></i>
+                    <span class="comment-count">{{ post.comments.count }}</span>
+                </button>
 
-        {% else %}
-            <p class="stream-post-body">{{ post.content }}</p>
-        {% endif %}
-    </article>
-    {% endfor %}
-{% else %}
-    <p>No posts yet.</p>
-{% endif %}
+                <!-- LIKE BUTTON -->
+                {% user_has_liked post request.user as liked %}
+                <button id="like-btn-{{ post.id }}" class="like-btn-heart" onclick="event.stopPropagation(); toggleLike('entry', '{{ post.id }}')">
+                    <i class="fa{% if liked %}s{% else %}r{% endif %} fa-heart"></i>
+                    <span id="like-count-{{ post.id }}">{{ post.likes.count }}</span>
+                </button>
+            </div>
+
+            <!-- DELETE / VISIBILITY CONTROL -->
+            {% if post.visibility != "DELETED" %}
+            <form method="POST" action="{% url 'delete_entry_ui' post.id %}" class="delete-form">
+                {% csrf_token %}
+                <button type="submit" class="delete-btn" title="Delete Post">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </form>
+            {% endif %}
+
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+        <p class="empty-state">No posts yet.</p>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/interactions.js' %}"></script>
 {% endblock %}

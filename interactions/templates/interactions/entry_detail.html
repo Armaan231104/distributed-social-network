@@ -3,6 +3,7 @@
 {% load interaction_tags %}
 
 {% block content %}
+{% load markdown_extras %}
 <link rel="stylesheet" href="{% static 'css/accounts/profile.css' %}">
 <link rel="stylesheet" href="{% static 'css/interactions/entry_detail.css' %}">
 
@@ -13,31 +14,65 @@
         <script src="{% static 'js/interactions.js' %}"></script>
 
         <!-- POST CONTENT -->
-        <h2>{{ entry.title }}</h2>
-        {% if post.author.author and post.author.author.profileImage %}
-        <img src="{{ post.author.author.profileImage.url }}"
-            alt="{{ post.author.author.displayName }}"
-            class="post-avatar">
-        {% else %}
-        <div class="post-avatar-placeholder">
-            <i class="fa-regular fa-user"></i>
-        </div>
-        {% endif %}
-        <a href="{% url 'author-profile' entry.author.author.id %}">
-            <strong>{{ entry.author.username }}</strong>
-        </a>
-        {% if entry.content_type == "image" and entry.image %}
-            <img src="{{ entry.image.url }}" alt="{{ entry.title }}">
-        {% endif %}
-        <p>{{ entry.content }}</p>
-        <span class="post-date">Published on {{ entry.published_at|date:"M d, Y H:i" }}</span>
+       <div class="post-header">
 
+    <!-- LEFT: avatar + name -->
+    <div class="post-header-left">
+        <div class="post-avatar-wrapper">
+            {% if entry.author.profileImage %}
+                <img src="{{ entry.author.profileImage.url }}" 
+                     alt="{{ entry.author.displayName }}" 
+                     class="post-avatar">
+            {% else %}
+                <div class="post-avatar-placeholder">
+                    {{ entry.author.displayName|make_list|first }}
+                </div>
+            {% endif %}
+        </div>
+        <span class="post-author-name">
+            {{ entry.author.displayName }}
+        </span>
+    </div>
+
+    <!-- RIGHT: like + comment count -->
+    <div class="post-header-right">
+
+        <span class="comment-count">
+            <i class="fa-regular fa-comment"></i>
+            {{ comments.count }}
+        </span>
         {% user_has_liked entry request.user as liked %}
-        <button class="like-btn" id="like-btn-{{ entry.id }}" onclick="toggleLike('entry','{{ entry.id }}')">
-            <i class="fa-solid fa-heart"></i>
+        <button class="like-btn-heart" id="like-btn-{{ entry.id }}" onclick="toggleLike('entry','{{ entry.id }}')">
+            <i class="fa{% if liked %}s{% else %}r{% endif %} fa-heart"></i>
             <span id="like-count-{{ entry.id }}">{{ entry.likes.count }}</span>
         </button>
 
+    </div>
+
+</div>
+        <hr class="post-divider">
+
+        <h2 class="post-title">{{ entry.title }}</h2>
+{% if entry.content_type == "image" and entry.image %}
+    <figure class="post-figure">
+        <img src="{{ entry.image.url }}" 
+             alt="{{ entry.title }}" 
+             class="post-content-image">
+        {% if entry.content %}
+            <figcaption class="post-figcaption">{{ entry.content }}</figcaption>
+        {% endif %}
+    </figure>
+{% elif entry.content_type == "text/markdown" %}
+    <section class="post-content-text">
+        {{ entry.content|render_markdown }}
+    </section>
+{% else %}
+    <p class="post-content-text">{{ entry.content }}</p>
+{% endif %}
+
+<span class="post-date">
+    Published on {{ entry.published_at|date:"M d, Y H:i" }}
+</span>
         <!-- COMMENTS SECTION BELOW POST -->
         <div class="comments-section">
             <h3>Comments ({{ comments.count }})</h3>
@@ -57,12 +92,17 @@
             {% empty %}
                 <p>No comments yet.</p>
             {% endfor %}
-
+            
             {% if user.is_authenticated %}
-            <form method="POST" action="{% url 'add_comment' entry.id %}">
+            <form method="POST" action="{% url 'add_comment' entry.id %}" class="comment-form-wrapper">
                 {% csrf_token %}
                 <textarea name="content" placeholder="Write a comment..." required></textarea>
-                <button type="submit" class="btn btn-primary">Comment</button>
+                <div class="comment-form-actions">
+<!-- <a href="/authors/{{ entry.author.id }}/profile/" class="btn btn-secondary">
+    <i class="fa-solid fa-arrow-left"></i> Back
+</a> -->
+                    <button type="submit" class="btn btn-primary">Comment</button>
+                </div>
             </form>
             {% endif %}
         </div>

@@ -66,10 +66,10 @@ window.addEventListener('load', () => {
   // Toggle content type
   typeSelect.addEventListener('change', () => {
     if (typeSelect.value === 'image') {
-      textarea.style.display = 'none';
+      // textarea.style.display = 'none';
       imageRow.style.display = 'flex';
     } else {
-      textarea.style.display = 'block';
+      // textarea.style.display = 'block';
       imageRow.style.display = 'none';
       resetImageState();
     }

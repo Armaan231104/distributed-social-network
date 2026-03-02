@@ -84,6 +84,10 @@
                         <span class="number">{{ profile_author.get_following_count }}</span>
                         <span class="label">Following</span>
                     </div>
+                    <div class="stat">
+                        <span class="number">{{ profile_author.get_friends_count }}</span>
+                        <span class="label">Friends</span>
+                    </div>
                 </div>
 
                 <!--
@@ -155,22 +159,34 @@
             <!--
               Post header: small avatar and author name.
             -->
-            <div class="post-header">
-                <div class="post-avatar-wrapper">
-                    {% if post.author.author and post.author.author.profileImage %}
-                        <img src="{{ post.author.author.profileImage.url }}"
-                            alt="{{ post.author.author.displayName }}"
-                            class="post-avatar">
-                    {% else %}
-                    <div class="post-avatar-placeholder">
-                        <i class="fa-regular fa-user"></i>
-                    </div>
-                    {% endif %}
+<!-- Post header -->
+<div class="post-header">
+
+    <!-- Row 1: avatar + username -->
+    <div class="post-header-top">
+        <div class="post-avatar-wrapper">
+            {% if post.author.author and post.author.author.profileImage %}
+                <img src="{{ post.author.author.profileImage.url }}"
+                     alt="{{ post.author.author.displayName }}"
+                     class="post-avatar">
+            {% else %}
+                <div class="post-avatar-placeholder">
+                    <i class="fa-regular fa-user"></i>
                 </div>
-                <span class="post-author-name">
-                    {{ post.author.author.displayName|default:post.author.username }}
-                </span>
-            </div>
+            {% endif %}
+        </div>
+
+        <span class="post-author-name">
+            {{ post.author.author.displayName|default:post.author.username }}
+        </span>
+    </div>
+
+    <!-- Row 2: title -->
+    <div class="post-title-row">
+        <h3 class="post-title">{{ post.title }}</h3>
+    </div>
+
+</div>
 
             <!--
               Post body: can be image, plaintext, or commonmark and renders
@@ -179,7 +195,7 @@
             -->
             {% if post.content_type == "image" and post.image %}
                 <figure class="stream-post-media">
-                    <img src="{{ post.image.url }}" alt="{{ post.title }}">
+                    <img src="{{ post.image.url }}" alt="{{ post.title }}" class="post-content-image">
                     {% if post.content %}
                         <figcaption>{{ post.content }}</figcaption>
                     {% endif %}
@@ -198,17 +214,30 @@
             <span class="post-date">
                 Published on {{ post.published_at|date:"M d, Y H:i" }}
             </span>
+<div class="post-interactions">
+    <!-- COMMENT BUTTON -->
+    <button class="comment-btn">
+        <i class="fa-regular fa-comment"></i>
+        <span class="comment-count">{{ post.comments.count }}</span>
+    </button>
 
-            <!--
-              Like button: We check if the current user has liked it, then show the right heart 
-              style and live like count. The stopPropagation is important so clicking the heart 
-              doesn’t open the post page.
-            -->
-            {% user_has_liked post request.user as liked %}
-            <button id="like-btn-{{ post.id }}" class="like-btn-heart" onclick="event.stopPropagation(); toggleLike('entry', '{{ post.id }}')">
-                <i class="fa{% if liked %}s{% else %}r{% endif %} fa-heart"></i>
-                <span id="like-count-{{ post.id }}">{{ post.likes.count }}</span>
-            </button>
+    <!-- LIKE BUTTON -->
+    {% user_has_liked post request.user as liked %}
+    <button id="like-btn-{{ post.id }}" class="like-btn-heart" onclick="event.stopPropagation(); toggleLike('entry', '{{ post.id }}')">
+        <i class="fa{% if liked %}s{% else %}r{% endif %} fa-heart"></i>
+        <span id="like-count-{{ post.id }}">{{ post.likes.count }}</span>
+    </button>
+</div>
+
+            <!-- DELETE / VISIBILITY CONTROL -->
+            {% if post.visibility != "DELETED" %}
+            <form method="POST" action="{% url 'delete_entry_ui' post.id %}" class="delete-form">
+                {% csrf_token %}
+                <button type="submit" class="delete-btn" title="Delete Post">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </form>
+            {% endif %}
 
         </div>
             {% endfor %}

@@ -171,27 +171,153 @@
     outline: none;
 }
 
-.comments-section button.btn-primary {
-    align-self: flex-end;
-    padding: 10px 18px;
-    border-radius: 14px;
-    border: none;
-    background: linear-gradient(90deg,#ff1a62,#ffa023);
-    color: white;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.comments-section button.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(244,23,23,0.2);
-}
-
 /* ============================= */
 /* RESPONSIVE */
 @media (max-width: 700px) {
     .post-card.full-card {
         padding: 20px;
     }
+}
+.comment-form-actions {
+    display: flex;            /* use flexbox */
+    justify-content: flex-end; /* right-align buttons */
+    gap: 12px;                /* spacing between buttons */
+    margin-top: 8px;          /* spacing from textarea */
+    flex-wrap: wrap;           /* wrap on small screens */
+}
+
+.post-card:hover {
+    transform: translateY(-4px) rotate(0deg);
+    box-shadow: 0 25px 60px rgba(244,23,23,0.25);
+}
+
+/* POST HEADER LAYOUT */
+.post-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+/* Left side: avatar + name */
+.post-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.post-avatar-wrapper {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.post-avatar-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.post-avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff1a62, #ffa023);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+/* Username */
+.post-author-name {
+    font-weight: 600;
+    font-size: 15px;
+    margin: 0;
+}
+
+/* Right side: like + comment */
+.post-header-right {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+/* Like button top right */
+.like-btn-heart {
+    font-size: 24px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.like-btn-heart i {
+    background: linear-gradient(90deg, #ff1a62, #ffa023);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    transition: transform 0.2s ease;
+}
+
+.like-btn-heart:hover i {
+    transform: scale(1.2);
+}
+
+.like-btn-heart span {
+    font-size: 16px;
+    color: #ff1a62;
+    font-weight: 600;
+}
+
+/* Comment count icon */
+.comment-count {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 16px;
+    color: #ff1a62;
+}
+.comment-count i {
+    font-size: 20px;
+}
+.post-card.full-card img {
+    display: block;
+    margin: 12px auto;       /* centers the image */
+    max-width: 100%;         /* don’t overflow card width */
+    max-height: 400px;       /* adjust max height as needed */
+    width: auto;             /* maintain natural width ratio */
+    height: auto;            /* maintain aspect ratio */
+    border-radius: 12px;
+    object-fit: contain;     /* scale image to fit without cropping */
+}
+
+.post-card.full-card h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: #222;
+    margin-bottom: 12px;
+}
+
+.post-card.full-card p {
+    font-size: 15px;
+    line-height: 1.6;
+    color: #444;
+}
+
+.post-card.full-card .post-date {
+    font-size: 12px;
+    color: #777;
+    margin: 16px 0 20px;
+}
+.post-divider {
+    border: none; 
+    border-top: 1px solid rgba(0,0,0,0.05); /* lighter than before */
+    margin: 20px 0; /* more spacing, matches profile card spacing */
+    width: 100%; 
 }
