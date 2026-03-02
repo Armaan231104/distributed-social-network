@@ -1,13 +1,49 @@
 from django.shortcuts import get_object_or_404, render
 from django.http import JsonResponse, HttpResponseForbidden
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from .models import Entry
+from accounts.models import Author, Follow
 import json
 
-@login_required
 def stream(request):
-    posts = Entry.objects.filter(author=request.user).exclude(visibility="DELETED")
+    # Unauthenticated users see only public posts from all authors
+    if not request.user.is_authenticated:
+        posts = Entry.objects.filter(
+            visibility="PUBLIC"
+        ).select_related('author__author').order_by('-published_at')
+        return render(request, 'posts/stream.html', {'posts': posts})
+
+    try:
+        current_author = request.user.author
+    except Author.DoesNotExist:
+        # Authenticated user with no Author profile: own posts + all public posts
+        posts = Entry.objects.filter(
+            Q(author=request.user) | Q(visibility="PUBLIC")
+        ).exclude(visibility="DELETED").select_related('author__author').order_by('-published_at')
+        return render(request, 'posts/stream.html', {'posts': posts})
+
+    # Collect local authors the current user follows
+    following_qs = Follow.objects.filter(
+        follower=current_author
+    ).select_related('followee__user')
+    followed_authors = [f.followee for f in following_qs if f.followee.user]
+    followed_users = [a.user for a in followed_authors]
+
+    # Subset of followed authors who also follow back (friends / mutual followers)
+    friend_users = [a.user for a in followed_authors if a.is_following(current_author)]
+
+    posts = Entry.objects.filter(
+        # Users own posts, excluding deleted
+        (Q(author=request.user) & ~Q(visibility="DELETED")) |
+        # Showing posts of authors followed by the user (public and unlisted posts)
+        Q(author__in=followed_users, visibility__in=["PUBLIC", "UNLISTED"]) |
+        # showing posts from user's friends, including FRIENDS-only posts
+        Q(author__in=friend_users, visibility="FRIENDS")
+    ).select_related('author__author').order_by('-published_at')
+
     return render(request, 'posts/stream.html', {'posts': posts})
+
 
 @login_required
 def create_entry(request):
