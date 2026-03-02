@@ -14,7 +14,18 @@
 
         <!-- POST CONTENT -->
         <h2>{{ entry.title }}</h2>
-        <strong>{{ entry.author.username }}</strong>
+        {% if post.author.author and post.author.author.profileImage %}
+        <img src="{{ post.author.author.profileImage.url }}"
+            alt="{{ post.author.author.displayName }}"
+            class="post-avatar">
+        {% else %}
+        <div class="post-avatar-placeholder">
+            <i class="fa-regular fa-user"></i>
+        </div>
+        {% endif %}
+        <a href="{% url 'author-profile' entry.author.author.id %}">
+            <strong>{{ entry.author.username }}</strong>
+        </a>
         {% if entry.content_type == "image" and entry.image %}
             <img src="{{ entry.image.url }}" alt="{{ entry.title }}">
         {% endif %}
