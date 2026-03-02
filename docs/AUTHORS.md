@@ -8,15 +8,6 @@ The author system implements the follow functionality described in the project s
 
 Every author has a unique identifier. Local authors use integer IDs (1, 2, 3...) while remote authors use Fully Qualified IDs (FQIDs) such as `http://remote-node.com/api/authors/abc123/`. API endpoints accept either format depending on whether the target author is local or remote.
 
-## Authentication
-
-Endpoints that modify data require authentication. You can authenticate using:
-- Session authentication (via browser login)
-- Basic authentication (HTTP Basic Auth header)
-- Token authentication (Token header)
-
-Public read-only endpoints (listing authors, viewing profiles) do not require authentication.
-
 ## Pagination
 
 The following endpoints return paginated results:
@@ -30,7 +21,8 @@ The following endpoints return paginated results:
 **Response:** `{ "type": "following", "following": [...], "page_number": 1, "size": 50, "count": 150 }`
 
 ---
-
+**The following API documentation was generated from Google, Gemini "Generate markdown documentation for the API including request body/params and response body" 2026-02-24**
+**Only the endpoint documentation is AI generated in this document, however it reviewed for correctness.**
 ## API Endpoints
 
 ### GET /api/authors/
@@ -49,7 +41,7 @@ Returns a list of all approved authors on this node.
 }
 ```
 
-**Implements:** Discover authors to follow
+**User story:** Discover authors to follow
 
 ---
 
@@ -61,7 +53,7 @@ Returns detailed information for a single author.
 
 **Response:** `{ "type": "author", "id": "...", "displayName": "...", ... }`
 
-**Implements:** View author profile
+**User story:** View author profile
 
 ---
 
@@ -75,7 +67,7 @@ Returns a list of authors that `{author_id}` is following.
 
 **Response:** `{ "type": "following", "following": [...], "page_number": 1, "size": 50, "count": 10 }`
 
-**Implements:** See who you follow, list of authors to unfollow
+**User story:** See who you follow, list authors to unfollow
 
 ---
 
@@ -89,7 +81,7 @@ Returns a list of authors who follow `{author_id}`.
 
 **Response:** `{ "type": "followers", "followers": [...], "page_number": 1, "size": 50, "count": 10 }`
 
-**Implements:** See your followers
+**User story:** See your followers
 
 ---
 
@@ -105,7 +97,7 @@ Sends a follow request to another author. Creates a pending follow request that 
 
 **Errors:** 400 if already following or request pending, 403 if unauthorized
 
-**Implements:** Follow author (local and remote). For remote authors, your node also sends the request to their inbox.
+**User story:** Follow author (local and remote). For remote authors, your node also sends the request to their inbox.
 
 ---
 
@@ -119,7 +111,7 @@ Removes a follow relationship between two authors. Also clears any pending follo
 
 **Response:** 200 OK - `{ "status": "unfollowed" }`
 
-**Implements:** Unfollow author, unfriend author
+**User story:** Unfollow author, unfriend author
 
 ---
 
@@ -133,7 +125,7 @@ Accepts a follow request from another author. Creates the follow relationship, a
 
 **Response:** 200 OK - `{ "status": "follow request accepted" }`
 
-**Implements:** Approve follower
+**User story:** Approve follower
 
 ---
 
@@ -147,7 +139,7 @@ Rejects a pending follow request or removes an existing follower.
 
 **Response:** 200 OK - `{ "status": "follower removed" }`
 
-**Implements:** Deny follower, remove follower
+**User story:** Deny follower, remove follower
 
 ---
 
@@ -178,7 +170,7 @@ Returns all pending follow requests for an author.
 }
 ```
 
-**Implements:** See follow requests
+**User story:** See follow requests
 
 ---
 
@@ -200,14 +192,14 @@ Receives objects from remote nodes, including follow requests. This is how remot
 
 **Response:** 201 Created
 
-**Implements:** Receive remote follow request. After receiving, handle via approve/deny endpoints.
+**User story:** Receive remote follow request. After receiving, handle via approve/deny endpoints.
 
 ---
 
 ## Running Tests
 
-```bash
+```
 python manage.py test accounts.tests
 ```
 
-This runs all 37 tests covering author model, follow/unfollow API, and follow request workflow.
+This runs all tests covering author model, follow/unfollow API, and follow request workflow.
