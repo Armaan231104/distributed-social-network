@@ -6,7 +6,7 @@
 <div class="edit-wrapper">
     <div class="edit-container login-container">
         <div class="edit-header">
-            <h1>Login</h1>
+            <h1>How You Doin'?</h1>
             <p>Use your Django credentials to access your account</p>
         </div>
 
@@ -20,13 +20,11 @@
             {% csrf_token %}
             
             <div class="form-group">
-                <label for="id_username">Username</label>
-                <input type="text" name="username" id="id_username" required>
+                <input type="text" name="username" id="id_username" placeholder="Username" required>
             </div>
 
             <div class="form-group">
-                <label for="id_password">Password</label>
-                <input type="password" name="password" id="id_password" required>
+                <input type="password" name="password" id="id_password" placeholder="Password" required>
             </div>
 
             <div class="form-actions">
@@ -39,19 +37,28 @@
 </div>
 
 <style>
-/* Glass-style container consistent with Edit Profile */
+/* Center the card vertically and horizontally */
+.edit-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+/* Glass-style card */
 .login-container {
+    width: 100%;
     max-width: 480px;
-    margin: 60px auto;
     padding: 40px;
     border-radius: 22px;
     background: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(20px);
     box-shadow: 0 20px 50px rgba(244, 23, 23, 0.15);
     border: 1px solid rgba(255, 26, 98, 0.15);
+    text-align: center;
 }
 
-/* Header gradient like edit page */
+/* Header */
 .edit-header h1 {
     font-size: 28px;
     margin-bottom: 8px;
@@ -65,20 +72,25 @@
     font-size: 15px;
     color: #555;
     margin-bottom: 30px;
-    text-align: center;
 }
 
-/* Form inputs match Edit Profile */
+/* Form inputs */
+.edit-form .form-group {
+    margin-bottom: 20px;
+}
+
 .edit-form input {
-    width: 90%;
-    box-sizing: border-box;
+    width: 95%;
+    /* box-sizing: border-box; */
+    max-width: 450px;
     padding: 16px 18px;
-    margin: 10px 5%;
     border-radius: 16px;
     border: 1px solid rgba(0,0,0,0.08);
     background: rgba(255,255,255,0.85);
     font-size: 15px;
     transition: 0.25s ease;
+    display: block;
+    margin: 0 auto;
 }
 
 .edit-form input:focus {
@@ -88,7 +100,12 @@
     outline: none;
 }
 
-/* Action button like Edit Profile */
+/* Button aligned right */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
 .btn-primary {
     padding: 14px 26px;
     border-radius: 16px;
@@ -101,12 +118,13 @@
     transition: 0.25s ease;
 }
 
+/* Hover effect */
 .btn-primary:hover {
     transform: translateY(-2px);
     box-shadow: 0 18px 45px rgba(244,23,23,0.35);
 }
 
-/* Error message consistent with glass vibe */
+/* Error message */
 .error-message {
     background: rgba(255, 26, 98, 0.1);
     color: #ff1a62;
@@ -119,9 +137,12 @@
 
 @media (max-width: 500px) {
     .login-container {
-        margin: 40px 20px;
         padding: 30px;
     }
+    .edit-form input {
+        width: 95%;
+    }
 }
+
 </style>
 {% endblock %}

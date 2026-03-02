@@ -389,6 +389,7 @@
 }
 .image-clear:hover {
     background: linear-gradient(45deg, #ff1a62, #ffa023);
+    color: white;
 }
 /* ============================= */
 /* RESPONSIVE                     */
