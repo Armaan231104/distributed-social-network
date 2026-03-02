@@ -24,12 +24,12 @@
 
 /* SPLIT HERO MOD */
 .profile-main {
-    flex: 0 0 60%;
+    flex: 0 0 70%;
     display: flex;
     gap: 30px;
 }
 .profile-description-side {
-    flex: 0 0 30%;
+    flex: 0 0 20%;
     padding-left: 20px;
     border-left: 1px solid rgba(0,0,0,0.08);
     display: flex;

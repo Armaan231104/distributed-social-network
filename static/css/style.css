@@ -188,7 +188,7 @@ body::before {
 /* ACTION BUTTONS */
 
 .btn {
-    padding: 12px 26px;
+    padding: 12px 30px;
     border-radius: 16px;
     text-decoration: none;
     font-weight: 500;
@@ -201,6 +201,7 @@ body::before {
     box-shadow: 0 12px 30px rgba(244,23,23,0.25);
     border: none;
     font-size: 14px;
+    padding: 12px 30px;
 }
 .btn-primary:hover {
     transform: translateY(-2px);
