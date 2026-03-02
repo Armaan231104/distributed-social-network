@@ -2,7 +2,9 @@ from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from accounts.models import Author, FollowRequest, Follow
 
-
+# The following command/class from Google, Gemini, "Create a django script for populating the database with test data for authors with follow and follow-request relationships.", 2026-02-20
+# The implementation of the Author model was also provided to the model
+# for context.
 class Command(BaseCommand):
     help = 'Creates test data for the follow system'
 

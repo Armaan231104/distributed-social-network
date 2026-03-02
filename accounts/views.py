@@ -56,9 +56,9 @@ def get_author_by_id(author_id):
     """
     Look up author by user_id (local) or FQID (remote).
     
-    Local authors: user_id is an integer (e.g., "1")
-    Remote authors: FQID URL (e.g., "http://remote.com/api/authors/abc/")
-    Detection: if it starts with 'http', it's a remote FQID.
+    Local authors use serial user_id.
+    Remote authors authors use FQID URL.
+    NOTE: if it starts with 'http', it's a remote FQID.
     """
     is_remote = str(author_id).startswith('http')
     if is_remote:
@@ -68,8 +68,8 @@ def get_author_by_id(author_id):
 
 def get_or_create_remote_author(foreign_id):
     """
-    Create remote author on first follow.
-    Extracts host from the FQID (everything before /api/authors/).
+    On first follow, create remote author.
+    Extracts host from the FQID (basically everything before /api/authors/).
     """
     return Author.objects.get_or_create(
         id=str(foreign_id),
@@ -83,14 +83,14 @@ def get_or_create_remote_author(foreign_id):
 
 def send_follow_to_remote(actor, target):
     """
-    Send a follow request to a remote author's inbox.
-    Used when following a remote author - their node needs to know about the request.
+    Send a follow request to a remote author's inbox on their node when following a remote author.
     """
     is_remote = not target.id.startswith(get_host_url())
     if not is_remote:
         return
     
     try:
+        # extract the remote node's url
         remote_id = target.id.split('/')[-1]
         inbox_url = f"{target.host.rstrip('/')}/api/authors/{remote_id}/inbox/"
         follow_data = {
@@ -106,11 +106,11 @@ def send_follow_to_remote(actor, target):
 
 def create_follow_request(actor, target):
     """
-    Create a follow request from actor to target.
     Returns the created/updated request.
     """
     existing = FollowRequest.objects.filter(actor=actor, object=target).first()
     
+    # edge cases for existing follow requests
     if existing:
         if existing.status == FollowRequest.Status.PENDING:
             return None, 'pending'
@@ -205,6 +205,7 @@ class FollowersListView(APIView):
         all_followers = list(author.followers.all())
         total = len(all_followers)
         
+        # pagination logic since the follower list could grow large.
         start = (page - 1) * size
         end = start + size
         paginated_followers = all_followers[start:end]
@@ -223,10 +224,6 @@ class FollowersListView(APIView):
 class FollowView(APIView):
     """
     Handle following and unfollowing authors.
-    
-    User story: As an author, I want to follow local authors, so that I can see their entries.
-    User story: As an author, I want to follow remote authors, so that I can see their entries. (Part 3-5)
-    User story: As an author, I want to unfollow authors I am following, so that I don't have to see their entries anymore.
     
     Note: Follow requests go to inbox first, Follow only created after approval.
     """
@@ -280,9 +277,6 @@ class FollowView(APIView):
 class AcceptFollowView(APIView):
     """
     Handle approving or rejecting follow requests.
-    
-    User story: As an author, I want to be able to approve or deny other authors following me, 
-    so that I don't get followed by people I don't like.
     """
     permission_classes = [IsAuthenticated]
 
@@ -332,8 +326,6 @@ class AcceptFollowView(APIView):
 class FollowRequestListView(APIView):
     """
     Get pending follow requests for an author.
-    
-    User story: As an author, I want to know if I have "follow requests," so I can approve them.
     """
     permission_classes = [IsAuthenticated]
 
