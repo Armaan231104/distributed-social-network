@@ -63,7 +63,7 @@ The response includes `page_number` (current page), `size` (items per page), and
 
 Returns a list of all approved authors on this node. This is the starting point for discovering authors to follow.
 
-**Auth:** None required - public endpoint
+**Auth:** N/A - public endpoint
 
 **Pagination:** Not paginated. Returns all approved authors in a single response.
 
@@ -75,9 +75,9 @@ Returns a list of all approved authors on this node. This is the starting point 
 
 Returns detailed information for a single author identified by their ID.
 
-**Auth:** None required - public endpoint
+**Auth:** N/A - public endpoint
 
-**Pagination:** Not applicable - returns single object
+**Pagination:** N/A - returns single object
 
 **User Stories:** Used when displaying an author's profile page. Required for stories #3, #4, and #5 to show the target author's information. Call this endpoint when the user navigates to a profile page.
 
@@ -119,7 +119,7 @@ For local authors, pass the integer ID (e.g., `2`). For remote authors, pass the
 
 **Auth:** Required. The authenticated user must be `{author_id}`.
 
-**Pagination:** Not applicable.
+**Pagination:** N/A
 
 **Response Codes:**
 - 201: Follow request created successfully
@@ -139,7 +139,7 @@ Removes a follow relationship between two authors. This completely severs the co
 
 **Auth:** Required. The authenticated user must be `{author_id}`.
 
-**Pagination:** Not applicable.
+**Pagination:** N/A
 
 **Response:** 200 OK on success
 
@@ -154,7 +154,7 @@ Withdraws a pending follow request. This cancels a follow request that has been 
 
 **Auth:** Required.
 
-**Pagination:** Not applicable.
+**Pagination:** N/A
 
 **Response:** 200 OK on success
 
@@ -165,7 +165,7 @@ When called, it deletes any existing Follow object and also clears any pending F
 
 **Auth:** Required. The authenticated user must be `{author_id}`.
 
-**Pagination:** Not applicable.
+**Pagination:** N/A
 
 **Response:** 200 OK on success
 
@@ -182,7 +182,7 @@ When someone sends you a follow request (visible via the follow_requests endpoin
 
 **Auth:** Required. The authenticated user must be `{author_id}` (the person accepting).
 
-**Pagination:** Not applicable.
+**Pagination:** N/A
 
 **Response Codes:**
 - 200: Follow request accepted successfully
@@ -201,7 +201,7 @@ If there's a pending request from this author, it rejects it (status becomes "re
 
 **Auth:** Required.
 
-**Pagination:** Not applicable.
+**Pagination:** N/A
 
 **Response:** 200 OK on success
 
@@ -252,7 +252,7 @@ When a remote author wants to follow you, their node sends a POST request to you
 
 **Auth:** Accepts both local cookie authentication and remote HTTP Basic Authentication from other nodes.
 
-**Pagination:** Not applicable.
+**Pagination:** N/A
 
 **Response:** 201 Created on success
 
