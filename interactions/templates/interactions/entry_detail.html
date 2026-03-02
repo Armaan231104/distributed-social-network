@@ -29,9 +29,9 @@
                 </div>
             {% endif %}
         </div>
-        <span class="post-author-name">
-            {{ entry.author.displayName }}
-        </span>
+        <a href="{% url 'author-profile' entry.author.author.id %}">
+            <strong>{{ entry.author.username }}</strong>
+        </a>
     </div>
 
     <!-- RIGHT: like + comment count -->

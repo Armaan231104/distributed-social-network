@@ -9,6 +9,9 @@ from interactions.models import Like, Comment
 from .models import Like
 
 def user_can_access_entry(user, entry):
+    """
+    Checks if the user has access to the entry based on entry visibility
+    """
     if entry.visibility in ['PUBLIC', 'UNLISTED']:
         return True
     if entry.visibility == 'FRIENDS':
@@ -27,6 +30,10 @@ def user_can_access_entry(user, entry):
 @login_required
 @require_POST
 def toggle_like(request, object_type, object_id):
+    """
+    Checks if the object (comment or entry) has been liked by the user, then
+    either adds or deletes a like depending on current status
+    """
     author = request.user.author
     if object_type == 'entry':
         obj = get_object_or_404(Entry, id=object_id)
@@ -54,6 +61,9 @@ def toggle_like(request, object_type, object_id):
 
 @login_required
 def add_comment(request, entry_id):
+    """
+    Create a comment object if user has proper permissions
+    """
     entry = get_object_or_404(Entry, id=entry_id)
     if not user_can_access_entry(request.user, entry):
         return JsonResponse({'error': 'Forbidden'}, status=403)
