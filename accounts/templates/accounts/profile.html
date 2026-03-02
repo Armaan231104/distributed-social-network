@@ -1,71 +1,220 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load interaction_tags %}
 
 {% block title %}{{ profile_author.displayName }} - SocialDistribution{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/accounts/profile.css' %}">
+{% endblock %}
+
 {% block content %}
-<div class="container">
-    <div class="profile-header">
-        {% if profile_author.profileImage %}
-            <img src="{{ profile_author.profileImage.url }}" alt="{{ profile_author.displayName }}" class="profile-avatar">
-        {% else %}
-            <div class="profile-avatar-placeholder">{{ profile_author.displayName|make_list|first }}</div>
-        {% endif %}
-        
-        <div class="profile-info">
-            <h1>{{ profile_author.displayName }}</h1>
-            
-            {% if profile_author.github %}
+<div class="profile-container">
+
+    <div class="profile-hero">
+
+        <div class="profile-main">
+
+            <div class="profile-avatar-wrapper">
+                {% if profile_author.profileImage %}
+                    <img src="{{ profile_author.profileImage.url }}" 
+                         alt="{{ profile_author.displayName }}" 
+                         class="profile-avatar">
+                {% else %}
+                    <div class="profile-avatar-placeholder">
+                        {{ profile_author.displayName|make_list|first }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="profile-info">
+                <h1>{{ profile_author.displayName }}</h1>
+
+                {% if profile_author.github %}
                 <p class="profile-github">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-                    </svg>
-                    <a href="{{ profile_author.github }}" target="_blank">{{ profile_author.github|slice:"19:" }}</a>
+                    <i class="fa-brands fa-github"></i>
+                    <a href="{{ profile_author.github }}" target="_blank" rel="noopener">
+                        {{ profile_author.github|slice:"19:" }}
+                    </a>
                 </p>
-            {% endif %}
-            
-            <div class="profile-stats">
-                <span><strong>{{ profile_author.get_followers_count }}</strong> Followers</span>
-                <span><strong>{{ profile_author.get_following_count }}</strong> Following</span>
+                {% endif %}
+
+                <div class="profile-stats">
+                    <div class="stat">
+                        <span class="number">{{ profile_author.get_followers_count }}</span>
+                        <span class="label">Followers</span>
+                    </div>
+                    <div class="stat">
+                        <span class="number">{{ profile_author.get_following_count }}</span>
+                        <span class="label">Following</span>
+                    </div>
+                </div>
+
+                <div class="profile-actions">
+                    {% if current_user_author %}
+                        {% if current_user_author == profile_author %}
+                            <a href="{% url 'edit-profile' %}" class="btn btn-primary">
+                                Edit Profile
+                            </a>
+
+                            <button id="open-create-post" class="btn btn-secondary" type="button">
+                                + Create Post
+                            </button>
+                        {% else %}
+                            {% if is_following %}
+                                <a href="{% url 'unfollow-author' author_id=profile_author.id %}" 
+                                   class="btn btn-secondary">
+                                    Unfollow
+                                </a>
+                            {% elif has_pending_request %}
+                                <a href="{% url 'cancel-follow-request' author_id=profile_author.id %}" 
+                                   class="btn btn-secondary">
+                                    Cancel Request
+                                </a>
+                            {% else %}
+                                <a href="{% url 'follow-author' author_id=profile_author.id %}" 
+                                   class="btn btn-primary">
+                                    Follow
+                                </a>
+                            {% endif %}
+                        {% endif %}
+                    {% endif %}
+                </div>
+
             </div>
         </div>
-        
-    <div class="profile-actions">
-        {% if current_user_author %}
-            {% if current_user_author == profile_author %}
-                <!-- Show edit button for self -->
-                <a href="{% url 'edit-profile' %}" class="btn btn-primary">Edit Profile</a>
+
+        <div class="profile-description-side">
+            <h3>About</h3>
+            {% if profile_author.description %}
+                <p>{{ profile_author.description }}</p>
             {% else %}
-                <!-- Show follow/unfollow for others -->
-                {% if is_following %}
-                    <a href="{% url 'unfollow-author' author_id=profile_author.id %}" class="btn btn-secondary">Unfollow</a>
-                {% elif has_pending_request %}
-                    <span class="btn btn-disabled">Request Pending</span>
-                {% else %}
-                    <a href="{% url 'follow-author' author_id=profile_author.id %}" class="btn btn-primary">Follow</a>
-                {% endif %}
+                <p class="empty-desc">No description provided.</p>
             {% endif %}
-        {% endif %}
+        </div>
+
     </div>
-    </div>
-    
+
     <div class="profile-content">
         <h2>Public Posts</h2>
 
         {% if posts %}
-            <ul class="author-posts">
-                {% for post in posts %}
-                    <li class="post-item">
-                        <h3>{{ post.title }}</h3>
-                        <p>{{ post.content|truncatewords:50 }}</p>
-                        <small>Published on {{ post.published_at|date:"M d, Y H:i" }}</small>
-                    </li>
-                {% endfor %}
-            </ul>
+        <div class="posts-grid">
+            <script src="{% static 'js/interactions.js' %}"></script>
+            {% for post in posts %}
+            <div class="post-card" onclick="window.location.href='{% url 'entry_detail' post.id %}'">
+
+            <!-- POST HEADER: Avatar + Author Name -->
+            <div class="post-header">
+                <div class="post-avatar-wrapper">
+                    {% if post.author.profileImage %}
+                        <img src="{{ post.author.profileImage.url }}" 
+                            alt="{{ post.author.displayName }}" 
+                            class="post-avatar">
+                    {% else %}
+                        <div class="post-avatar-placeholder">
+                            {{ post.author.displayName|make_list|first }}
+                        </div>
+                    {% endif %}
+                </div>
+                <span class="post-author-name">{{ post.author.displayName }}</span>
+            </div>
+
+            <!-- POST CONTENT -->
+            <h3>{{ post.title }}</h3>
+            {% if post.content_type == "image" and post.image %}
+                <img src="{{ post.image.url }}" alt="{{ post.title }}">
+                {% if post.content %}
+                    <p>{{ post.content|truncatewords:30 }}</p>
+                {% endif %}
+            {% else %}
+                {% if post.content %}
+                    <p>{{ post.content|truncatewords:50 }}</p>
+                {% endif %}
+            {% endif %}
+
+            <span class="post-date">
+                Published on {{ post.published_at|date:"M d, Y H:i" }}
+            </span>
+
+            {% user_has_liked post request.user as liked %}
+            <button id="like-btn-{{ post.id }}" class="like-btn-heart" onclick="event.stopPropagation(); toggleLike('entry', '{{ post.id }}')">
+                <i class="fa{% if liked %}s{% else %}r{% endif %} fa-heart"></i>
+                <span id="like-count-{{ post.id }}">{{ post.likes.count }}</span>
+            </button>
+
+        </div>
+            {% endfor %}
+        </div>
         {% else %}
             <p class="empty-state">No public posts yet.</p>
         {% endif %}
     </div>
+
 </div>
-<link rel="stylesheet" href="{% static 'css/accounts/profile.css' %}">
+
+<!-- CREATE POST MODAL -->
+{% if current_user_author and current_user_author == profile_author %}
+<div id="new-post-modal" class="modal hidden">
+    <div class="modal-content">
+        <h2>New Post</h2>
+
+        <form id="new-post-form" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <input type="text" name="title" placeholder="Title" required>
+
+            <select name="contentType" id="content-type-select">
+                <option value="text/plain">Plain Text</option>
+                <option value="text/markdown">Markdown</option>
+                <option value="image">Image</option>
+            </select>
+
+            <textarea name="content" placeholder="Write your post..."></textarea>
+
+            <!-- IMAGE ROW (60% / 40%) -->
+            <div class="image-row" id="image-row" style="display:none;">
+
+                <!-- 60% BACKGROUND BOX -->
+<div class="image-box" id="image-upload-box">
+    Click to add image
+    <input type="file" name="image" id="image-input" hidden>
+</div>
+                <!-- 40% CLEAR BUTTON -->
+                <div class="image-clear" id="clear-image">
+                    <i class="fa-solid fa-xmark"></i>
+                </div>
+
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Post</button>
+                <button type="button" id="close-create-post" class="btn btn-secondary">Discard</button>
+            </div>
+
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<div id="comment-modal-{{ post.id }}" class="modal hidden">
+    <div class="modal-content">
+        <h2>Add Comment</h2>
+        <form class="comment-form" data-post-id="{{ post.id }}">
+            {% csrf_token %}
+            <textarea name="content" placeholder="Write a comment..."></textarea>
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Comment</button>
+                <button type="button" class="close-comment-modal btn btn-secondary">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{% if current_user_author and current_user_author == profile_author %}
+<script src="{% static 'js/posts.js' %}"></script>
+{% endif %}
 {% endblock %}

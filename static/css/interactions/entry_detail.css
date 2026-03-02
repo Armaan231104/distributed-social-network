@@ -1,0 +1,197 @@
+/* ============================= */
+/* FULL POST CARD WITH COMMENTS  */
+/* ============================= */
+.post-card.full-card {
+    background: rgba(255,255,255,0.95);
+    border-radius: 20px;
+    padding: 25px;
+    box-shadow: 0 15px 35px rgba(244,23,23,0.12);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 40px;
+    cursor: default; /* default for whole card */
+}
+
+.post-card.full-card h2 {
+    margin-bottom: 12px;
+    font-size: 22px;
+    font-weight: 600;
+    color: #222;
+}
+
+.post-card.full-card p {
+    font-size: 15px;
+    line-height: 1.6;
+    color: #444;
+}
+
+/* IMAGE CENTERED */
+.post-card.full-card img {
+    display: block;
+    margin: 12px auto; /* centers the image */
+    max-width: 100%;
+    border-radius: 12px;
+}
+
+/* POST DATE */
+.post-card.full-card .post-date {
+    display: block;
+    font-size: 12px;
+    color: #777;
+    margin: 16px 0 20px;
+}
+
+/* ============================= */
+/* LIKE BUTTON TOP RIGHT */
+.post-card.full-card .like-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 2;
+    font-size: 28px;
+}
+
+.post-card.full-card .like-btn i {
+    background: linear-gradient(90deg, #ff1a62, #ffa023);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    transition: transform 0.2s ease;
+}
+
+.post-card.full-card .like-btn:hover i {
+    transform: scale(1.2);
+}
+
+/* Match profile.css font size for like count */
+.post-card.full-card .like-btn span {
+    font-size: 16px; /* same as profile.css */
+    color: #ff1a62;
+    font-weight: 600;
+}
+
+.pop-heart {
+    animation: pop 0.4s ease;
+}
+
+@keyframes pop {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.5); }
+    100% { transform: scale(1); }
+}
+
+/* ============================= */
+/* COMMENTS SECTION STYLING      */
+/* ============================= */
+.comments-section {
+    margin-top: 30px;
+}
+
+/* Comment cards */
+.comment-card {
+    background: rgba(255,255,255,0.92);
+    border-radius: 18px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 12px 28px rgba(244,23,23,0.08);
+    position: relative;
+    transition: all 0.3s ease;
+    cursor: default; /* default for comment card */
+}
+
+.comment-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 18px 38px rgba(244,23,23,0.12);
+}
+
+/* Comment content */
+.comment-card strong {
+    display: block;
+    font-size: 14px;
+    color: #222;
+    margin-bottom: 4px;
+}
+
+.comment-card p {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #444;
+    margin-bottom: 6px;
+}
+
+/* Comment timestamp BELOW comment */
+.comment-card .post-date {
+    font-size: 11px;
+    color: #777;
+    display: block;
+    margin-top: 4px;
+}
+
+/* Only like button inside comment has pointer */
+.comment-card .like-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 22px;
+    cursor: pointer;
+}
+
+/* ============================= */
+/* COMMENT FORM */
+.comments-section form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+/* Input width consistent */
+.comments-section textarea {
+    width: 100%;
+    min-height: 90px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(0,0,0,0.1);
+    resize: vertical;
+    font-size: 14px;
+    background: #fafafa;
+    transition: all 0.25s ease;
+    box-sizing: border-box; /* ensures full width */
+}
+
+.comments-section textarea:focus {
+    border-color: #ff1a62;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(255,26,98,0.12);
+    outline: none;
+}
+
+.comments-section button.btn-primary {
+    align-self: flex-end;
+    padding: 10px 18px;
+    border-radius: 14px;
+    border: none;
+    background: linear-gradient(90deg,#ff1a62,#ffa023);
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.comments-section button.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(244,23,23,0.2);
+}
+
+/* ============================= */
+/* RESPONSIVE */
+@media (max-width: 700px) {
+    .post-card.full-card {
+        padding: 20px;
+    }
+}

@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load interaction_tags %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/accounts/profile.css' %}">
+<link rel="stylesheet" href="{% static 'css/interactions/entry_detail.css' %}">
+
+<div class="post-detail-wrapper">
+
+    <!-- POST CARD WITH COMMENTS INSIDE -->
+    <div class="post-card full-card">
+        <script src="{% static 'js/interactions.js' %}"></script>
+
+        <!-- POST CONTENT -->
+        <h2>{{ entry.title }}</h2>
+        {% if entry.content_type == "image" and entry.image %}
+            <img src="{{ entry.image.url }}" alt="{{ entry.title }}">
+        {% endif %}
+        <p>{{ entry.content }}</p>
+        <span class="post-date">Published on {{ entry.published_at|date:"M d, Y H:i" }}</span>
+
+        {% user_has_liked entry request.user as liked %}
+        <button class="like-btn" id="like-btn-{{ entry.id }}" onclick="toggleLike('entry','{{ entry.id }}')">
+            <i class="fa-solid fa-heart"></i>
+            <span id="like-count-{{ entry.id }}">{{ entry.likes.count }}</span>
+        </button>
+
+        <!-- COMMENTS SECTION BELOW POST -->
+        <div class="comments-section">
+            <h3>Comments ({{ comments.count }})</h3>
+
+            {% for comment in comments %}
+            <div class="comment-card">
+                <strong>{{ comment.author.displayName }}</strong>
+                <span class="post-date">{{ comment.created_at|date:"M d, Y H:i" }}</span>
+                <p>{{ comment.content }}</p>
+
+                {% user_has_liked comment request.user as liked %}
+                <button class="like-btn" id="like-btn-{{ comment.id }}" onclick="toggleLike('comment', '{{ comment.id }}')">
+                    <i class="fa-solid fa-heart"></i>
+                    <span id="like-count-{{ comment.id }}">{{ comment.likes.count }}</span>
+                </button>
+            </div>
+            {% empty %}
+                <p>No comments yet.</p>
+            {% endfor %}
+
+            {% if user.is_authenticated %}
+            <form method="POST" action="{% url 'add_comment' entry.id %}">
+                {% csrf_token %}
+                <textarea name="content" placeholder="Write a comment..." required></textarea>
+                <button type="submit" class="btn btn-primary">Comment</button>
+            </form>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+
+<script src="{% static 'js/interactions.js' %}"></script>
+{% endblock %}

@@ -44,7 +44,7 @@ def get_or_create_author(author_data):
     )
 
 
-# --- Helpers for author lookup ---
+# Helpers for autho lookup
 # These handle the difference between local authors (user_id) and remote authors (FQID)
 
 def get_current_author(request):
@@ -81,6 +81,54 @@ def get_or_create_remote_author(foreign_id):
     )
 
 
+def send_follow_to_remote(actor, target):
+    """
+    Send a follow request to a remote author's inbox.
+    Used when following a remote author - their node needs to know about the request.
+    """
+    is_remote = not target.id.startswith(get_host_url())
+    if not is_remote:
+        return
+    
+    try:
+        remote_id = target.id.split('/')[-1]
+        inbox_url = f"{target.host.rstrip('/')}/api/authors/{remote_id}/inbox/"
+        follow_data = {
+            'type': 'follow',
+            'summary': f'{actor.displayName} wants to follow {target.displayName}',
+            'actor': AuthorSerializer(actor).data,
+            'object': AuthorSerializer(target).data
+        }
+        requests.post(inbox_url, json=follow_data, timeout=10)
+    except Exception:
+        pass
+
+
+def create_follow_request(actor, target):
+    """
+    Create a follow request from actor to target.
+    Returns the created/updated request.
+    """
+    existing = FollowRequest.objects.filter(actor=actor, object=target).first()
+    
+    if existing:
+        if existing.status == FollowRequest.Status.PENDING:
+            return None, 'pending'
+        elif existing.status == FollowRequest.Status.ACCEPTED:
+            return None, 'accepted'
+        else:
+            existing.status = FollowRequest.Status.PENDING
+            existing.save()
+            return existing, 'resent'
+    
+    return FollowRequest.objects.create(
+        actor=actor,
+        object=target,
+        summary=f'{actor.displayName} wants to follow {target.displayName}',
+        status=FollowRequest.Status.PENDING
+    ), 'created'
+
+
 # API Views
 
 class AuthorListView(APIView):
@@ -92,7 +140,7 @@ class AuthorListView(APIView):
         serializer = AuthorListSerializer(authors, many=True)
         return Response({
             'type': 'authors',
-            'items': serializer.data
+            'authors': serializer.data
         })
 
 
@@ -134,7 +182,7 @@ class FollowingListView(APIView):
         serializer = AuthorSerializer(following_authors, many=True)
         return Response({
             'type': 'following',
-            'items': serializer.data,
+            'following': serializer.data,
             'page_number': page,
             'size': size,
             'count': total
@@ -165,7 +213,7 @@ class FollowersListView(APIView):
         serializer = AuthorSerializer(follower_authors, many=True)
         return Response({
             'type': 'followers',
-            'items': serializer.data,
+            'followers': serializer.data,
             'page_number': page,
             'size': size,
             'count': total
@@ -198,38 +246,20 @@ class FollowView(APIView):
         else:
             foreign_author = get_author_by_id(foreign_id)
 
+        if current_author.id == foreign_author.id:
+            return Response({'error': 'Cannot follow yourself'}, status=status.HTTP_400_BAD_REQUEST)
+
         if current_author.is_following(foreign_author):
             return Response({'error': 'Already following'}, status=status.HTTP_400_BAD_REQUEST)
 
-        existing_request = FollowRequest.objects.filter(
-            actor=current_author,
-            object=foreign_author,
-            status=FollowRequest.Status.PENDING
-        ).first()
-
-        if existing_request:
+        request_result, state = create_follow_request(current_author, foreign_author)
+        
+        if state == 'pending':
             return Response({'error': 'Follow request already pending'}, status=status.HTTP_400_BAD_REQUEST)
-
-        FollowRequest.objects.create(
-            actor=current_author,
-            object=foreign_author,
-            summary=f'{current_author.displayName} wants to follow {foreign_author.displayName}',
-            status=FollowRequest.Status.PENDING
-        )
-
-        if is_remote:
-            inbox_url = f"{foreign_author.host.rstrip('/')}/api/authors/{foreign_id}/inbox/"
-            try:
-                follow_data = {
-                    'type': 'follow',
-                    'summary': f'{current_author.displayName} wants to follow {foreign_author.displayName}',
-                    'actor': AuthorSerializer(current_author).data,
-                    'object': AuthorSerializer(foreign_author).data
-                }
-                requests.post(inbox_url, json=follow_data, timeout=10)
-            except Exception:
-                pass
-
+        elif state == 'accepted':
+            return Response({'error': 'Already following'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        send_follow_to_remote(current_author, foreign_author)
         return Response({'status': 'follow request sent'}, status=status.HTTP_201_CREATED)
 
     def delete(self, request, author_id, foreign_id):
@@ -329,7 +359,7 @@ class FollowRequestListView(APIView):
         serializer = FollowRequestSerializer(paginated_requests, many=True)
         return Response({
             'type': 'follow_requests',
-            'items': serializer.data,
+            'follow_requests': serializer.data,
             'page_number': page,
             'size': size,
             'count': total
@@ -475,48 +505,18 @@ def follow_author(request, author_id):
     except Author.DoesNotExist:
         return redirect('authors-list')
     
+    if current_author == target_author:
+        return redirect('author-profile', author_id=author_id)
+    
     if current_author.is_following(target_author):
         return redirect('author-profile', author_id=author_id)
     
-    FollowRequest.objects.get_or_create(
-        actor=current_author,
-        object=target_author,
-        defaults={
-            'summary': f'{current_author.displayName} wants to follow {target_author.displayName}',
-            'status': FollowRequest.Status.PENDING
-        }
-    )
+    request_result, state = create_follow_request(current_author, target_author)
     
-    Follow.objects.get_or_create(follower=current_author, followee=target_author)
+    if state in ('pending', 'accepted'):
+        return redirect('author-profile', author_id=author_id)
     
-    is_remote = not target_author.id.startswith(get_host_url())
-    if is_remote:
-        try:
-            remote_id = target_author.id.split('/')[-1]
-            inbox_url = f"{target_author.host.rstrip('/')}/api/authors/{remote_id}/inbox/"
-            follow_data = {
-                'type': 'follow',
-                'summary': f'{current_author.displayName} wants to follow {target_author.displayName}',
-                'actor': {
-                    'type': 'author',
-                    'id': current_author.id,
-                    'host': current_author.host,
-                    'displayName': current_author.displayName,
-                    'github': current_author.github,
-                    'profileImage': current_author.profileImage,
-                    'web': current_author.web,
-                },
-                'object': {
-                    'type': 'author',
-                    'id': target_author.id,
-                    'host': target_author.host,
-                    'displayName': target_author.displayName,
-                }
-            }
-            requests.post(inbox_url, json=follow_data, timeout=10)
-        except Exception:
-            pass
-    
+    send_follow_to_remote(current_author, target_author)
     return redirect('author-profile', author_id=author_id)
 
 
@@ -537,6 +537,31 @@ def unfollow_author(request, author_id):
     
     Follow.objects.filter(follower=current_author, followee=target_author).delete()
     FollowRequest.objects.filter(actor=current_author, object=target_author).delete()
+    
+    return redirect('author-profile', author_id=author_id)
+
+
+@login_required
+def cancel_follow_request(request, author_id):
+    """Cancel a pending follow request (withdraw request)."""
+    author_id = unquote(author_id)
+    
+    try:
+        current_author = request.user.author
+    except Author.DoesNotExist:
+        return redirect('authors-list')
+    
+    try:
+        target_author = Author.objects.get(id=author_id)
+    except Author.DoesNotExist:
+        return redirect('authors-list')
+    
+    # Only delete the FollowRequest, not the Follow (if exists)
+    FollowRequest.objects.filter(
+        actor=current_author,
+        object=target_author,
+        status=FollowRequest.Status.PENDING
+    ).delete()
     
     return redirect('author-profile', author_id=author_id)
 
@@ -634,3 +659,19 @@ def edit_profile(request):
         form = AuthorUpdateForm(instance=author)
 
     return render(request, "accounts/edit_profile.html", {"form": form})
+
+from django.contrib.auth import logout
+from django.contrib.auth.decorators import login_required
+
+def logout_view(request):
+    """
+    Logs out the user only if the request is POST.
+    Redirects to login page after logout.
+    """
+    if request.method == "POST":
+        if request.user.is_authenticated:
+            logout(request)
+        return redirect('login')  # or 'authors-list'
+    else:
+        # Block GET or other methods
+        return HttpResponseForbidden("Logout must be via POST.")

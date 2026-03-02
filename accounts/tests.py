@@ -1,6 +1,5 @@
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
-from django.urls import reverse
 import json
 from unittest.mock import patch, MagicMock
 
@@ -144,7 +143,7 @@ class FollowingAPITest(TestCase):
         response = self.client.get(f'/api/authors/{self.user1.id}/following/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(len(data['items']), 1)
+        self.assertEqual(len(data['following']), 1)
 
 
 class FollowersAPITest(TestCase):
@@ -167,7 +166,7 @@ class FollowersAPITest(TestCase):
         response = self.client.get(f'/api/authors/{self.user1.id}/followers/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(len(data['items']), 1)
+        self.assertEqual(len(data['followers']), 1)
 
 
 class FollowRequestAPITest(TestCase):
@@ -188,7 +187,7 @@ class FollowRequestAPITest(TestCase):
         response = self.client.get(f'/api/authors/{self.user1.id}/follow_requests/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(data['items'], [])
+        self.assertEqual(data['follow_requests'], [])
     
     def test_list_follow_requests_with_pending(self):
         FollowRequest.objects.create(
@@ -200,7 +199,7 @@ class FollowRequestAPITest(TestCase):
         response = self.client.get(f'/api/authors/{self.user1.id}/follow_requests/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(len(data['items']), 1)
+        self.assertEqual(len(data['follow_requests']), 1)
 
 
 class FollowViewTest(TestCase):
