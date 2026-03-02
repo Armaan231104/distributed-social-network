@@ -622,3 +622,13 @@ def edit_profile(request):
         form = AuthorUpdateForm(instance=author)
 
     return render(request, "accounts/edit_profile.html", {"form": form})
+
+from django.contrib.auth import logout
+from django.shortcuts import redirect
+from django.contrib.auth.decorators import login_required
+
+
+@login_required
+def logout_view(request):
+    logout(request)
+    return redirect('login')  # or 'authors-list' or home

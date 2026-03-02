@@ -10,16 +10,14 @@
 {% block content %}
 <div class="profile-container">
 
-    <!-- HERO PROFILE CARD -->
     <div class="profile-hero">
 
-        <!-- LEFT 60% -->
         <div class="profile-main">
 
             <div class="profile-avatar-wrapper">
                 {% if profile_author.profileImage %}
-                    <img src="{{ profile_author.profileImage.url }}"
-                         alt="{{ profile_author.displayName }}"
+                    <img src="{{ profile_author.profileImage.url }}" 
+                         alt="{{ profile_author.displayName }}" 
                          class="profile-avatar">
                 {% else %}
                     <div class="profile-avatar-placeholder">
@@ -58,14 +56,12 @@
                                 Edit Profile
                             </a>
 
-                            <!-- ✅ NEW: Create Post button only on your own profile -->
                             <button id="open-create-post" class="btn btn-secondary" type="button">
                                 + Create Post
                             </button>
-
                         {% else %}
                             {% if is_following %}
-                                <a href="{% url 'unfollow-author' author_id=profile_author.id %}"
+                                <a href="{% url 'unfollow-author' author_id=profile_author.id %}" 
                                    class="btn btn-secondary">
                                     Unfollow
                                 </a>
@@ -74,7 +70,7 @@
                                     Request Pending
                                 </span>
                             {% else %}
-                                <a href="{% url 'follow-author' author_id=profile_author.id %}"
+                                <a href="{% url 'follow-author' author_id=profile_author.id %}" 
                                    class="btn btn-primary">
                                     Follow
                                 </a>
@@ -86,7 +82,6 @@
             </div>
         </div>
 
-        <!-- RIGHT 40% DESCRIPTION -->
         <div class="profile-description-side">
             <h3>About</h3>
             {% if profile_author.description %}
@@ -108,12 +103,14 @@
                 <h3>{{ post.title }}</h3>
 
                 {% if post.content_type == "image" and post.image %}
-                    <img src="{{ post.image.url }}" alt="{{ post.title }}" style="max-width:100%; border-radius:12px;">
+                    <img src="{{ post.image.url }}" alt="{{ post.title }}">
                     {% if post.content %}
                         <p>{{ post.content|truncatewords:30 }}</p>
                     {% endif %}
                 {% else %}
-                    <p>{{ post.content|truncatewords:50 }}</p>
+                    {% if post.content %}
+                        <p>{{ post.content|truncatewords:50 }}</p>
+                    {% endif %}
                 {% endif %}
 
                 <span class="post-date">
@@ -129,7 +126,7 @@
 
 </div>
 
-<!-- ✅ NEW: Modal only on your own profile -->
+<!-- CREATE POST MODAL -->
 {% if current_user_author and current_user_author == profile_author %}
 <div id="new-post-modal" class="modal hidden">
     <div class="modal-content">
@@ -148,16 +145,31 @@
 
             <textarea name="content" placeholder="Write your post..."></textarea>
 
-            <input type="file" name="image" id="image-input" style="display:none;">
+            <!-- IMAGE ROW (60% / 40%) -->
+            <div class="image-row" id="image-row" style="display:none;">
+
+                <!-- 60% BACKGROUND BOX -->
+<div class="image-box" id="image-upload-box">
+    Click to add image
+    <input type="file" name="image" id="image-input" hidden>
+</div>
+                <!-- 40% CLEAR BUTTON -->
+                <div class="image-clear" id="clear-image">
+                    <i class="fa-solid fa-xmark"></i>
+                </div>
+
+            </div>
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Post</button>
                 <button type="button" id="close-create-post" class="btn btn-secondary">Discard</button>
             </div>
+
         </form>
     </div>
 </div>
 {% endif %}
+
 {% endblock %}
 
 {% block extra_js %}

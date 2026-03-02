@@ -1,5 +1,5 @@
 body {
-    font-family: 'Times New Roman', Times, serif;
+    font-family: 'Times New Roman', Times, serif !important;
     background: linear-gradient(45deg, #ff2066, #ffa023, #ff3737);
     background-size: 400% 400%;
     animation: gradientMove 40s ease infinite;
@@ -8,6 +8,20 @@ body {
     position: relative;
     overflow-x: hidden;
 }
+
+button,.btn{
+    font-family: 'Times New Roman', Times, serif !important;
+    font-size: inherit;
+}
+/* i,
+.fa,
+.fas,
+.fa-solid,
+.fa-regular,
+.fa-brands {
+    font-family: "Font Awesome 6 Free" !important;
+    font-weight: 900;
+} */
 
 /* subtle animated gradient */
 @keyframes gradientMove {
@@ -95,10 +109,10 @@ body::before {
 }
 
 .sidebar-links a:hover {
-    background: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(10px);
-    transform: translateX(4px);
-    box-shadow: 0 8px 20px rgba(74,144,217,0.1);
+    transform: translateX(10px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
 }
 
 .sidebar-links i {
@@ -140,8 +154,9 @@ body::before {
     width: 100%;
     max-width: 960px;
     margin: 0 auto;
-    padding: 60px 20px 120px;
+    padding: 60px 60px 120px;
     position: relative;
+    box-sizing: border-box;
     z-index: 10;
 }
 
@@ -153,9 +168,11 @@ body::before {
     right: 0;
     text-align: center;
     box-sizing: border-box;
-    font-size: 14px;
-    color: white;
-    backdrop-filter: blur(10px);
+    font-size: 12px;
+    color: black;
+    /* backdrop-filter: blur(10px); */
+    /* background-color: #11111120; */
+    /* text-shadow: 0 0 5px rgb(0, 0, 0); */
     border-top: 1px solid rgba(200,200,200,0.2);
     z-index: 1100;
 }
@@ -168,53 +185,46 @@ body::before {
         width: 180px;
     }
 }
+/* ACTION BUTTONS */
 
-/* New post form */
-
-.new-post-btn {
-  padding: 10px 14px;
-  border: none;
-  border-radius: 10px;
-  font-weight: 600;
-  cursor: pointer;
+.btn {
+    padding: 12px 26px;
+    border-radius: 16px;
+    text-decoration: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
 }
-
-.modal.hidden {
-  display: none;
+.btn-primary {
+    background: linear-gradient(45deg, #ff1a62, #f41717, #ffa023);
+    color: #fff;
+    box-shadow: 0 12px 30px rgba(244,23,23,0.25);
+    border: none;
+    font-size: 14px;
 }
-
-.modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 45px rgba(244,23,23,0.35);
 }
-
-.modal-content {
-  background: white;
-  max-width: 520px;
-  width: 90%;
-  border-radius: 14px;
-  padding: 18px;
+.btn-secondary {
+    background: #fff;
+    font-size: 14px;
+    color: #ff1a62;
+    border: 2px solid #ff1a62;
+    font-weight: 600;
+    border-radius: 16px;
+    padding: 12px 30px;
+    transition: all 0.25s ease;
 }
-
-.modal-content input,
-.modal-content select,
-.modal-content textarea {
-  width: 100%;
-  margin: 10px 0;
-  padding: 10px;
+.btn-secondary:hover {
+    transform: translateY(-2px);
+    background: #ff1a62;
+    color: #fff;
+    box-shadow: 0 5px 15px rgba(255,26,98,0.3);
 }
-
-.modal-content textarea {
-  min-height: 120px;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
+.btn-disabled {
+    background: #ddd;
+    color: #999;
+    cursor: not-allowed;
+    pointer-events: none;
 }
