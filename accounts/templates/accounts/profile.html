@@ -102,28 +102,48 @@
         <div class="posts-grid">
             <script src="{% static 'js/interactions.js' %}"></script>
             {% for post in posts %}
-            <div class="post-card">
-                <a href="{% url 'entry_detail' post.id %}"><h3>{{ post.title }}</h3></a>
-                {% if post.content_type == "image" and post.image %}
-                    <img src="{{ post.image.url }}" alt="{{ post.title }}">
-                    {% if post.content %}
-                        <p>{{ post.content|truncatewords:30 }}</p>
+            <div class="post-card" onclick="window.location.href='{% url 'entry_detail' post.id %}'">
+
+            <!-- POST HEADER: Avatar + Author Name -->
+            <div class="post-header">
+                <div class="post-avatar-wrapper">
+                    {% if post.author.profileImage %}
+                        <img src="{{ post.author.profileImage.url }}" 
+                            alt="{{ post.author.displayName }}" 
+                            class="post-avatar">
+                    {% else %}
+                        <div class="post-avatar-placeholder">
+                            {{ post.author.displayName|make_list|first }}
+                        </div>
                     {% endif %}
-                {% else %}
-                    {% if post.content %}
-                        <p>{{ post.content|truncatewords:50 }}</p>
-                    {% endif %}
-                {% endif %}
-                <span class="post-date">
-                    Published on {{ post.published_at|date:"M d, Y H:i" }}
-                </span>
-                {% user_has_liked post request.user as liked %}
-                <button id="like-btn-{{ post.id }}" onclick="toggleLike('entry', '{{ post.id }}')">
-                    {% if liked %}Unlike{% else %}Like{% endif %}
-                    (<span id="like-count-{{ post.id }}">{{ post.likes.count }}</span>)
-                </button>
-                <a href="{% url 'entry_detail' post.id %}#comment-form" class="btn btn-secondary">Comment</a>
+                </div>
+                <span class="post-author-name">{{ post.author.displayName }}</span>
             </div>
+
+            <!-- POST CONTENT -->
+            <h3>{{ post.title }}</h3>
+            {% if post.content_type == "image" and post.image %}
+                <img src="{{ post.image.url }}" alt="{{ post.title }}">
+                {% if post.content %}
+                    <p>{{ post.content|truncatewords:30 }}</p>
+                {% endif %}
+            {% else %}
+                {% if post.content %}
+                    <p>{{ post.content|truncatewords:50 }}</p>
+                {% endif %}
+            {% endif %}
+
+            <span class="post-date">
+                Published on {{ post.published_at|date:"M d, Y H:i" }}
+            </span>
+
+            {% user_has_liked post request.user as liked %}
+            <button id="like-btn-{{ post.id }}" class="like-btn-heart" onclick="event.stopPropagation(); toggleLike('entry', '{{ post.id }}')">
+                <i class="fa{% if liked %}s{% else %}r{% endif %} fa-heart"></i>
+                <span id="like-count-{{ post.id }}">{{ post.likes.count }}</span>
+            </button>
+
+        </div>
             {% endfor %}
         </div>
         {% else %}
