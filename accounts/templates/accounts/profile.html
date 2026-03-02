@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load interaction_tags %}
+{% load markdown_extras %}
 
 {% block title %}{{ profile_author.displayName }} - SocialDistribution{% endblock %}
 
@@ -100,37 +101,43 @@
 
         {% if posts %}
         <div class="posts-grid">
-            <script src="{% static 'js/interactions.js' %}"></script>
             {% for post in posts %}
             <div class="post-card" onclick="window.location.href='{% url 'entry_detail' post.id %}'">
 
             <!-- POST HEADER: Avatar + Author Name -->
             <div class="post-header">
                 <div class="post-avatar-wrapper">
-                    {% if post.author.profileImage %}
-                        <img src="{{ post.author.profileImage.url }}" 
-                            alt="{{ post.author.displayName }}" 
+                    {% if post.author.author and post.author.author.profileImage %}
+                        <img src="{{ post.author.author.profileImage.url }}"
+                            alt="{{ post.author.author.displayName }}"
                             class="post-avatar">
                     {% else %}
-                        <div class="post-avatar-placeholder">
-                            {{ post.author.displayName|make_list|first }}
-                        </div>
+                    <div class="post-avatar-placeholder">
+                        <i class="fa-regular fa-user"></i>
+                    </div>
                     {% endif %}
                 </div>
-                <span class="post-author-name">{{ post.author.displayName }}</span>
+                <span class="post-author-name">
+                    {{ post.author.author.displayName|default:post.author.username }}
+                </span>
             </div>
 
             <!-- POST CONTENT -->
-            <h3>{{ post.title }}</h3>
             {% if post.content_type == "image" and post.image %}
-                <img src="{{ post.image.url }}" alt="{{ post.title }}">
-                {% if post.content %}
-                    <p>{{ post.content|truncatewords:30 }}</p>
-                {% endif %}
+                <figure class="stream-post-media">
+                    <img src="{{ post.image.url }}" alt="{{ post.title }}">
+                    {% if post.content %}
+                        <figcaption>{{ post.content }}</figcaption>
+                    {% endif %}
+                </figure>
+
+            {% elif post.content_type == "text/markdown" %}
+                <section class="stream-post-body">
+                    {{ post.content | render_markdown }}
+                </section>
+
             {% else %}
-                {% if post.content %}
-                    <p>{{ post.content|truncatewords:50 }}</p>
-                {% endif %}
+                <p class="stream-post-body">{{ post.content }}</p>
             {% endif %}
 
             <span class="post-date">
@@ -214,7 +221,8 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/interactions.js' %}"></script>
 {% if current_user_author and current_user_author == profile_author %}
-<script src="{% static 'js/posts.js' %}"></script>
+    <script src="{% static 'js/posts.js' %}"></script>
 {% endif %}
 {% endblock %}
