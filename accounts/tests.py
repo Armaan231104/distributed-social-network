@@ -261,6 +261,19 @@ class FollowViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(self.author1.is_following(self.author2))
     
+    def test_unfollow_removes_friend_status(self):
+        # Create mutual follow (friends)
+        Follow.objects.create(follower=self.author1, followee=self.author2)
+        Follow.objects.create(follower=self.author2, followee=self.author1)
+        self.assertTrue(self.author1.is_friend(self.author2))
+        
+        # Unfollow via API
+        self.client.login(username='author1', password='testpass123')
+        self.client.delete(f'/api/authors/{self.user1.id}/following/{self.user2.id}/')
+        
+        # Should no longer be friends
+        self.assertFalse(self.author1.is_friend(self.author2))
+    
     def test_cannot_follow_self(self):
         self.client.login(username='author1', password='testpass123')
         response = self.client.put(

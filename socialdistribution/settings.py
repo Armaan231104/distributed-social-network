@@ -44,7 +44,6 @@ INSTALLED_APPS = [
     'posts',
     'interactions',
     'nodes',
-    'markdownx',
 ]
 
 MIDDLEWARE = [
