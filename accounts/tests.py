@@ -7,6 +7,8 @@ from accounts.models import Author, FollowRequest, Follow
 
 
 class AuthorModelTest(TestCase):
+    """Tests for the Author model methods."""
+    
     def setUp(self):
         self.user1 = User.objects.create_user(username='author1', password='testpass123')
         self.author1 = self.user1.author
@@ -47,6 +49,8 @@ class AuthorModelTest(TestCase):
 
 
 class FollowRequestModelTest(TestCase):
+    """Tests for FollowRequest model creation and constraints."""
+    
     def setUp(self):
         self.user1 = User.objects.create_user(username='author1', password='testpass123')
         self.author1 = self.user1.author
@@ -77,6 +81,8 @@ class FollowRequestModelTest(TestCase):
 
 
 class FollowModelTest(TestCase):
+    """Tests for Follow model creation and relationships."""
+    
     def setUp(self):
         self.user1 = User.objects.create_user(username='author1', password='testpass123')
         self.author1 = self.user1.author
@@ -101,6 +107,8 @@ class FollowModelTest(TestCase):
 
 
 class AuthorAPITest(TestCase):
+    """Tests for author list and detail API endpoints."""
+    
     def setUp(self):
         self.client = Client()
         self.user1 = User.objects.create_user(username='author1', password='testpass123')
@@ -124,6 +132,8 @@ class AuthorAPITest(TestCase):
 
 
 class FollowingAPITest(TestCase):
+    """Tests for the following list API endpoint (Story 5)."""
+    
     def setUp(self):
         self.client = Client()
         self.user1 = User.objects.create_user(username='author1', password='testpass123')
@@ -147,6 +157,8 @@ class FollowingAPITest(TestCase):
 
 
 class FollowersAPITest(TestCase):
+    """Tests for the followers list API endpoint (Story 3)."""
+    
     def setUp(self):
         self.client = Client()
         self.user1 = User.objects.create_user(username='author1', password='testpass123')
@@ -170,6 +182,8 @@ class FollowersAPITest(TestCase):
 
 
 class FollowRequestAPITest(TestCase):
+    """Tests for the follow requests list API endpoint (Story 4)."""
+    
     def setUp(self):
         self.client = Client()
         self.user1 = User.objects.create_user(username='author1', password='testpass123')
@@ -203,6 +217,8 @@ class FollowRequestAPITest(TestCase):
 
 
 class FollowViewTest(TestCase):
+    """Tests for follow/unfollow API endpoints (Stories 1, 2, 5)."""
+    
     def setUp(self):
         self.client = Client()
         self.user1 = User.objects.create_user(username='author1', password='testpass123')
@@ -244,9 +260,96 @@ class FollowViewTest(TestCase):
         response = self.client.delete(f'/api/authors/{self.user1.id}/following/{self.user2.id}/')
         self.assertEqual(response.status_code, 200)
         self.assertFalse(self.author1.is_following(self.author2))
+    
+    def test_unfollow_removes_friend_status(self):
+        # Create mutual follow (friends)
+        Follow.objects.create(follower=self.author1, followee=self.author2)
+        Follow.objects.create(follower=self.author2, followee=self.author1)
+        self.assertTrue(self.author1.is_friend(self.author2))
+        
+        # Unfollow via API
+        self.client.login(username='author1', password='testpass123')
+        self.client.delete(f'/api/authors/{self.user1.id}/following/{self.user2.id}/')
+        
+        # Should no longer be friends
+        self.assertFalse(self.author1.is_friend(self.author2))
+    
+    def test_cannot_follow_self(self):
+        self.client.login(username='author1', password='testpass123')
+        response = self.client.put(
+            f'/api/authors/{self.user1.id}/following/{self.user1.id}/',
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Cannot follow yourself', response.json()['error'])
+    
+    def test_cannot_follow_already_following(self):
+        Follow.objects.create(follower=self.author1, followee=self.author2)
+        self.client.login(username='author1', password='testpass123')
+        response = self.client.put(
+            f'/api/authors/{self.user1.id}/following/{self.user2.id}/',
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Already following', response.json()['error'])
+    
+    def test_resend_after_rejection(self):
+        # Create rejected request (simulating past rejection)
+        FollowRequest.objects.create(
+            actor=self.author1,
+            object=self.author2,
+            summary='Rejected request',
+            status=FollowRequest.Status.REJECTED
+        )
+        self.client.login(username='author1', password='testpass123')
+        response = self.client.put(
+            f'/api/authors/{self.user1.id}/following/{self.user2.id}/',
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 201)
+        # Request should be pending now
+        req = FollowRequest.objects.get(actor=self.author1, object=self.author2)
+        self.assertEqual(req.status, FollowRequest.Status.PENDING)
+    
+    def test_cannot_send_duplicate_request(self):
+        # Already have pending request
+        FollowRequest.objects.create(
+            actor=self.author1,
+            object=self.author2,
+            summary='Pending request',
+            status=FollowRequest.Status.PENDING
+        )
+        self.client.login(username='author1', password='testpass123')
+        response = self.client.put(
+            f'/api/authors/{self.user1.id}/following/{self.user2.id}/',
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('already pending', response.json()['error'])
+    
+    def test_cancel_pending_request(self):
+        FollowRequest.objects.create(
+            actor=self.author1,
+            object=self.author2,
+            summary='Request to cancel',
+            status=FollowRequest.Status.PENDING
+        )
+        self.client.login(username='author1', password='testpass123')
+        response = self.client.get(f'/cancel-request/{self.author2.id}/')
+        self.assertEqual(response.status_code, 302)  # Redirect
+        # Request should be deleted
+        self.assertFalse(
+            FollowRequest.objects.filter(
+                actor=self.author1,
+                object=self.author2,
+                status=FollowRequest.Status.PENDING
+            ).exists()
+        )
 
 
 class AcceptRejectFollowTest(TestCase):
+    """Tests for accept/reject follow request endpoints (Story 3)."""
+    
     def setUp(self):
         self.client = Client()
         self.user1 = User.objects.create_user(username='author1', password='testpass123')
@@ -289,6 +392,8 @@ class AcceptRejectFollowTest(TestCase):
 
 
 class InboxFollowRequestTest(TestCase):
+    """Tests for receiving remote follow requests via inbox (Story 2)."""
+    
     def setUp(self):
         self.client = Client()
         self.user1 = User.objects.create_user(username='author1', password='testpass123')
@@ -328,6 +433,8 @@ class InboxFollowRequestTest(TestCase):
 
 
 class AuthorSignalTest(TestCase):
+    """Tests for Django signals that auto-create Author on User creation."""
+    
     def test_author_created_on_user_creation(self):
         user = User.objects.create_user(username='newauthor', password='pass123')
         self.assertTrue(Author.objects.filter(user=user).exists())

@@ -416,7 +416,7 @@ class InboxView(APIView):
         return Response({'error': 'Unknown inbox item type'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-# --- UI Views ---
+# UI views
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden
@@ -436,6 +436,7 @@ def authors_list(request):
         'authors': authors,
         'current_user_author': current_user_author,
     })
+
 def author_profile(request, author_id):
     """Show an author's profile along with their posts."""
     author = get_object_or_404(Author, id=author_id)

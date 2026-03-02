@@ -7,8 +7,8 @@ import uuid
 
 class Comment(models.Model):
     """
-    Represents a comment on a post.
-    A user/author can comment on a post.
+    Represents a comment on a post
+    An author can comment on a post they have access to
     """
     id = models.UUIDField(primary_key=True, max_length=255, unique=True, default=uuid.uuid4, editable=False)
     entry = models.ForeignKey(Entry, on_delete=models.CASCADE, related_name='comments')
@@ -21,8 +21,9 @@ class Comment(models.Model):
 
 class Like(models.Model):
     """
-    Represents a like on a post.
-    A user/author can like a post, with a timestamp of when the like was made.
+    Represents a like on a post
+    An author can like a post they have access to, with a timestamp of when the like was made.
+    Multiple likes cannot be made on the same post
     """
     id = models.UUIDField(primary_key=True, max_length=255, unique=True, default=uuid.uuid4, editable=False)
     author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name='likes')
