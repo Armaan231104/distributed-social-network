@@ -464,6 +464,18 @@ def author_profile(request, author_id):
             posts = Entry.objects.filter(
                 author=author.user
             ).exclude(visibility="DELETED")
+        elif current_user_author and current_user_author.is_friend(author):
+            # Mutual followers (friends) can see public, unlisted, and friends posts
+            posts = Entry.objects.filter(
+                author=author.user,
+                visibility__in=["PUBLIC", "UNLISTED", "FRIENDS"]
+            )
+        elif is_following:
+            # One-way followers can see public and unlisted posts
+            posts = Entry.objects.filter(
+                author=author.user,
+                visibility__in=["PUBLIC", "UNLISTED"]
+            )
         else:
             # Viewing someone else's profile → only public
             posts = Entry.objects.filter(
