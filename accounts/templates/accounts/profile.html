@@ -1,9 +1,29 @@
+<!--
+  Profile page template: This page is the “author profile” screen of the site,
+  it reuses the shared site layout from base.html, then fills in the main content 
+  with the author’s info and their public posts.
+-->
+
 {% extends 'base.html' %}
+
+<!--
+  These "load" lines turn on helpers for this template: static: lets us link to CSS/JS files in /static
+  interaction_tags: custom template tags, and markdown_extras: custom filter to render markdown/commonmark 
+  into HTML on the page.
+-->
+
 {% load static %}
 {% load interaction_tags %}
 {% load markdown_extras %}
 
+<!-- Page title that shows in the browser tab #} -->
+
 {% block title %}{{ profile_author.displayName }} - SocialDistribution{% endblock %}
+
+<!--
+  Profile page-specific styling - base.html includes the main global CSS and this adds the 
+  profile styles on top.
+--> 
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/accounts/profile.css' %}">
@@ -12,9 +32,18 @@
 {% block content %}
 <div class="profile-container">
 
+    <!--
+      Hero area: This is the big header card at the top of the profile with avatar, name, stats,
+      follow and edit buttons on the left, and description/bio on the right
+    -->
     <div class="profile-hero">
 
         <div class="profile-main">
+
+            <!--
+              Avatar display: If the author uploaded a profile image, it shows.
+              Otherwise there's a placeholder.
+            -->
 
             <div class="profile-avatar-wrapper">
                 {% if profile_author.profileImage %}
@@ -28,9 +57,14 @@
                 {% endif %}
             </div>
 
+            <!--
+              Main profile info: Name, optional GitHub link, follower/following counts,
+              and the action buttons (edit/follow/unfollow/etc.).
+            -->
             <div class="profile-info">
                 <h1>{{ profile_author.displayName }}</h1>
 
+                <!-- Optional GitHub link if they added it -->
                 {% if profile_author.github %}
                 <p class="profile-github">
                     <i class="fa-brands fa-github"></i>
@@ -40,6 +74,7 @@
                 </p>
                 {% endif %}
 
+                <!-- Social stats summary -->
                 <div class="profile-stats">
                     <div class="stat">
                         <span class="number">{{ profile_author.get_followers_count }}</span>
@@ -51,6 +86,11 @@
                     </div>
                 </div>
 
+                <!--
+                  Buttons area:
+                  - If you're viewing your own profile: show Edit Profile + Create Post
+                  - If you're viewing someone else: show Follow/Unfollow/Cancel Request
+                -->
                 <div class="profile-actions">
                     {% if current_user_author %}
                         {% if current_user_author == profile_author %}
@@ -85,6 +125,10 @@
             </div>
         </div>
 
+        <!-- 
+          “About” sidebar:
+          Shows the author’s description (if set), otherwise a friendly empty message.
+        -->
         <div class="profile-description-side">
             <h3>About</h3>
             {% if profile_author.description %}
@@ -96,6 +140,10 @@
 
     </div>
 
+    <!-- 
+      Posts: This is where the author’s posts are displayed in a grid.
+      Each card is clickable so it will take you to the full post details page.
+    -->
     <div class="profile-content">
         <h2>Public Posts</h2>
 
@@ -104,7 +152,9 @@
             {% for post in posts %}
             <div class="post-card" onclick="window.location.href='{% url 'entry_detail' post.id %}'">
 
-            <!-- POST HEADER: Avatar + Author Name -->
+            <!--
+              Post header: small avatar and author name.
+            -->
             <div class="post-header">
                 <div class="post-avatar-wrapper">
                     {% if post.author.author and post.author.author.profileImage %}
@@ -122,7 +172,10 @@
                 </span>
             </div>
 
-            <!-- POST CONTENT -->
+            <!--
+              Post body: can be image, plaintext, or commonmark and renders
+              differently depending on which it is.
+            -->
             {% if post.content_type == "image" and post.image %}
                 <figure class="stream-post-media">
                     <img src="{{ post.image.url }}" alt="{{ post.title }}">
@@ -140,10 +193,16 @@
                 <p class="stream-post-body">{{ post.content }}</p>
             {% endif %}
 
+            <!-- Timestamp under each post -->
             <span class="post-date">
                 Published on {{ post.published_at|date:"M d, Y H:i" }}
             </span>
 
+            <!--
+              Like button: We check if the current user has liked it, then show the right heart 
+              style and live like count. The stopPropagation is important so clicking the heart 
+              doesn’t open the post page.
+            -->
             {% user_has_liked post request.user as liked %}
             <button id="like-btn-{{ post.id }}" class="like-btn-heart" onclick="event.stopPropagation(); toggleLike('entry', '{{ post.id }}')">
                 <i class="fa{% if liked %}s{% else %}r{% endif %} fa-heart"></i>
@@ -160,7 +219,11 @@
 
 </div>
 
-<!-- CREATE POST MODAL -->
+<!--
+  Create posts modal: Only the profile owner will see this. This is a popup form that lets the author
+  create plain text posts, markdown (commonmark) posts, image posts (with optional caption), JS will handle 
+  showing/hiding the modal and switching the image upload UI on/off.
+--> 
 {% if current_user_author and current_user_author == profile_author %}
 <div id="new-post-modal" class="modal hidden">
     <div class="modal-content">
@@ -179,15 +242,14 @@
 
             <textarea name="content" placeholder="Write your post..."></textarea>
 
-            <!-- IMAGE ROW (60% / 40%) -->
+            <!-- Image upload row (hidden until “Image” is selected in the dropdown) -->
             <div class="image-row" id="image-row" style="display:none;">
 
-                <!-- 60% BACKGROUND BOX -->
-<div class="image-box" id="image-upload-box">
-    Click to add image
-    <input type="file" name="image" id="image-input" hidden>
-</div>
-                <!-- 40% CLEAR BUTTON -->
+                <div class="image-box" id="image-upload-box">
+                    Click to add image
+                    <input type="file" name="image" id="image-input" hidden>
+                </div>
+
                 <div class="image-clear" id="clear-image">
                     <i class="fa-solid fa-xmark"></i>
                 </div>
@@ -204,6 +266,9 @@
 </div>
 {% endif %}
 
+<!--
+  Comment modal: WIP
+-->
 <div id="comment-modal-{{ post.id }}" class="modal hidden">
     <div class="modal-content">
         <h2>Add Comment</h2>
@@ -220,6 +285,10 @@
 
 {% endblock %}
 
+<!--
+  Page scripts: interactions.js handles like/unlike and posts.js only loads for your 
+  own profile because it powers the “Create Post” modal
+-->
 {% block extra_js %}
 <script src="{% static 'js/interactions.js' %}"></script>
 {% if current_user_author and current_user_author == profile_author %}
