@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load markdown_extras %}
 
 {% block title %}My Stream{% endblock %}
 
@@ -9,8 +8,27 @@
 {% if posts %}
     {% for post in posts %}
     <article class="stream-post">
-        <h2>{{ post.title }}</h2>
+        <h2><a href="{% url 'entry_detail' post.id %}">{{ post.title }}</a></h2>
         <p class="stream-post-meta">{{ post.published_at|date:"N j, Y, g:i a" }}</p>
+
+        <p>
+            <strong>Visibility:</strong> {{ post.visibility }}
+        </p>
+
+        <p>
+            <a href="{% url 'entry_detail' post.id %}">View link</a>
+        </p>
+
+        {% if post.visibility != "DELETED" %}
+            <form method="POST" action="{% url 'delete_entry_ui' post.id %}">
+                {% csrf_token %}
+                <button type="submit">Delete</button>
+            </form>
+        {% else %}
+            {% if user.is_staff %}
+                <p><em>This entry is deleted (admin can see it).</em></p>
+            {% endif %}
+        {% endif %}
 
         {% if post.content_type == "image" and post.image %}
             <figure class="stream-post-media">
@@ -22,7 +40,7 @@
 
         {% elif post.content_type == "text/markdown" %}
             <section class="stream-post-body">
-                {{ post.content|render_markdown }}
+                {{ post.content }}
             </section>
 
         {% else %}
