@@ -5,6 +5,7 @@ from django.views.decorators.http import require_POST
 from django.db.models import Q
 from .models import Entry
 from accounts.models import Author, Follow
+from interactions.views import user_can_access_entry
 import json
 
 def stream(request):
@@ -48,6 +49,8 @@ def stream(request):
 @login_required
 def entry_detail(request, entry_id):
     entry = get_object_or_404(Entry, id=entry_id)
+    if not user_can_access_entry(request.user, entry):
+        return JsonResponse({'error': 'Forbidden'}, status=403)
     comments = entry.comments.all()
     return render(request, 'interactions/entry_detail.html', {
         'entry': entry,
