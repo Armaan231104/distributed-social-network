@@ -408,6 +408,8 @@ class PostVisibilityOnProfileTest(TestCase):
         resp = self.client.get("/posts/api/entries/create/")
         self.assertEqual(resp.status_code, 400)
         
+    # The following tests by Open AI, Chat GPT 5.2, "please write tests to check an author's ability to create
+    # plaintext, commonmark, and image posts", 2026-02-27 
     '''
     Tests: author can create a plaintext post
     '''

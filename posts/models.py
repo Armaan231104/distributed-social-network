@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 import uuid
 
+# The following class edited by Open AI, Chat GPT 5.2, "please adjust this class to properly handle image, plaintext, and commonmark input", 2026-02-26 
 class Entry(models.Model):
     """
     Represents a post created by a local user on this node.
