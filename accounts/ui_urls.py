@@ -12,6 +12,6 @@ urlpatterns = [
     path('follow-requests/<int:request_id>/reject/', views.reject_follow_request, name='reject-follow-request'),
     path('me/', views.my_profile, name='my-profile'),
     path('login/', auth_views.LoginView.as_view(template_name='accounts/login.html'), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(next_page='/'), name='logout'),
+    path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
     path('me/edit/', views.edit_profile, name='edit-profile'),
 ]

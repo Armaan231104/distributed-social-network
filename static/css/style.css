@@ -228,3 +228,49 @@ body::before {
     cursor: not-allowed;
     pointer-events: none;
 }
+
+/* reuse sidebar link styles */
+.sidebar-link {
+    all: unset; /* removes default button styles */
+    display: flex;
+    align-items: center;
+    height: 48px;
+    padding-left: 10px;
+    color: #222;
+    border-radius: 10px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.25s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    width: 100%; /* important: matches <a> width */
+    box-sizing: border-box;
+}
+
+/* hover effect identical to sidebar <a> */
+.sidebar-link:hover {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    transform: translateX(10px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* icon and text same as links */
+.sidebar-link i {
+    font-size: 24px;
+    width: 24px;
+    min-width: 24px;
+    text-align: center;
+}
+
+.sidebar-link span {
+    position: absolute;
+    left: 50px;
+    opacity: 0;
+    transform: translateX(-10px);
+    white-space: nowrap;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.sidebar:hover .sidebar-link span {
+    opacity: 1;
+    transform: translateX(0);
+}
