@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load interaction_tags %}
 
 {% block title %}{{ profile_author.displayName }} - SocialDistribution{% endblock %}
 
@@ -98,10 +99,10 @@
 
         {% if posts %}
         <div class="posts-grid">
+            <script src="{% static 'js/interactions.js' %}"></script>
             {% for post in posts %}
             <div class="post-card">
-                <h3>{{ post.title }}</h3>
-
+                <a href="{% url 'entry_detail' post.id %}"><h3>{{ post.title }}</h3></a>
                 {% if post.content_type == "image" and post.image %}
                     <img src="{{ post.image.url }}" alt="{{ post.title }}">
                     {% if post.content %}
@@ -112,10 +113,15 @@
                         <p>{{ post.content|truncatewords:50 }}</p>
                     {% endif %}
                 {% endif %}
-
                 <span class="post-date">
                     Published on {{ post.published_at|date:"M d, Y H:i" }}
                 </span>
+                {% user_has_liked post request.user as liked %}
+                <button id="like-btn-{{ post.id }}" onclick="toggleLike('entry', '{{ post.id }}')">
+                    {% if liked %}Unlike{% else %}Like{% endif %}
+                    (<span id="like-count-{{ post.id }}">{{ post.likes.count }}</span>)
+                </button>
+                <a href="{% url 'entry_detail' post.id %}#comment-form" class="btn btn-secondary">Comment</a>
             </div>
             {% endfor %}
         </div>
@@ -169,6 +175,20 @@
     </div>
 </div>
 {% endif %}
+
+<div id="comment-modal-{{ post.id }}" class="modal hidden">
+    <div class="modal-content">
+        <h2>Add Comment</h2>
+        <form class="comment-form" data-post-id="{{ post.id }}">
+            {% csrf_token %}
+            <textarea name="content" placeholder="Write a comment..."></textarea>
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Comment</button>
+                <button type="button" class="close-comment-modal btn btn-secondary">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 {% endblock %}
 

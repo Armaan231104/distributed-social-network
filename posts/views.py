@@ -10,6 +10,15 @@ def stream(request):
     return render(request, 'posts/stream.html', {'posts': posts})
 
 @login_required
+def entry_detail(request, entry_id):
+    entry = get_object_or_404(Entry, id=entry_id)
+    comments = entry.comments.all()
+    return render(request, 'interactions/entry_detail.html', {
+        'entry': entry,
+        'comments': comments,
+    })
+
+@login_required
 def create_entry(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=400)
@@ -148,3 +157,4 @@ def delete_entry(request, entry_id):
     # story 1
     entry.soft_delete()
     return JsonResponse({"deleted": True})
+
