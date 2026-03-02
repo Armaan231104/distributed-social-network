@@ -2,54 +2,57 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.http import JsonResponse, HttpResponseForbidden, HttpResponseNotFound
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
+from django.db.models import Q
 from .models import Entry
+from accounts.models import Author, Follow
 import json
 
-# -------------------------
-# Author sees their own entries until deleted
-# -------------------------
-@login_required
 def stream(request):
-    if request.user.is_staff:
-        posts = Entry.objects.filter(author=request.user)
-    else:
-        posts = Entry.objects.filter(author=request.user).exclude(visibility="DELETED")
+    # Unauthenticated users see only public posts from all authors
+    if not request.user.is_authenticated:
+        posts = Entry.objects.filter(
+            visibility="PUBLIC"
+        ).select_related('author__author').order_by('-published_at')
+        return render(request, 'posts/stream.html', {'posts': posts})
 
-    return render(request, "posts/stream.html", {"posts": posts})
+    try:
+        current_author = request.user.author
+    except Author.DoesNotExist:
+        # Authenticated user with no Author profile: own posts + all public posts
+        posts = Entry.objects.filter(
+            Q(author=request.user) | Q(visibility="PUBLIC")
+        ).exclude(visibility="DELETED").select_related('author__author').order_by('-published_at')
+        return render(request, 'posts/stream.html', {'posts': posts})
 
-# -------------------------
-# Entry detail page
-# -------------------------
+    # Collect local authors the current user follows
+    following_qs = Follow.objects.filter(
+        follower=current_author
+    ).select_related('followee__user')
+    followed_authors = [f.followee for f in following_qs if f.followee.user]
+    followed_users = [a.user for a in followed_authors]
+
+    # Subset of followed authors who also follow back (friends / mutual followers)
+    friend_users = [a.user for a in followed_authors if a.is_following(current_author)]
+
+    posts = Entry.objects.filter(
+        # Users own posts, excluding deleted
+        (Q(author=request.user) & ~Q(visibility="DELETED")) |
+        # Showing posts of authors followed by the user (public and unlisted posts)
+        Q(author__in=followed_users, visibility__in=["PUBLIC", "UNLISTED"]) |
+        # showing posts from user's friends, including FRIENDS-only posts
+        Q(author__in=friend_users, visibility="FRIENDS")
+    ).select_related('author__author').order_by('-published_at')
+
+    return render(request, 'posts/stream.html', {'posts': posts})
+
+@login_required
 def entry_detail(request, entry_id):
     entry = get_object_or_404(Entry, id=entry_id)
-
-    # Deleted entries: only admin can view
-    if entry.visibility == "DELETED":
-        if not request.user.is_authenticated or not request.user.is_staff:
-            return HttpResponseNotFound("Entry not found.")
-
-    # Friends only: only the author
-    if entry.visibility == "FRIENDS":
-        if not request.user.is_authenticated or request.user != entry.author:
-            return HttpResponseForbidden("Forbidden.")
-
-    # Public (Accessible by link)
-    return render(request, "posts/detail.html", {"entry": entry})
-
-# -------------------------
-# Author can delete their own entries
-# -------------------------
-@login_required
-@require_POST
-def delete_entry_ui(request, entry_id):
-    entry = get_object_or_404(Entry, id=entry_id)
-
-    # Other authors cannot modify/delete my entries
-    if entry.author != request.user:
-        return HttpResponseForbidden("You cannot delete this entry.")
-
-    entry.soft_delete()
-    return redirect("stream")
+    comments = entry.comments.all()
+    return render(request, 'interactions/entry_detail.html', {
+        'entry': entry,
+        'comments': comments,
+    })
 
 @login_required
 def create_entry(request):
@@ -200,6 +203,21 @@ def edit_entry(request, entry_id):
 
     entry.save()
     return JsonResponse({"updated": True}, status=200)
+  
+# -------------------------
+# Author can delete their own entries
+# -------------------------
+@login_required
+@require_POST
+def delete_entry_ui(request, entry_id):
+    entry = get_object_or_404(Entry, id=entry_id)
+
+    # Other authors cannot modify/delete my entries
+    if entry.author != request.user:
+        return HttpResponseForbidden("You cannot delete this entry.")
+
+    entry.soft_delete()
+    return redirect("stream")
 
 @login_required
 def delete_entry(request, entry_id):
@@ -213,3 +231,4 @@ def delete_entry(request, entry_id):
 
     entry.soft_delete()
     return JsonResponse({"deleted": True})
+

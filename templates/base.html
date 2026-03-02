@@ -21,7 +21,7 @@
 
         <nav class="sidebar-links">
 
-            <a href="/">
+            <a href="/posts/stream">
                 <i class="fa-regular fa-house"></i>
                 <span>Home</span>
             </a>
@@ -41,11 +41,13 @@
                     <i class="fa-regular fa-bell"></i>
                     <span>Requests</span>
                 </a>
-
-                <a href="{% url 'logout' %}">
-                    <i class="fa-regular fa-right-from-bracket"></i>
-                    <span>Logout</span>
-                </a>
+                <form method="POST" action="{% url 'logout' %}" style="display: contents;">
+                    {% csrf_token %}
+                    <button type="submit" class="sidebar-link">
+                        <i class="fa-regular fa-right-from-bracket"></i>
+                        <span>Logout</span>
+                    </button>
+                </form>
             {% else %}
                 <a href="{% url 'login' %}">
                     <i class="fa-regular fa-user"></i>

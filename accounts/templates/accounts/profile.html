@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load interaction_tags %}
 
 {% block title %}{{ profile_author.displayName }} - SocialDistribution{% endblock %}
 
@@ -10,16 +11,14 @@
 {% block content %}
 <div class="profile-container">
 
-    <!-- HERO PROFILE CARD -->
     <div class="profile-hero">
 
-        <!-- LEFT 60% -->
         <div class="profile-main">
 
             <div class="profile-avatar-wrapper">
                 {% if profile_author.profileImage %}
-                    <img src="{{ profile_author.profileImage.url }}"
-                         alt="{{ profile_author.displayName }}"
+                    <img src="{{ profile_author.profileImage.url }}" 
+                         alt="{{ profile_author.displayName }}" 
                          class="profile-avatar">
                 {% else %}
                     <div class="profile-avatar-placeholder">
@@ -58,23 +57,22 @@
                                 Edit Profile
                             </a>
 
-                            <!-- ✅ NEW: Create Post button only on your own profile -->
                             <button id="open-create-post" class="btn btn-secondary" type="button">
                                 + Create Post
                             </button>
-
                         {% else %}
                             {% if is_following %}
-                                <a href="{% url 'unfollow-author' author_id=profile_author.id %}"
+                                <a href="{% url 'unfollow-author' author_id=profile_author.id %}" 
                                    class="btn btn-secondary">
                                     Unfollow
                                 </a>
                             {% elif has_pending_request %}
-                                <span class="btn btn-disabled">
-                                    Request Pending
-                                </span>
+                                <a href="{% url 'cancel-follow-request' author_id=profile_author.id %}" 
+                                   class="btn btn-secondary">
+                                    Cancel Request
+                                </a>
                             {% else %}
-                                <a href="{% url 'follow-author' author_id=profile_author.id %}"
+                                <a href="{% url 'follow-author' author_id=profile_author.id %}" 
                                    class="btn btn-primary">
                                     Follow
                                 </a>
@@ -86,7 +84,6 @@
             </div>
         </div>
 
-        <!-- RIGHT 40% DESCRIPTION -->
         <div class="profile-description-side">
             <h3>About</h3>
             {% if profile_author.description %}
@@ -103,23 +100,50 @@
 
         {% if posts %}
         <div class="posts-grid">
+            <script src="{% static 'js/interactions.js' %}"></script>
             {% for post in posts %}
-            <div class="post-card">
-                <h3><a href="{% url 'entry_detail' post.id %}">{{ post.title }}</a></h3>
+            <div class="post-card" onclick="window.location.href='{% url 'entry_detail' post.id %}'">
 
-                {% if post.content_type == "image" and post.image %}
-                    <img src="{{ post.image.url }}" alt="{{ post.title }}" style="max-width:100%; border-radius:12px;">
-                    {% if post.content %}
-                        <p>{{ post.content|truncatewords:30 }}</p>
+            <!-- POST HEADER: Avatar + Author Name -->
+            <div class="post-header">
+                <div class="post-avatar-wrapper">
+                    {% if post.author.profileImage %}
+                        <img src="{{ post.author.profileImage.url }}" 
+                            alt="{{ post.author.displayName }}" 
+                            class="post-avatar">
+                    {% else %}
+                        <div class="post-avatar-placeholder">
+                            {{ post.author.displayName|make_list|first }}
+                        </div>
                     {% endif %}
-                {% else %}
+                </div>
+                <span class="post-author-name">{{ post.author.displayName }}</span>
+            </div>
+
+            <!-- POST CONTENT -->
+            <h3>{{ post.title }}</h3>
+            {% if post.content_type == "image" and post.image %}
+                <img src="{{ post.image.url }}" alt="{{ post.title }}">
+                {% if post.content %}
+                    <p>{{ post.content|truncatewords:30 }}</p>
+                {% endif %}
+            {% else %}
+                {% if post.content %}
                     <p>{{ post.content|truncatewords:50 }}</p>
                 {% endif %}
+            {% endif %}
 
-                <span class="post-date">
-                    Published on {{ post.published_at|date:"M d, Y H:i" }}
-                </span>
-            </div>
+            <span class="post-date">
+                Published on {{ post.published_at|date:"M d, Y H:i" }}
+            </span>
+
+            {% user_has_liked post request.user as liked %}
+            <button id="like-btn-{{ post.id }}" class="like-btn-heart" onclick="event.stopPropagation(); toggleLike('entry', '{{ post.id }}')">
+                <i class="fa{% if liked %}s{% else %}r{% endif %} fa-heart"></i>
+                <span id="like-count-{{ post.id }}">{{ post.likes.count }}</span>
+            </button>
+
+        </div>
             {% endfor %}
         </div>
         {% else %}
@@ -129,7 +153,7 @@
 
 </div>
 
-<!-- ✅ NEW: Modal only on your own profile -->
+<!-- CREATE POST MODAL -->
 {% if current_user_author and current_user_author == profile_author %}
 <div id="new-post-modal" class="modal hidden">
     <div class="modal-content">
@@ -148,16 +172,45 @@
 
             <textarea name="content" placeholder="Write your post..."></textarea>
 
-            <input type="file" name="image" id="image-input" style="display:none;">
+            <!-- IMAGE ROW (60% / 40%) -->
+            <div class="image-row" id="image-row" style="display:none;">
+
+                <!-- 60% BACKGROUND BOX -->
+<div class="image-box" id="image-upload-box">
+    Click to add image
+    <input type="file" name="image" id="image-input" hidden>
+</div>
+                <!-- 40% CLEAR BUTTON -->
+                <div class="image-clear" id="clear-image">
+                    <i class="fa-solid fa-xmark"></i>
+                </div>
+
+            </div>
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Post</button>
                 <button type="button" id="close-create-post" class="btn btn-secondary">Discard</button>
             </div>
+
         </form>
     </div>
 </div>
 {% endif %}
+
+<div id="comment-modal-{{ post.id }}" class="modal hidden">
+    <div class="modal-content">
+        <h2>Add Comment</h2>
+        <form class="comment-form" data-post-id="{{ post.id }}">
+            {% csrf_token %}
+            <textarea name="content" placeholder="Write a comment..."></textarea>
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Comment</button>
+                <button type="button" class="close-comment-modal btn btn-secondary">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
