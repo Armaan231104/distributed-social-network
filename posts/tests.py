@@ -297,9 +297,117 @@ class PostVisibilityOnProfileTest(TestCase):
         self.client.login(username='author', password='testpass123')
         response = self.client.get(self.profile_url)
         self.assertIn(self.public_post, response.context['posts'])
+        
+    '''
+    Tests: author can create a plaintext post
+    '''
+    def test_create_entry_plaintext_json_success(self):
+        self.login("u1")
 
-    # The following tests by Open AI, Chat GPT 5.2, "please write tests to check an author's ability to create
-    # plaintext, commonmark, and image posts", 2026-02-27 
+        resp = self.post_json({
+            "title": "Plain",
+            "content": "hello world",
+            "contentType": "text/plain",
+            "visibility": "PUBLIC",
+        })
+        self.assertEqual(resp.status_code, 201)
+
+        entry = Entry.objects.get(id=resp.json()["id"])
+        self.assertEqual(entry.author, self.user1)
+        self.assertEqual(entry.title, "Plain")
+        self.assertEqual(entry.content, "hello world")
+        self.assertEqual(entry.content_type, "text/plain")
+        self.assertEqual(entry.visibility, "PUBLIC")
+    
+    '''
+    Tests: author can create a commonmark post
+    '''
+    def test_create_entry_commonmark_json_success(self):
+        self.login("u1")
+
+        md = "- item one\n- item two\n\n[Example](https://example.com)"
+        resp = self.post_json({
+            "title": "MD",
+            "content": md,
+            "contentType": "text/markdown",
+            "visibility": "PUBLIC",
+        })
+        self.assertEqual(resp.status_code, 201)
+
+        entry = Entry.objects.get(id=resp.json()["id"])
+        self.assertEqual(entry.content_type, "text/markdown")
+        self.assertIn("item one", entry.content)
+        self.assertIn("https://example.com", entry.content)
+
+    '''
+    Tests: author can create an image post
+    '''
+    def test_create_entry_image_multipart_success(self):
+        self.login("u1")
+
+        resp = self.post_image_multipart(title="Pic", content="caption here")
+        self.assertEqual(resp.status_code, 201)
+
+        entry = Entry.objects.get(id=resp.json()["id"])
+        self.assertEqual(entry.author, self.user1)
+        self.assertEqual(entry.title, "Pic")
+        self.assertEqual(entry.content, "caption here")
+        self.assertEqual(entry.content_type, "image")
+
+        # Only run this assertion if your model actually has an image field
+        self.assertTrue(hasattr(entry, "image"))
+        self.assertTrue(entry.image.name)  # saved file path
+
+    '''
+    Tests: author cannot upload an invalid file type
+    '''
+    def test_create_entry_rejects_invalid_content_type(self):
+        self.login("u1")
+
+        resp = self.post_json({
+            "title": "Bad",
+            "content": "nope",
+            "contentType": "video/mp4",
+        })
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("error", resp.json())
+    
+    '''
+    Tests: author cannot save an image post if they have not uploaded an image
+    '''
+    def test_create_entry_image_missing_file_rejected(self):
+        self.login("u1")
+
+        resp = self.client.post(
+            "/posts/api/entries/create/",
+            data={
+                "title": "No image",
+                "content": "caption",
+                "contentType": "image",
+                "visibility": "PUBLIC",
+                # missing "image"
+            },
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("error", resp.json())
+
+    '''
+    Tests: author must be logged in to create entries
+    '''
+    def test_create_entry_requires_login(self):
+        resp = self.post_json({
+            "title": "NoAuth",
+            "content": "test",
+            "contentType": "text/plain",
+        })
+        # login_required usually redirects to login page (302)
+        self.assertIn(resp.status_code, [302, 401, 403])
+
+    def test_create_entry_rejects_get(self):
+        self.login("u1")
+        resp = self.client.get("/posts/api/entries/create/")
+        self.assertEqual(resp.status_code, 400)
+        
     '''
     Tests: author can create a plaintext post
     '''

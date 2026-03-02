@@ -2,8 +2,20 @@ from django.db import models
 from django.contrib.auth.models import User
 import uuid
 
-# The following class edited by Open AI, Chat GPT 5.2, "please adjust this class to properly handle image, plaintext, and commonmark input", 2026-02-26 
 class Entry(models.Model):
+    """
+    Represents a post created by a local user on this node.
+
+    Supports: Plain text posts, Markdown posts, Image posts
+
+    Visibility Levels:
+    - PUBLIC: Visible to everyone.
+    - UNLISTED: Accessible via direct link.
+    - FRIENDS: Restricted to mutual followers (friends).
+    - DELETED: Soft-deleted entry. Hidden from all users except node admins.
+
+    Soft deletion keeps the entry in the database but changes its visibility to DELETED.
+    """
     VISIBILITY_CHOICES = [
         ("PUBLIC", "Public"),
         ("UNLISTED", "Unlisted"),
@@ -33,11 +45,23 @@ class Entry(models.Model):
     image = models.ImageField(upload_to="entries/", blank=True, null=True)
 
     class Meta:
+        """
+        Default ordering: newest entries first.
+        """
         ordering = ['-published_at']
 
     def __str__(self):
+        """
+        Returns a readable representation of the entry.
+        """
         return f"{self.title} by {self.author.username}"
 
     def soft_delete(self):
+        """
+        Performs a soft delete by setting visibility to DELETED.
+
+        The entry remains in the database but becomes inaccessible
+        to non-admin users.
+        """
         self.visibility = "DELETED"
         self.save()
