@@ -10,10 +10,13 @@ def stream(request):
     return render(request, 'posts/stream.html', {'posts': posts})
 
 @login_required
-def render_profile_post(request, entry_id):
-    post = get_object_or_404(Entry, id=entry_id)
-    user_has_liked = post.likes.filter(user=request.user).exists()
-    return render(request, 'posts.html/detail.html', {'post': post, 'user_has_liked': user_has_liked})
+def entry_detail(request, entry_id):
+    entry = get_object_or_404(Entry, id=entry_id)
+    comments = entry.comments.all()
+    return render(request, 'interactions/entry_detail.html', {
+        'entry': entry,
+        'comments': comments,
+    })
 
 @login_required
 def create_entry(request):
