@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-
+{% load markdown_extras %}
 {% block title %}My Stream{% endblock %}
 
 {% block content %}
@@ -40,7 +40,7 @@
 
         {% elif post.content_type == "text/markdown" %}
             <section class="stream-post-body">
-                {{ post.content }}
+                {{ post.content | render_markdown }}
             </section>
 
         {% else %}
