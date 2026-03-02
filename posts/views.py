@@ -1,5 +1,5 @@
 from django.shortcuts import get_object_or_404, render, redirect
-from django.http import JsonResponse, HttpResponseForbidden, HttpResponseNotFound
+from django.http import JsonResponse, HttpResponseForbidden
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.db.models import Q
@@ -8,7 +8,16 @@ from accounts.models import Author, Follow
 import json
 
 def stream(request):
-    # Unauthenticated users see only public posts from all authors
+    """
+    Renders the main timeline page.
+
+    Visibility Rules:
+    - Unauthenticated users see only PUBLIC entries.
+    - Authenticated users see:
+        • Their own entries (excluding DELETED)
+        • PUBLIC and UNLISTED entries from authors they follow
+        • FRIENDS entries from mutual followers
+    """
     if not request.user.is_authenticated:
         posts = Entry.objects.filter(
             visibility="PUBLIC"
@@ -31,7 +40,6 @@ def stream(request):
     followed_authors = [f.followee for f in following_qs if f.followee.user]
     followed_users = [a.user for a in followed_authors]
 
-    # Subset of followed authors who also follow back (friends / mutual followers)
     friend_users = [a.user for a in followed_authors if a.is_following(current_author)]
 
     posts = Entry.objects.filter(
@@ -47,6 +55,10 @@ def stream(request):
 
 @login_required
 def entry_detail(request, entry_id):
+    """
+    Renders the detailed view of a single entry.
+    Returns 403 if the user is not permitted to view the entry.
+    """
     entry = get_object_or_404(Entry, id=entry_id)
     comments = entry.comments.all()
     return render(request, 'interactions/entry_detail.html', {
@@ -56,6 +68,9 @@ def entry_detail(request, entry_id):
 
 @login_required
 def create_entry(request):
+    """
+    Creates a new entry. 
+    """
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=400)
 
@@ -73,7 +88,7 @@ def create_entry(request):
             author=request.user,
             title=title,
             content=content,
-            content_type=content_type,  # probably "image"
+            content_type=content_type,
             image=image_file
         )
         return JsonResponse({"id": str(entry.id)}, status=201)
@@ -103,6 +118,14 @@ def create_entry(request):
     return JsonResponse({"id": str(entry.id)}, status=201)
 
 def get_entry(request, entry_id):
+    """
+    Returns a JSON representation of an entry.
+
+    Visibility Enforcement:
+    - DELETED: Only accessible to node admins.
+    - PUBLIC / UNLISTED: Accessible by anyone.
+    - FRIENDS: Accessible only to the author (API restriction).
+    """
     entry = get_object_or_404(Entry, id=entry_id)
 
     if entry.visibility == "DELETED":
@@ -129,6 +152,9 @@ def get_entry(request, entry_id):
 
 @login_required
 def my_entries(request):
+    """
+    Returns all non-deleted entries created by the user.
+    """
     entries = Entry.objects.filter(author=request.user).exclude(visibility="DELETED")
 
     def entry_to_dict(e):
@@ -155,6 +181,12 @@ def my_entries(request):
 
 @login_required
 def edit_entry(request, entry_id):
+    """
+    Updates an existing entry.
+
+    Only the author may edit.
+    Deleted entries cannot be edited.
+    """
     entry = get_object_or_404(Entry, id=entry_id)
 
     if entry.author != request.user:
@@ -204,15 +236,16 @@ def edit_entry(request, entry_id):
     entry.save()
     return JsonResponse({"updated": True}, status=200)
   
-# -------------------------
-# Author can delete their own entries
-# -------------------------
 @login_required
 @require_POST
 def delete_entry_ui(request, entry_id):
+    """
+    Soft deletes an entry via the UI.
+
+    Only the author may delete.
+    """
     entry = get_object_or_404(Entry, id=entry_id)
 
-    # Other authors cannot modify/delete my entries
     if entry.author != request.user:
         return HttpResponseForbidden("You cannot delete this entry.")
 
@@ -221,6 +254,11 @@ def delete_entry_ui(request, entry_id):
 
 @login_required
 def delete_entry(request, entry_id):
+    """
+    Soft deletes an entry via the API.
+
+    Only the author may delete.
+    """
     entry = get_object_or_404(Entry, id=entry_id)
 
     if entry.author != request.user:
