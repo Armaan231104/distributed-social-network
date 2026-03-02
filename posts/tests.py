@@ -435,7 +435,7 @@ class PostVisibilityOnProfileTest(TestCase):
     def test_create_entry_commonmark_json_success(self):
         self.login("u1")
 
-        md = "- item one\n- item two\n\n[OpenAI](https://openai.com)"
+        md = "- item one\n- item two\n\n[Example](https://example.com)"
         resp = self.post_json({
             "title": "MD",
             "content": md,
@@ -447,7 +447,7 @@ class PostVisibilityOnProfileTest(TestCase):
         entry = Entry.objects.get(id=resp.json()["id"])
         self.assertEqual(entry.content_type, "text/markdown")
         self.assertIn("item one", entry.content)
-        self.assertIn("https://openai.com", entry.content)
+        self.assertIn("https://example.com", entry.content)
 
     '''
     Tests: author can create an image post
