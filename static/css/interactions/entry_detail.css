@@ -26,7 +26,7 @@
 }
 
 /* IMAGE CENTERED */
-.post-card.full-card img {
+.post-card.full-card .post-figure img {
     display: block;
     margin: 12px auto; /* centers the image */
     max-width: 100%;
@@ -54,7 +54,7 @@
     align-items: center;
     gap: 6px;
     z-index: 2;
-    font-size: 28px;
+    font-size: 24px;
 }
 
 .post-card.full-card .like-btn i {
@@ -89,19 +89,35 @@
 /* COMMENTS SECTION STYLING      */
 /* ============================= */
 .comments-section {
-    margin-top: 30px;
+    margin-top: 32px;                    /* give some breathing room after post */
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* 2 equal columns by default */
+    gap: 20px;                           /* space between comment cards */
 }
 
-/* Comment cards */
+/* Single column on smaller screens */
+@media (max-width: 768px) {
+    .comments-section {
+        grid-template-columns: 1fr;      /* 1 column on tablets & phones */
+    }
+}
+
+/* Optional: even smaller screens get tighter spacing */
+@media (max-width: 480px) {
+    .comments-section {
+        gap: 16px;
+    }
+}
+
 .comment-card {
     background: rgba(255,255,255,0.92);
     border-radius: 18px;
-    padding: 14px 18px;
-    margin-bottom: 16px;
+    padding: 16px 20px;
     box-shadow: 0 12px 28px rgba(244,23,23,0.08);
-    position: relative;
+    backdrop-filter: blur(10px);
     transition: all 0.3s ease;
-    cursor: default; /* default for comment card */
+    position: relative;
+    overflow: hidden;                    /* clip any overflowing content */
 }
 
 .comment-card:hover {
@@ -137,7 +153,7 @@
     position: absolute;
     top: 10px;
     right: 10px;
-    font-size: 22px;
+    font-size: 24px;
     cursor: pointer;
 }
 
@@ -198,7 +214,9 @@
     align-items: center;
     gap: 16px;
 }
-
+.post-header-top{
+    padding-bottom: 0;
+}
 /* Left side: avatar + name */
 .post-header-left {
     display: flex;
@@ -207,8 +225,8 @@
 }
 
 .post-avatar-wrapper {
-    width: 40px;
-    height: 40px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     overflow: hidden;
     flex-shrink: 0;
@@ -286,13 +304,11 @@
 .comment-count i {
     font-size: 20px;
 }
-.post-card.full-card img {
+.post-card.full-card .post-figure img {
     display: block;
     margin: 12px auto;       /* centers the image */
-    max-width: 100%;         /* don’t overflow card width */
-    max-height: 400px;       /* adjust max height as needed */
-    width: auto;             /* maintain natural width ratio */
-    height: auto;            /* maintain aspect ratio */
+    max-width: 80%;         /* don’t overflow card width */
+    max-height: 500px;       /* adjust max height as needed */
     border-radius: 12px;
     object-fit: contain;     /* scale image to fit without cropping */
 }

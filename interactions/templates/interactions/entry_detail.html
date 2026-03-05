@@ -11,27 +11,28 @@
 
     <!-- POST CARD WITH COMMENTS INSIDE -->
     <div class="post-card full-card">
-        <script src="{% static 'js/interactions.js' %}"></script>
+        <!-- <script src="{% static 'js/interactions.js' %}"></script> -->
 
         <!-- POST CONTENT -->
        <div class="post-header">
 
-    <!-- LEFT: avatar + name -->
-    <div class="post-header-left">
+    <!-- Row 1: avatar + username -->
+    <div class="post-header-top">
         <div class="post-avatar-wrapper">
-            {% if entry.author.profileImage %}
-                <img src="{{ entry.author.profileImage.url }}" 
-                     alt="{{ entry.author.displayName }}" 
+            {% if entry.author.author and entry.author.author.profileImage %}
+                <img src="{{ entry.author.author.profileImage.url }}"
+                     alt="{{ entry.author.author.displayName }}"
                      class="post-avatar">
             {% else %}
                 <div class="post-avatar-placeholder">
-                    {{ entry.author.displayName|make_list|first }}
+                    <i class="fa-regular fa-user"></i>
                 </div>
             {% endif %}
         </div>
-        <a href="{% url 'author-profile' entry.author.author.id %}">
-            <strong>{{ entry.author.username }}</strong>
-        </a>
+
+        <span class="post-author-name">
+            <a style="font-size: 20px;" class="author-link" href="{% url 'author-profile' entry.author.author.id %}">{{ entry.author.author.displayName|default:entry.author.username }}</a>
+        </span>
     </div>
 
     <!-- RIGHT: like + comment count -->
@@ -46,11 +47,11 @@
             <i class="fa{% if liked %}s{% else %}r{% endif %} fa-heart"></i>
             <span id="like-count-{{ entry.id }}">{{ entry.likes.count }}</span>
         </button>
-
     </div>
-
 </div>
+
         <hr class="post-divider">
+        
 
         <h2 class="post-title">{{ entry.title }}</h2>
 {% if entry.content_type == "image" and entry.image %}
@@ -73,24 +74,63 @@
 <span class="post-date">
     Published on {{ entry.published_at|date:"M d, Y H:i" }}
 </span>
+
+    <!-- POST OPTIONS (three dots menu) -->
+    {% if entry.author == request.user %}
+    <div class="post-options" style="position: relative;transform: translateY(-30px);text-align: right;;">
+        <button class="options-btn" 
+                onclick="event.stopPropagation(); togglePostOptions('{{ entry.id }}')">
+            <i class="fa-solid fa-ellipsis-v"></i>
+        </button>
+
+        <div id="post-options-menu-{{ entry.id }}" class="post-options-menu hidden">
+        <button class="menu-edit-btn" type="button"
+        onclick="event.stopPropagation();
+        window.openEditPostDescription(
+            '{{ entry.id }}',
+            `{{ entry.content|escapejs }}`,
+            '{% url "update_entry" entry.id %}'
+        );">
+            <i class="fa-solid fa-pen-to-square"></i> Edit Post
+        </button>
+            <hr class="menu-divider">
+            <button class="menu-delete-btn" type="button"
+                    onclick="event.stopPropagation();if (confirm('Are you sure you want to delete?\n\nThis cannot be undone >:(')) { 
+                            document.getElementById('delete-form-{{ entry.id }}').submit(); 
+                            }">
+                <i class="fa-solid fa-trash"></i> Delete
+            </button>
+            <!-- Future options can go here, e.g. -->
+            <!-- <button class="menu-item">Edit Post</button> -->
+        </div>
+
+        <!-- Hidden form (keeps POST + CSRF, but triggered via JS) -->
+        <form id="delete-form-{{ entry.id }}" method="POST" 
+            action="{% url 'delete_entry_ui' entry.id %}" style="display:none;">
+            {% csrf_token %}
+        </form>
+    </div>
+    {% endif %}
+
+        <hr class="menu-divider">
         <!-- COMMENTS SECTION BELOW POST -->
-        <div class="comments-section">
             <h3>Comments ({{ comments.count }})</h3>
+        <div class="comments-section">
 
             {% for comment in comments %}
             <div class="comment-card">
-                <strong>{{ comment.author.displayName }}</strong>
+                <span class="author-link" style="font-size: 16px;">{{ comment.author.displayName }}</span>
                 <span class="post-date">{{ comment.created_at|date:"M d, Y H:i" }}</span>
                 <p>{{ comment.content }}</p>
 
                 {% user_has_liked comment request.user as liked %}
                 <button class="like-btn" id="like-btn-{{ comment.id }}" onclick="toggleLike('comment', '{{ comment.id }}')">
-                    <i class="fa-solid fa-heart"></i>
+                    <i class="fa{% if liked %}s{% else %}r{% endif %} fa-heart"></i>
                     <span id="like-count-{{ comment.id }}">{{ comment.likes.count }}</span>
                 </button>
             </div>
             {% empty %}
-                <p>No comments yet.</p>
+                <p class="empty-state" style="text-align: center;">No comments yet.</p>
             {% endfor %}
             
             {% if user.is_authenticated %}
@@ -98,10 +138,10 @@
                 {% csrf_token %}
                 <textarea name="content" placeholder="Write a comment..." required></textarea>
                 <div class="comment-form-actions">
-<!-- <a href="/authors/{{ entry.author.id }}/profile/" class="btn btn-secondary">
-    <i class="fa-solid fa-arrow-left"></i> Back
-</a> -->
-                    <button type="submit" class="btn btn-primary">Comment</button>
+                    <a href="{% url 'author-profile' entry.author.author.id %}" class="btn btn-secondary">
+                        <i class="fa-solid fa-hand-point-left"></i> Back
+                    </a>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-bullhorn fa-rotate-by" style="--fa-rotate-angle: -15deg;"></i> Comment</button>
                 </div>
             </form>
             {% endif %}
@@ -109,6 +149,21 @@
 
     </div>
 </div>
+<!-- Edit Description Modal – only bio/description editable -->
+<div id="edit-description-modal" class="modal hidden">
+  <div class="modal-content">
+    <h2>Did you make a Typo?</h2>
+    <form id="edit-description-form">
+    {% csrf_token %}
+<input type="hidden" name="post_id">
 
+<textarea name="content" id="edit-description" placeholder="Update your post..."></textarea>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" id="close-edit-description" class="btn btn-secondary">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
 <script src="{% static 'js/interactions.js' %}"></script>
 {% endblock %}

@@ -31,7 +31,13 @@
 
 {% block content %}
 <div class="profile-container">
-
+    <!-- {% if profile_author != current_user_author%}
+        {%if not is_following and not has_pending_request%}
+            <h1>Hello Stranger (¬_¬")</h1>
+        {%else%}
+            <h1>Hello Friend </h1>
+        {%endif%}
+    {% endif %} -->
     <!--
       Hero area: This is the big header card at the top of the profile with avatar, name, stats,
       follow and edit buttons on the left, and description/bio on the right
@@ -64,16 +70,6 @@
             <div class="profile-info">
                 <h1>{{ profile_author.displayName }}</h1>
 
-                <!-- Optional GitHub link if they added it -->
-                {% if profile_author.github %}
-                <p class="profile-github">
-                    <i class="fa-brands fa-github"></i>
-                    <a href="{{ profile_author.github }}" target="_blank" rel="noopener">
-                        {{ profile_author.github|slice:"19:" }}
-                    </a>
-                </p>
-                {% endif %}
-
                 <!-- Social stats summary -->
                 <div class="profile-stats">
                     <div class="stat">
@@ -99,18 +95,19 @@
                     {% if current_user_author %}
                         {% if current_user_author == profile_author %}
                             <a href="{% url 'edit-profile' %}" class="btn btn-primary">
-                                Edit Profile
+                                <i class="fa-solid fa-pen-to-square"></i> Edit
                             </a>
 
                             <button id="open-create-post" class="btn btn-secondary" type="button">
-                                + Create Post
+                                <i class="fa-solid fa-plus"></i> Create
                             </button>
                         {% else %}
-                            {% if is_following %}
-                                <a href="{% url 'unfollow-author' author_id=profile_author.id %}" 
-                                   class="btn btn-secondary">
-                                    Unfollow
-                                </a>
+                        {% if is_following %}
+                        <a href="{% url 'unfollow-author' author_id=profile_author.id %}"
+                        class="btn btn-secondary"
+                        onclick="return confirm('Unfollow alert! °(°¯᷄◠¯᷅°)°\n{{ profile_author.displayName|capfirst}} will lose 1 cool follower (you).');">
+                            Unfollow
+                        </a>
                             {% elif has_pending_request %}
                                 <a href="{% url 'cancel-follow-request' author_id=profile_author.id %}" 
                                    class="btn btn-secondary">
@@ -141,6 +138,23 @@
                 <p class="empty-desc">No description provided.</p>
             {% endif %}
         </div>
+                <!-- Optional GitHub link if they added it -->
+                {% if profile_author.github %}
+                <p class="profile-links">
+                    <i class="fa-brands fa-github"></i>
+                    <a href="{{ profile_author.github }}" target="_blank" rel="noopener">
+                        {{ profile_author.github|slice:"19:" }}
+                    </a>
+                </p>
+                {% endif %}
+                {% if profile_author.web %}
+                <p class="profile-links">
+                    <i class="fa-solid fa-globe"></i>
+                    <a href="{{ profile_author.web }}" target="_blank" rel="noopener">
+                        {{ profile_author.web}}
+                    </a>
+                </p>
+                {% endif %}
 
     </div>
 
@@ -149,7 +163,7 @@
       Each card is clickable so it will take you to the full post details page.
     -->
     <div class="profile-content">
-        <h2>Public Posts</h2>
+        <h2>{{ profile_author.displayName|capfirst}}'s Timeline...</h2>
 
         {% if posts %}
         <div class="posts-grid">
@@ -176,9 +190,9 @@
             {% endif %}
         </div>
 
-        <span class="post-author-name">
+        <a class="post-author-name author-link" href="{% url 'author-profile' post.author.author.id %}">
             {{ post.author.author.displayName|default:post.author.username }}
-        </span>
+        </a>
     </div>
 
     <!-- Row 2: title -->
@@ -231,15 +245,37 @@
     </button>
 </div>
 
-            <!-- DELETE / VISIBILITY CONTROL -->
-            {% if post.visibility != "DELETED" %}
-            <form method="POST" action="{% url 'delete_entry_ui' post.id %}" class="delete-form">
-                {% csrf_token %}
-                <button type="submit" class="delete-btn" title="Delete Post">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
-            </form>
-            {% endif %}
+
+<!-- POST OPTIONS (three dots menu) -->
+{% if post.visibility != "DELETED" and post.author == request.user %}
+<div class="post-options">
+    <button class="options-btn" 
+            onclick="event.stopPropagation(); togglePostOptions('{{ post.id }}')">
+        <i class="fa-solid fa-ellipsis-v"></i>
+    </button>
+
+    <div id="post-options-menu-{{ post.id }}" class="post-options-menu hidden">
+        <button class="menu-edit-btn" type="button"
+        onclick="event.stopPropagation();window.openEditPostDescription('{{ post.id }}', `{{ post.content|escapejs }}`);", '{% url 'entry_detail' post.id %}');">
+            <i class="fa-solid fa-pen-to-square"></i> Edit Post
+        </button>
+        <button class="menu-delete-btn" type="button"
+                onclick="event.stopPropagation();if (confirm('Are you sure you want to delete?\n\nThis cannot be undone >:(')) { 
+                        document.getElementById('delete-form-{{ post.id }}').submit(); 
+                        }">
+            <i class="fa-solid fa-trash"></i> Delete
+        </button>
+        <!-- Future options can go here, e.g. -->
+        <!-- <button class="menu-item">Edit Post</button> -->
+    </div>
+
+    <!-- Hidden form (keeps POST + CSRF, but triggered via JS) -->
+    <form id="delete-form-{{ post.id }}" method="POST" 
+          action="{% url 'delete_entry_ui' post.id %}" style="display:none;">
+        {% csrf_token %}
+    </form>
+</div>
+{% endif %}
 
         </div>
             {% endfor %}
@@ -259,7 +295,7 @@
 {% if current_user_author and current_user_author == profile_author %}
 <div id="new-post-modal" class="modal hidden">
     <div class="modal-content">
-        <h2>New Post</h2>
+        <h2>What You Cookin'?</h2>
 
         <form id="new-post-form" enctype="multipart/form-data">
             {% csrf_token %}
@@ -298,10 +334,26 @@
 </div>
 {% endif %}
 
+<!-- Edit Description Modal – only bio/description editable -->
+<div id="edit-description-modal" class="modal hidden">
+  <div class="modal-content">
+    <h2>Did you make a Typo?</h2>
+    <form id="edit-description-form">
+    {% csrf_token %}
+<input type="hidden" name="post_id">
+
+<textarea name="content" id="edit-description" placeholder="Update your post..."></textarea>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" id="close-edit-description" class="btn btn-secondary">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
 <!--
   Comment modal: WIP
 -->
-<div id="comment-modal-{{ post.id }}" class="modal hidden">
+<!-- <div id="comment-modal-{{ post.id }}" class="modal hidden">
     <div class="modal-content">
         <h2>Add Comment</h2>
         <form class="comment-form" data-post-id="{{ post.id }}">
@@ -313,7 +365,7 @@
             </div>
         </form>
     </div>
-</div>
+</div> -->
 
 {% endblock %}
 
@@ -324,6 +376,20 @@
 {% block extra_js %}
 <script src="{% static 'js/interactions.js' %}"></script>
 {% if current_user_author and current_user_author == profile_author %}
+    <style>
+        #profile i{
+            transform: scale(1.5);
+            font-weight: 800;
+        }
+    </style>
     <script src="{% static 'js/posts.js' %}"></script>
+{%else%}
+    <style>
+        #explore i{
+            transform: scale(1.5);
+            font-weight: 800;
+        }
+    </style>
 {% endif %}
+
 {% endblock %}

@@ -11,7 +11,8 @@
 
 {% block content %}
 <div class="profile-container">
-    <h1>My Stream</h1>
+    
+        <h1>The Sacred Timeline...</h1>
 
     {% if posts %}
     <div class="posts-grid">
@@ -35,9 +36,10 @@
                         {% endif %}
                     </div>
 
-                    <span class="post-author-name">
-                        {{ post.author.author.displayName|default:post.author.username }}
-                    </span>
+
+        <a class="post-author-name author-link" href="{% url 'author-profile' post.author.author.id %}">
+            {{ post.author.author.displayName|default:post.author.username }}
+        </a>
                 </div>
 
                 <!-- Title row -->
@@ -86,24 +88,74 @@
                 </button>
             </div>
 
-            <!-- DELETE / VISIBILITY CONTROL -->
-            {% if post.visibility != "DELETED" %}
-            <form method="POST" action="{% url 'delete_entry_ui' post.id %}" class="delete-form">
-                {% csrf_token %}
-                <button type="submit" class="delete-btn" title="Delete Post">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
-            </form>
-            {% endif %}
+<!-- POST OPTIONS (three dots menu) -->
+{% if post.visibility != "DELETED" and post.author == request.user %}
+<div class="post-options">
+    <button class="options-btn" 
+            onclick="event.stopPropagation(); togglePostOptions('{{ post.id }}')">
+        <i class="fa-solid fa-ellipsis-v"></i>
+    </button>
+
+    <div id="post-options-menu-{{ post.id }}" class="post-options-menu hidden">
+        <button class="menu-edit-btn" type="button"
+        onclick="event.stopPropagation();
+        window.openEditPostDescription(
+            '{{ post.id }}',
+            `{{ post.content|escapejs }}`,
+            '{% url "update_entry" post.id %}'
+        );">
+            <i class="fa-solid fa-pen-to-square"></i> Edit Post
+        </button>
+        <hr class="menu-divider">
+        <button class="menu-delete-btn" type="button"
+                onclick="event.stopPropagation();if (confirm('Are you sure you want to delete?\n\nThis cannot be undone >:(')) { 
+                        document.getElementById('delete-form-{{ post.id }}').submit(); 
+                        }">
+            <i class="fa-solid fa-trash"></i> Delete
+        </button>
+        <!-- Future options can go here, e.g. -->
+        <!-- <button class="menu-item">Edit Post</button> -->
+    </div>
+
+    <!-- Hidden form (keeps POST + CSRF, but triggered via JS) -->
+    <form id="delete-form-{{ post.id }}" method="POST" 
+          action="{% url 'delete_entry_ui' post.id %}" style="display:none;">
+        {% csrf_token %}
+    </form>
+</div>
+{% endif %}
 
         </div>
         {% endfor %}
+
     </div>
     {% else %}
         <p class="empty-state">No posts yet.</p>
     {% endif %}
 
+<!-- Edit Description Modal – only bio/description editable -->
+<div id="edit-description-modal" class="modal hidden">
+  <div class="modal-content">
+    <h2>Did you make a Typo?</h2>
+    <form id="edit-description-form">
+    {% csrf_token %}
+<input type="hidden" name="post_id">
+
+<textarea name="content" id="edit-description" placeholder="Update your post..."></textarea>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" id="close-edit-description" class="btn btn-secondary">Cancel</button>
+      </div>
+    </form>
+  </div>
 </div>
+</div>
+<style>
+    #stream i{
+        transform: scale(1.5);
+        font-weight: 800;
+    }
+</style>
 {% endblock %}
 
 {% block extra_js %}

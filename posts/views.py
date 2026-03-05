@@ -123,6 +123,35 @@ def create_entry(request):
     )
     return JsonResponse({"id": str(entry.id)}, status=201)
 
+from django.views.decorators.http import require_http_methods
+@login_required
+@require_http_methods(["PUT"])
+def update_entry(request, entry_id):
+    try:
+        entry = Entry.objects.get(id=entry_id, author=request.user)
+    except Entry.DoesNotExist:
+        return JsonResponse({"error": "Entry not found or not yours"}, status=404)
+
+    try:
+        data = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    # Only update content if provided
+    if "content" in data:
+        entry.content = data["content"].strip()
+
+    # Ignore title, content_type, image, visibility, etc.
+    # (you can add them back if you need full edit later)
+
+    entry.save()
+
+    return JsonResponse({
+        "id": str(entry.id),
+        "message": "Updated successfully",
+        "content": entry.content
+    }, status=200)
+
 def get_entry(request, entry_id):
     """
     Returns a JSON representation of an entry.

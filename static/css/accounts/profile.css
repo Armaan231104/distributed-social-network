@@ -5,7 +5,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 30px;
-    padding: 30px;
+    padding: 25px;
     border-radius: 20px;
     background: rgba(255,255,255,1);
     backdrop-filter: blur(20px);
@@ -13,23 +13,23 @@
     border: 1px solid rgba(255,26,98,0.15);
     position: relative;
     overflow: hidden;
-    animation: float 5s ease-in-out infinite alternate;
+    animation: float 6s ease-in-out infinite alternate;
 }
 
 @keyframes float {
-    0%   { transform: translateY(0) rotate(0deg); }
+    0%   { transform: translateY(0) rotate(0.1deg); }
     50%  { transform: translateY(-8px) rotate(0.4deg); }
     100% { transform: translateY(0) rotate(-0.1deg); }
 }
 
 /* SPLIT HERO MOD */
 .profile-main {
-    flex: 0 0 70%;
+    flex: 0 0 65%;
     display: flex;
     gap: 30px;
 }
 .profile-description-side {
-    flex: 0 0 20%;
+    flex: 0 0 25%;
     padding-left: 20px;
     border-left: 1px solid rgba(0,0,0,0.08);
     display: flex;
@@ -111,7 +111,7 @@
 }
 
 /* ============================= */
-/* PROFILE INFO & GITHUB LINKS   */
+/* PROFILE INFO & PROFILE LINKS   */
 /* ============================= */
 .profile-info {
     flex: 1;
@@ -141,26 +141,26 @@
 }
 .profile-info h1:hover::after { width: 130px; }
 
-.profile-github {
+.profile-links {
     display: flex;
     align-items: center;
     gap: 12px;
-    font-size: 16px;
+    font-size: 14px;
     color: #555;
     margin-bottom: 25px;
 }
-.profile-github i,
-.profile-github a {
+.profile-links i,
+.profile-links a {
     transition: all 0.3s ease;
 }
-.profile-github i { font-size: 20px; color: #ff1a62; }
-.profile-github a {
+.profile-links i { font-size: 20px; color: #ff1a62; }
+.profile-links a {
     color: #ff1a62;
     text-decoration: none;
     font-weight: 500;
 }
-.profile-github a:hover,
-.profile-github i:hover { color: #ffa023; transform: scale(1.05); }
+.profile-links a:hover,
+.profile-links i:hover { color: #ffa023; transform: scale(1.05); }
 
 /* ============================= */
 /* STATS                         */
@@ -203,6 +203,9 @@
     flex-wrap: wrap;
     gap: 15px;
 }
+.profile-actions button ,.profile-actions a {
+    padding: 12px 24px;
+}
 
 /* ============================= */
 /* POSTS & EMPTY STATE           */
@@ -219,6 +222,7 @@
     gap: 24px;
     grid-auto-rows: auto;       /* cards can be different heights */
     grid-auto-flow: dense;      /* fills gaps in columns */
+    grid-template-rows: masonry;
 }
 /* Responsive columns */
 @media (max-width: 1000px) {
@@ -243,6 +247,7 @@
     position: relative;
     overflow: hidden;
     align-self: start;
+    /* transform: rotate(1deg); */
 }
 
 .post-card::before {
@@ -256,7 +261,7 @@
 }
 .post-card:hover::before { opacity: 0.08; }
 .post-card:hover {
-    transform: translateY(0) rotate(0.4deg);
+    transform: translateY(0) rotate(0.3deg);
     box-shadow: 0 25px 60px rgba(244,23,23,0.25);
 }
 
@@ -271,7 +276,7 @@
 
 .empty-state {
     text-align: center;
-    font-size: 16px;
+    font-size: 18px;
     color: #666;
     padding: 60px 20px;
     border-radius: 14px;
@@ -328,7 +333,7 @@
     gap: 20px;
 }
 #new-post-form input,
-#new-post-form textarea,
+.modal textarea,
 #new-post-form select {
     width: 100%;
     padding: 16px 18px;
@@ -406,17 +411,26 @@
 /* ============================= */
 /* RESPONSIVE                     */
 /* ============================= */
-@media (max-width: 900px) {
+/* @media (max-width: 900px) {
     .profile-hero { flex-direction: column; }
     .profile-main,
     .profile-description-side { flex: 1 1 100%; border-left: none; padding-left: 0; }
-    .profile-description-side { margin-top: 20px; }
+    .profile-description-side { margin-top: 20px;}
+    
+} */
+@media (max-width: 900px) {
+    .profile-main { 
+    flex: 0 0 90%;
+    }
+    .profile-description-side {
+    flex: 0 0 90%;
+    }
 }
 @media (max-width: 700px) {
-    .profile-hero { flex-direction: column; text-align: center; padding: 40px 20px; }
+    /* .profile-hero { flex-direction: column; text-align: center; padding: 40px 20px; } */
     .profile-avatar-wrapper { margin: 0 auto; }
-    .profile-stats { justify-content: center; gap: 30px; }
-    .profile-actions { justify-content: center; }
+    .profile-stats { justify-content: center; gap: 10px; }
+    /* .profile-actions { justify-content: center; } */
     .posts-grid { grid-template-columns: 1fr; }
 }
 
@@ -518,7 +532,6 @@
     align-items: center;
     gap: 12px;
     padding-bottom: 10px;
-    border-bottom: 1px solid rgba(0,0,0,0.08); /* 👈 divider line */
 }
 
 /* Avatar circle */
@@ -586,25 +599,73 @@ figcaption{
 }
 
 /* ============================= */
-/* DELETE BUTTON (trash) */
-.delete-form {
+/* POST OPTIONS MENU (replaces old delete btn) */
+/* ============================= */
+.post-options {
     position: absolute;
     bottom: 16px;
     right: 16px;
-    margin: 0;
+    z-index: 3;                     /* above like/comment if overlap */
 }
 
-.delete-btn {
+.options-btn {
     background: transparent;
     border: none;
-    font-size: 22px; /* same size as like button */
+    font-size: 22px;                /* same size as old delete / like btn */
+    color: #ff1a62;                 /* matches your theme pink */
     cursor: pointer;
+    padding: 4px;
     line-height: 1;
-    color: #ff1a62; /* match like button hover gradient color */
     transition: transform 0.2s ease, color 0.2s ease;
 }
 
-.delete-btn:hover {
+.options-btn:hover {
     transform: scale(1.2);
-     color: #ffa023;
+    color: #ffa023;                 /* orange on hover, like your other hovers */
+}
+
+.post-options-menu {
+    position: absolute;
+    bottom: 100%;                   /* pops upward from button */
+    right: 0;
+    margin-bottom: 8px;             /* space from button */
+    background: rgba(255,255,255,0.95);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(244,23,23,0.18);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,26,98,0.15);
+    min-width: 140px;
+    overflow: hidden;
+    z-index: 4;
+}
+
+.post-options-menu.hidden {
+    display: none;
+}
+
+.post-options-menu button {
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 12px 16px;
+    font-size: 15px;
+    color: #e63946;/* red for delete danger */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.post-options-menu button:hover {
+    color: #ffa023; transform: scale(1.05); 
+}
+
+.post-options-menu i {
+    font-size: 18px;
+}
+.menu-divider {
+    border: none;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    margin: 4px 0;
 }

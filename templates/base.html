@@ -16,34 +16,35 @@
     <!-- Sidebar -->
     <aside class="sidebar">
         <div class="logo">
-            <a href="/">Crimson</a>
+            <a href="/posts/stream"">Crimson</a>
         </div>
 
         <nav class="sidebar-links">
 
-            <a href="/posts/stream">
+            <a href="/posts/stream" id="stream">
                 <i class="fa-regular fa-house"></i>
                 <span>Home</span>
             </a>
 
-            <a href="{% url 'authors-list' %}">
+            <a href="{% url 'authors-list' %}" id="explore">
                 <i class="fa-regular fa-compass"></i>
                 <span>Explore</span>
             </a>
 
             {% if user.is_authenticated %}
-                <a href="{% url 'my-profile' %}">
+                <a href="{% url 'my-profile' %}" id="profile">
                     <i class="fa-regular fa-user"></i>
                     <span>Profile</span>
                 </a>
 
-                <a href="{% url 'follow-requests' %}">
+                <a href="{% url 'follow-requests' %}" id="requests">
                     <i class="fa-regular fa-bell"></i>
                     <span>Requests</span>
                 </a>
-                <form method="POST" action="{% url 'logout' %}" style="display: contents;">
+                <form method="POST" action="{% url 'logout' %}" style="display: contents;" id="logout">
                     {% csrf_token %}
-                    <button type="submit" class="sidebar-link">
+                    <button type="submit" class="sidebar-link"
+                            onclick="return confirm('Logging Out\n\nIt will be lonely without you… come back soon! ¯\\_(ツ)_/¯');">
                         <i class="fa-regular fa-right-from-bracket"></i>
                         <span>Logout</span>
                     </button>
@@ -66,7 +67,7 @@
         </main>
 
         <footer class="footer">
-            <p>&copy; {{ now|date:"Y" }} Crimson. All rights reserved.</p>
+            <span>&copy; {{ now|date:"Y" }} Crimson. All rights reserved.</span>
         </footer>
     </div>
 
