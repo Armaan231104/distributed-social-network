@@ -232,6 +232,7 @@ def edit_entry(request, entry_id):
     """
     entry = get_object_or_404(Entry, id=entry_id)
 
+
     if entry.author != request.user:
         return HttpResponseForbidden()
 
@@ -245,6 +246,7 @@ def edit_entry(request, entry_id):
     if request.content_type and request.content_type.startswith("multipart/form-data"):
         entry.title = request.POST.get("title", entry.title)
         entry.content = request.POST.get("content", entry.content)
+
 
         ct = request.POST.get("contentType", getattr(entry, "content_type", "text/plain"))
         if ct not in dict(Entry.CONTENT_TYPES).keys():

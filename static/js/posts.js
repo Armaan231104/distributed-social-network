@@ -132,7 +132,6 @@ const payload = {
   contentType: contentType,
   visibility: visibilitySelect.value
 };
-
         res = await fetch('/posts/api/entries/create/', {
           method: 'POST',
           headers: {

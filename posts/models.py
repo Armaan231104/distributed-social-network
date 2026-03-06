@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 import uuid
+from datetime import timedelta
 
 # The following class edited by Open AI, Chat GPT 5.2, "please adjust this class to properly handle image, plaintext, and commonmark input", 2026-02-26 
 class Entry(models.Model):
@@ -36,6 +37,8 @@ class Entry(models.Model):
     content = models.TextField(blank=True)
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default="PUBLIC")
     published_at = models.DateTimeField(auto_now_add=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
     
     content_type = models.CharField(
         max_length = 20,
@@ -66,3 +69,7 @@ class Entry(models.Model):
         """
         self.visibility = "DELETED"
         self.save()
+
+    @property
+    def is_edited(self):
+        return (self.updated_at - self.published_at) > timedelta(seconds=1)

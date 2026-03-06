@@ -70,8 +70,10 @@
             <!-- POST DATE -->
             <span class="post-date">
                 Published on {{ post.published_at|date:"M d, Y H:i" }}
+            {% if post.is_edited %}
+               <br>(edited)
+            {% endif %}
             </span>
-
             <!-- POST INTERACTIONS -->
             <div class="post-interactions">
                 <!-- COMMENT BUTTON -->
