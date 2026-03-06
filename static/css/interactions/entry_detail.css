@@ -203,7 +203,7 @@
 }
 
 .post-card:hover {
-    transform: translateY(-4px) rotate(0deg);
+    transform: translateY(0) rotate(0deg);
     box-shadow: 0 25px 60px rgba(244,23,23,0.25);
 }
 

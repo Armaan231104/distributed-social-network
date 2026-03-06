@@ -16,7 +16,8 @@
     <!-- Sidebar -->
     <aside class="sidebar">
         <div class="logo">
-            <a href="/posts/stream"">Crimson</a>
+            <a href="/posts/stream"">Crimson</a> 
+            <br>
         </div>
 
         <nav class="sidebar-links">
@@ -74,8 +75,9 @@
 </div>
 
 {% block extra_js %}
-    <script src="{% static 'js/script.js' %}"></script>
 {% endblock %}
-
+<div id="glass-overlay"></div>
+<span id="toggle-torch"><i class="fa-regular fa-moon"></i></span>
 </body>
+    <script src="{% static 'js/script.js' %}"></script>
 </html>

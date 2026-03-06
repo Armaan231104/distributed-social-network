@@ -10,6 +10,34 @@ body {
     word-wrap: break-word;
 }
 
+#glass-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;       /* clicks pass through */
+  z-index: 9999;
+  background: black;
+  opacity: 0;                 /* start invisible */
+  transition: opacity 0.5s;   /* smooth fade in/out */
+}
+#toggle-torch {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 100001;       /* above overlay */
+  font-size: 32px;        /* size of icon */
+  color: black;         /* crimson vibe */
+  cursor: pointer;        /* indicates clickable */
+  transition: transform 0.5s, color 0.2s;
+  transform: rotate(-15deg);
+}
+
+#toggle-torch:hover {
+  transform: scale(1.5) rotate(-20deg);
+  color: #ce0041; 
+}
 button,.btn{
     font-family: 'Times New Roman', Times, serif !important;
     font-size: inherit;
