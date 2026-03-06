@@ -247,8 +247,10 @@
     position: relative;
     overflow: hidden;
     align-self: start;
+    
     /* transform: rotate(1deg); */
 }
+
 
 .post-card::before {
     content: "";
@@ -668,4 +670,18 @@ figcaption{
     border: none;
     border-top: 1px solid rgba(0, 0, 0, 0.08);
     margin: 4px 0;
+}
+.post-card:hover{
+transform:translateY(-3px);
+box-shadow:0 12px 28px rgba(0,0,0,0.12);
+}
+
+.type-row{
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.type-row select{
+    flex: 1;
 }

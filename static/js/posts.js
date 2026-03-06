@@ -22,6 +22,7 @@ window.addEventListener('load', () => {
 
   // INPUTS / BOXES
   const typeSelect = document.getElementById('content-type-select');
+  const visibilitySelect = document.getElementById('visibility-select');
   const textarea = form.querySelector('textarea[name="content"]');
   const imageInput = document.getElementById('image-input');
   const imageBox = document.getElementById('image-upload-box');
@@ -125,11 +126,12 @@ window.addEventListener('load', () => {
         });
 
       } else {
-        const payload = {
-          title: form.elements.title.value,
-          content: form.elements.content.value,
-          contentType: contentType
-        };
+const payload = {
+  title: form.elements.title.value,
+  content: form.elements.content.value,
+  contentType: contentType,
+  visibility: visibilitySelect.value
+};
 
         res = await fetch('/posts/api/entries/create/', {
           method: 'POST',

@@ -71,20 +71,23 @@ def entry_detail(request, entry_id):
         'author_path': author_path,
         
     })
-
 @login_required
 def create_entry(request):
-    """
-    Creates a new entry. 
-    """
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=400)
 
+    valid_visibilities = [v[0] for v in Entry.VISIBILITY_CHOICES]
+
     # A) multipart/form-data => image upload
     if request.content_type and request.content_type.startswith("multipart/form-data"):
+
         title = request.POST.get("title", "")
         content = request.POST.get("content", "")
         content_type = request.POST.get("contentType", "image")
+        visibility = request.POST.get("visibility", "PUBLIC")
+
+        if visibility not in valid_visibilities:
+            return JsonResponse({"error": "Invalid visibility"}, status=400)
 
         image_file = request.FILES.get("image")
         if not image_file:
@@ -95,8 +98,10 @@ def create_entry(request):
             title=title,
             content=content,
             content_type=content_type,
+            visibility=visibility,
             image=image_file
         )
+
         return JsonResponse({"id": str(entry.id)}, status=201)
 
     # B) JSON => text/plain or text/markdown
@@ -108,11 +113,13 @@ def create_entry(request):
     title = data.get("title", "")
     content = data.get("content", "")
     content_type = data.get("contentType", "text/plain")
+    visibility = data.get("visibility", "PUBLIC")
 
     if content_type not in dict(Entry.CONTENT_TYPES).keys():
-        return JsonResponse({"error": "Invalid contentType for JSON post"}, status=400)
+        return JsonResponse({"error": "Invalid contentType"}, status=400)
 
-    visibility = data.get("visibility", "PUBLIC")
+    if visibility not in valid_visibilities:
+        return JsonResponse({"error": "Invalid visibility"}, status=400)
 
     entry = Entry.objects.create(
         author=request.user,
@@ -121,6 +128,7 @@ def create_entry(request):
         content_type=content_type,
         visibility=visibility
     )
+
     return JsonResponse({"id": str(entry.id)}, status=201)
 
 from django.views.decorators.http import require_http_methods

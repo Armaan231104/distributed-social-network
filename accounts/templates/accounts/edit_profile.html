@@ -28,6 +28,12 @@
             <div class="form-group">
                 <label for="id_github">GitHub URL</label>
                 {{ form.github }}
+<br>
+                {% if form.github.errors %}
+                    <div class="form-error">
+                        {{ form.github.errors.0 }}
+                    </div>
+                {% endif %}
             </div>
 
             <div class="form-group">
@@ -86,6 +92,18 @@
         transform: scale(2);
         font-weight: 800;
     }
+    .form-error {
+        color: #ff0800;
+        font-size: 14px;
+        margin-top: 4px;
+        font-weight: 800;
+    animation: float2 0.5s ease-in-out 3 alternate;
+    }
+@keyframes float2 {
+    0%   { transform: scaleY(1); opacity: 1; }
+    50%  { transform: scaleY(1); opacity: 0; }
+    100% { transform: scaleY(1); opacity: 1; }
+}
 </style>
 <link rel="stylesheet" href="{% static 'css/accounts/edit_profile.css' %}">
 <script src="{% static 'js/edit_profile.js' %}"></script>

@@ -212,10 +212,11 @@
             {% if post.content_type == "image" and post.image %}
                 <figure class="stream-post-media">
                     <img src="{{ post.image.url }}" alt="{{ post.title }}" class="post-content-image">
+
+                </figure>
                     {% if post.content %}
                         <figcaption>{{ post.content }}</figcaption>
                     {% endif %}
-                </figure>
 
             {% elif post.content_type == "text/markdown" %}
                 <section class="stream-post-body">
@@ -301,12 +302,21 @@
             {% csrf_token %}
 
             <input type="text" name="title" placeholder="Title" required>
+<div class="type-row">
 
-            <select name="contentType" id="content-type-select">
-                <option value="text/plain">Plain Text</option>
-                <option value="text/markdown">Markdown</option>
-                <option value="image">Image</option>
-            </select>
+    <select name="contentType" id="content-type-select">
+        <option value="text/plain">Plain Text</option>
+        <option value="text/markdown">Markdown</option>
+        <option value="image">Image</option>
+    </select>
+
+    <select name="visibility" id="visibility-select">
+        <option value="PUBLIC">Public</option>
+        <option value="UNLISTED">Unlisted</option>
+        <option value="FRIENDS">Friends</option>
+    </select>
+
+</div>
 
             <textarea name="content" placeholder="Write your post..."></textarea>
 
