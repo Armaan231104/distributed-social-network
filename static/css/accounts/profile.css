@@ -242,7 +242,7 @@
     padding: 22px;
     backdrop-filter: blur(12px);
     box-shadow: 0 15px 35px rgba(244,23,23,0.12);
-    transition: all 0.3s ease;
+    transition: transform 0 ease;
     cursor: pointer;
     position: relative;
     overflow: hidden;
@@ -263,7 +263,8 @@
 }
 .post-card:hover::before { opacity: 0.08; }
 .post-card:hover {
-    transform: translateY(0) rotate(0.3deg);
+    background-color: rgba(255, 255, 255, 0.9);
+    /* transition: all 0.6s ease; */
     box-shadow: 0 25px 60px rgba(244,23,23,0.25);
 }
 
@@ -671,17 +672,13 @@ figcaption{
     border-top: 1px solid rgba(0, 0, 0, 0.08);
     margin: 4px 0;
 }
-.post-card:hover{
-transform:translateY(-3px);
-box-shadow:0 12px 28px rgba(0,0,0,0.12);
-}
 
-.type-row{
+.type-row {
     display: flex;
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 12px;
+    width: 100%;
 }
 
-.type-row select{
-    flex: 1;
+.type-row select {
+    flex: 1;   /* makes them share the row evenly */
 }

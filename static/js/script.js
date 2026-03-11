@@ -67,3 +67,110 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+function applyMasonryRowWise() {
+    const grid = document.querySelector('.posts-grid');
+    const items = Array.from(grid.children);
+
+    // Determine number of columns
+    let COLS = 3;
+    if (window.innerWidth <= 700) COLS = 1;
+    else if (window.innerWidth <= 1000) COLS = 2;
+
+    // Reset transforms
+    items.forEach(item => item.style.transform = 'translateY(0px)');
+
+    // Keep track of cumulative height diff per column
+    let colOffset = new Array(COLS).fill(0);
+
+    // Process items row by row
+    for (let i = 0; i < items.length; i += COLS) {
+        const rowItems = items.slice(i, i + COLS);
+
+        // Find tallest item in this row
+        const tallest = Math.max(...rowItems.map(item => item.offsetHeight));
+
+        if (COLS === 2 && rowItems.length === 2) {
+            // Special 2-col logic: shorter item gets half the difference
+            const h0 = rowItems[0].offsetHeight;
+            const h1 = rowItems[1].offsetHeight;
+            const diff = Math.abs(h0 - h1) / 2;
+
+            if (h0 > h1) {
+                rowItems[0].style.transform = `translateY(${0}px)`;
+                rowItems[1].style.transform = `translateY(${diff}px)`;
+                colOffset[0] += 0;
+                colOffset[1] += diff;
+            } else if (h1 > h0) {
+                rowItems[0].style.transform = `translateY(${diff}px)`;
+                rowItems[1].style.transform = `translateY(${0}px)`;
+                colOffset[0] += diff;
+                colOffset[1] += 0;
+            } else {
+                continue
+            }
+
+            // Add the difference to cumulative offset
+            colOffset = colOffset.map((offset, idx) => offset + Math.abs(h0 - h1)/2);
+
+            // Add hover scale for both items
+            rowItems.forEach((item, idx) => {
+                const colIndex = idx;
+                item.addEventListener('mouseenter', () => {
+                    const currentTransform = item.style.transform || '';
+                    const translateMatch = currentTransform.match(/translateY\([^)]+\)/);
+                    const translateValue = translateMatch ? translateMatch[0] : 'translateY(0px)';
+                    item.style.transform = `${translateValue} scale(1.02)`;
+                });
+                item.addEventListener('mouseleave', () => {
+                    const currentTransform = item.style.transform || '';
+                    const translateMatch = currentTransform.match(/translateY\([^)]+\)/);
+                    const translateValue = translateMatch ? translateMatch[0] : 'translateY(0px)';
+                    item.style.transform = `${translateValue} scale(1)`;
+                });
+            });
+
+        } else {
+            // Normal logic for 3 cols or single items
+            rowItems.forEach((item, idx) => {
+                const colIndex = idx; // column in this row
+                const diff = tallest - item.offsetHeight; // difference to tallest
+
+                // Apply translate based on cumulative offset
+                item.style.transform = `translateY(-${colOffset[colIndex]}px)`;
+
+                // Add hover scale
+                item.addEventListener('mouseenter', () => {
+                    const currentTransform = item.style.transform || '';
+                    const translateMatch = currentTransform.match(/translateY\([^)]+\)/);
+                    const translateValue = translateMatch ? translateMatch[0] : 'translateY(0px)';
+                    item.style.transform = `${translateValue} scale(1.02)`;
+                });
+                item.addEventListener('mouseleave', () => {
+                    const currentTransform = item.style.transform || '';
+                    const translateMatch = currentTransform.match(/translateY\([^)]+\)/);
+                    const translateValue = translateMatch ? translateMatch[0] : 'translateY(0px)';
+                    item.style.transform = `${translateValue} scale(1)`;
+                });
+
+                // Add the difference to this column's cumulative offset
+                colOffset[colIndex] += diff;
+            });
+        }
+    }
+}
+
+// Wait for full load to ensure offsets are correct
+window.addEventListener('load', () => {
+    applyMasonryRowWise();
+});
+window.addEventListener('resize', () => {
+    applyMasonryRowWise();
+});
+// Run initially
+window.addEventListener('load', () => {
+    applyMasonryRowWise();
+});
+// Re-run on resize
+window.addEventListener('resize', () => {
+    applyMasonryRowWise();
+});

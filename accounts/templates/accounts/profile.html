@@ -173,34 +173,34 @@
             <!--
               Post header: small avatar and author name.
             -->
-<!-- Post header -->
-<div class="post-header">
+            <!-- Post header -->
+            <div class="post-header">
 
-    <!-- Row 1: avatar + username -->
-    <div class="post-header-top">
-        <div class="post-avatar-wrapper">
-            {% if post.author.author and post.author.author.profileImage %}
-                <img src="{{ post.author.author.profileImage.url }}"
-                     alt="{{ post.author.author.displayName }}"
-                     class="post-avatar">
-            {% else %}
-                <div class="post-avatar-placeholder">
-                    <i class="fa-regular fa-user"></i>
+                <!-- Row 1: avatar + username -->
+                <div class="post-header-top">
+                    <div class="post-avatar-wrapper">
+                        {% if post.author.author and post.author.author.profileImage %}
+                            <img src="{{ post.author.author.profileImage.url }}"
+                                alt="{{ post.author.author.displayName }}"
+                                class="post-avatar">
+                        {% else %}
+                            <div class="post-avatar-placeholder">
+                                <i class="fa-regular fa-user"></i>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <a class="post-author-name author-link" href="{% url 'author-profile' post.author.author.id %}">
+                        {{ post.author.author.displayName|default:post.author.username }}
+                    </a>
                 </div>
-            {% endif %}
-        </div>
 
-        <a class="post-author-name author-link" href="{% url 'author-profile' post.author.author.id %}">
-            {{ post.author.author.displayName|default:post.author.username }}
-        </a>
-    </div>
+                <!-- Row 2: title -->
+                <div class="post-title-row">
+                    <h3 class="post-title">{{ post.title }}</h3>
+                </div>
 
-    <!-- Row 2: title -->
-    <div class="post-title-row">
-        <h3 class="post-title">{{ post.title }}</h3>
-    </div>
-
-</div>
+            </div>
 
             <!--
               Post body: can be image, plaintext, or commonmark and renders
@@ -317,7 +317,6 @@
     </select>
 
 </div>
-
             <textarea name="content" placeholder="Write your post..."></textarea>
 
             <!-- Image upload row (hidden until “Image” is selected in the dropdown) -->

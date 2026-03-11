@@ -1,5 +1,4 @@
 // interactions.js
-
 // Like / Unlike a post/entry
 function toggleLike(objectType, objectId) {
     fetch(`/interactions/like/${objectType}/${objectId}/`, {

@@ -294,8 +294,12 @@ def delete_entry_ui(request, entry_id):
     if entry.author != request.user:
         return HttpResponseForbidden("You cannot delete this entry.")
 
-    entry.soft_delete()
-    return redirect("stream")
+    entry.soft_delete()    
+    referrer = request.META.get("HTTP_REFERER")
+    if referrer:
+        return redirect(referrer)
+    else:
+        return redirect("stream")  # fallback
 
 @login_required
 def delete_entry(request, entry_id):
@@ -314,4 +318,3 @@ def delete_entry(request, entry_id):
 
     entry.soft_delete()
     return JsonResponse({"deleted": True})
-

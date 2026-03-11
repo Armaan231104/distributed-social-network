@@ -1,6 +1,6 @@
 body {
     font-family: 'Times New Roman', Times, serif !important;
-    background: linear-gradient(45deg, #ff2066, #ffa023, #ff3737);
+    background: linear-gradient(265deg, #ff2066, #ffa023, #ff3737);
     background-size: 400% 400%;
     animation: gradientMove 40s ease infinite;
     color: #000000;
