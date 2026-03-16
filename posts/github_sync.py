@@ -54,7 +54,7 @@ def sync_github_activity():
                 content = f"{commit_messages}\n\nhttps://github.com/{repo}"
             else:
                 print("Push event without commits")
-                content = f"New push activity on GitHub\n\nhttps://github.com/{repo}"
+                content = f"New push activity on GitHub\n\n<a href='https://github.com/{repo}'>Click me! <i class='fa-brands fa-github'></i></a>"
 
             # Create entry for each author linked to this GitHub
             for author in authors_with_same_github:
@@ -73,7 +73,7 @@ def sync_github_activity():
                     title=f"Pushed to {repo}",
                     content=content,
                     visibility="PUBLIC",
-                    content_type="text/plain",
+                    content_type="text/markdown",
                     github_event_id=event["id"]
                 )
 
