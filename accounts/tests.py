@@ -479,3 +479,56 @@ class AuthorSignalTest(TestCase):
         user = User.objects.create_user(username='testuser', password='pass123')
         author = Author.objects.get(user=user)
         self.assertEqual(author.displayName, 'testuser')
+
+
+class AuthorAdminDeleteTest(TestCase):
+    """Tests for admin delete functionality - delete author and user together."""
+    
+    def setUp(self):
+        self.client = Client()
+    
+    def test_delete_author_also_deletes_user(self):
+        """Verifies deleting an Author also deletes the associated User."""
+        user = User.objects.create_user(username='testauthor', password='pass123')
+        author = Author.objects.get(user=user)
+        
+        author_id = author.id
+        user_id = user.id
+        
+        author.delete()
+        
+        self.assertFalse(Author.objects.filter(id=author_id).exists())
+        self.assertFalse(User.objects.filter(id=user_id).exists())
+    
+    def test_delete_author_with_follows_cleans_up(self):
+        """Verifies deleting Author also cleans up Follow/FollowRequest records."""
+        user1 = User.objects.create_user(username='author1', password='pass123')
+        user2 = User.objects.create_user(username='author2', password='pass123')
+        author1 = Author.objects.get(user=user1)
+        author2 = Author.objects.get(user=user2)
+        
+        Follow.objects.create(follower=author1, followee=author2)
+        Follow.objects.create(follower=author2, followee=author1)
+        
+        author1_id = author1.id
+        user1_id = user1.id
+        
+        author1.delete()
+        
+        self.assertFalse(Author.objects.filter(id=author1_id).exists())
+        self.assertFalse(User.objects.filter(id=user1_id).exists())
+        self.assertFalse(Follow.objects.filter(follower_id=author1_id).exists())
+    
+    def test_delete_remote_author_without_user(self):
+        """Verifies deleting a remote Author (no User) works without errors."""
+        remote_author = Author.objects.create(
+            id='http://remote.com/api/authors/abc/',
+            host='http://remote.com/api/',
+            displayName='Remote Author',
+            is_approved=True,
+            user=None
+        )
+        
+        remote_author.delete()
+        
+        self.assertFalse(Author.objects.filter(id=remote_author.id).exists())

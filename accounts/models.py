@@ -71,6 +71,21 @@ class Author(models.Model):
         follower_ids = set(self.followers.values_list('follower_id', flat=True))
         mutual_ids = following_ids & follower_ids  # intersection = friends
         return len(mutual_ids)
+    
+    def delete(self, *args, **kwargs):
+        """
+        Override delete to also remove the associated User.
+        This ensures no orphaned User accounts remain when an Author is deleted.
+        For local authors (has User): deletes both Author and User.
+        For remote authors (no User): just deletes the Author.
+        """
+        if self.user:
+            user = self.user
+            super().delete(*args, **kwargs)  # CASCADE removes Follow/FollowRequest
+            user.delete()
+        else:
+            super().delete(*args, **kwargs)
+
 class FollowRequest(models.Model):
     """
     Tracks follow requests between authors.

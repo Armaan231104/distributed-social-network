@@ -7,8 +7,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from accounts.models import Follow
 from posts.models import Entry
 
+
 class PostsApiTests(TestCase):
     def setUp(self):
+        self.client = Client()
         self.user1 = User.objects.create_user(username="u1", password="pass12345")
         self.user2 = User.objects.create_user(username="u2", password="pass12345")
         self.admin = User.objects.create_user(
@@ -38,7 +40,7 @@ class PostsApiTests(TestCase):
                 "image": image_file,
             },
         )
-    
+
     def login(self, username):
         ok = self.client.login(username=username, password="pass12345")
         self.assertTrue(ok)
@@ -180,39 +182,127 @@ class PostsApiTests(TestCase):
         e.refresh_from_db()
         self.assertEqual(e.visibility, "DELETED")
 
+    '''
+    Tests: author can create a plaintext post
+    '''
+    def test_create_entry_plaintext_json_success(self):
+        self.login("u1")
+
+        resp = self.post_json({
+            "title": "Plain",
+            "content": "hello world",
+            "contentType": "text/plain",
+            "visibility": "PUBLIC",
+        })
+        self.assertEqual(resp.status_code, 201)
+
+        entry = Entry.objects.get(id=resp.json()["id"])
+        self.assertEqual(entry.author, self.user1)
+        self.assertEqual(entry.title, "Plain")
+        self.assertEqual(entry.content, "hello world")
+        self.assertEqual(entry.content_type, "text/plain")
+        self.assertEqual(entry.visibility, "PUBLIC")
+
+    '''
+    Tests: author can create a commonmark post
+    '''
+    def test_create_entry_commonmark_json_success(self):
+        self.login("u1")
+
+        md = "- item one\n- item two\n\n[Example](https://example.com)"
+        resp = self.post_json({
+            "title": "MD",
+            "content": md,
+            "contentType": "text/markdown",
+            "visibility": "PUBLIC",
+        })
+        self.assertEqual(resp.status_code, 201)
+
+        entry = Entry.objects.get(id=resp.json()["id"])
+        self.assertEqual(entry.content_type, "text/markdown")
+
+    '''
+    Tests: author can create an image post
+    '''
+    def test_create_entry_image_multipart_success(self):
+        self.login("u1")
+
+        resp = self.post_image_multipart(title="Pic", content="caption here")
+        self.assertEqual(resp.status_code, 201)
+
+        entry = Entry.objects.get(id=resp.json()["id"])
+        self.assertEqual(entry.author, self.user1)
+
+    '''
+    Tests: author cannot upload an invalid file type
+    '''
+    def test_create_entry_rejects_invalid_content_type(self):
+        self.login("u1")
+
+        resp = self.post_json({
+            "title": "Bad",
+            "content": "nope",
+            "contentType": "video/mp4",
+        })
+        self.assertEqual(resp.status_code, 400)
+
+    '''
+    Tests: author cannot save an image post if they have not uploaded an image
+    '''
+    def test_create_entry_image_missing_file_rejected(self):
+        self.login("u1")
+
+        resp = self.client.post(
+            "/posts/api/entries/create/",
+            data={
+                "title": "No image",
+                "content": "caption",
+                "contentType": "image",
+                "visibility": "PUBLIC",
+            },
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    '''
+    Tests: author must be logged in to create entries
+    '''
+    def test_create_entry_requires_login(self):
+        resp = self.post_json({
+            "title": "NoAuth",
+            "content": "test",
+            "contentType": "text/plain",
+        })
+        self.assertIn(resp.status_code, [302, 401, 403])
+
+    def test_create_entry_rejects_get(self):
+        self.login("u1")
+        resp = self.client.get("/posts/api/entries/create/")
+        self.assertEqual(resp.status_code, 400)
+
+
 class PostVisibilityOnProfileTest(TestCase):
     """
     Tests that post visibility rules are correctly enforced on author profile pages
-
-    Rules used:
-      PUBLIC   - visible to everyone (logged in or not)
-      UNLISTED - visible only to followers and the author
-      FRIENDS  - visible only to friends (they both follow each other) and the author
-      DELETED  - never visible even to the author
     """
 
     def setUp(self):
         self.client = Client()
 
-        # author who creates posts
         self.author_user = User.objects.create_user(
             username='author', password='testpass123'
         )
         self.author = self.author_user.author
 
-        # user who does not follow the author
         self.non_follower_user = User.objects.create_user(
             username='non_follower', password='testpass123'
         )
 
-        # user who follows the author but the author does not follow them back
         self.follower_user = User.objects.create_user(
             username='follower', password='testpass123'
         )
         self.follower_author = self.follower_user.author
         Follow.objects.create(follower=self.follower_author, followee=self.author)
 
-        # user who is friends with the author
         self.friend_user = User.objects.create_user(
             username='friend', password='testpass123'
         )
@@ -220,7 +310,6 @@ class PostVisibilityOnProfileTest(TestCase):
         Follow.objects.create(follower=self.friend_author, followee=self.author)
         Follow.objects.create(follower=self.author, followee=self.friend_author)
 
-        # post creation for each visibility option
         self.public_post = Entry.objects.create(
             author=self.author_user,
             title='Public Post',
@@ -249,374 +338,86 @@ class PostVisibilityOnProfileTest(TestCase):
         self.profile_url = reverse(
             'author-profile', kwargs={'author_id': self.author.id}
         )
-    # ------------------------------------------------------------------------------------------
-    # PUBLIC POST TESTS
-    # ------------------------------------------------------------------------------------------
-    '''
-    Tests: PUBLIC post is visible to anyone, even while not logged-in
-    Pass Condition: The public post is in the profile page context
-    '''
+
+    # --- PUBLIC ---
+
     def test_public_post_visible_to_unauthenticated_user(self):
         response = self.client.get(self.profile_url)
-        self.assertEqual(response.status_code, 200)
         self.assertIn(self.public_post, response.context['posts'])
 
-    '''
-    Tests: PUBLIC post is visible to a logged-in user who does not foolow the author
-    Pass Condition: The public post is in the profile page context
-    '''
     def test_public_post_visible_to_non_follower(self):
-        #
         self.client.login(username='non_follower', password='testpass123')
         response = self.client.get(self.profile_url)
         self.assertIn(self.public_post, response.context['posts'])
 
-    '''
-    Tests: PUBLIC post is visible to user who follows the user
-    Pass Condition: The public post is in the profile page context
-    '''
     def test_public_post_visible_to_follower(self):
         self.client.login(username='follower', password='testpass123')
         response = self.client.get(self.profile_url)
         self.assertIn(self.public_post, response.context['posts'])
 
-    '''
-    Tests: PUBLIC post is visible to a friend
-    Pass Condition: The public post is in the profile page context
-    '''
     def test_public_post_visible_to_friend(self):
         self.client.login(username='friend', password='testpass123')
         response = self.client.get(self.profile_url)
         self.assertIn(self.public_post, response.context['posts'])
 
-    '''
-    Tests: author can see their own PUBLIC post on their own profile
-    Pass Condition: The public post is in the profile page context
-    '''
     def test_public_post_visible_to_author_on_own_profile(self):
         self.client.login(username='author', password='testpass123')
         response = self.client.get(self.profile_url)
         self.assertIn(self.public_post, response.context['posts'])
-        
-    '''
-    Tests: author can create a plaintext post
-    '''
-    def test_create_entry_plaintext_json_success(self):
-        self.login("u1")
 
-        resp = self.post_json({
-            "title": "Plain",
-            "content": "hello world",
-            "contentType": "text/plain",
-            "visibility": "PUBLIC",
-        })
-        self.assertEqual(resp.status_code, 201)
+    # --- UNLISTED ---
 
-        entry = Entry.objects.get(id=resp.json()["id"])
-        self.assertEqual(entry.author, self.user1)
-        self.assertEqual(entry.title, "Plain")
-        self.assertEqual(entry.content, "hello world")
-        self.assertEqual(entry.content_type, "text/plain")
-        self.assertEqual(entry.visibility, "PUBLIC")
-    
-    '''
-    Tests: author can create a commonmark post
-    '''
-    def test_create_entry_commonmark_json_success(self):
-        self.login("u1")
-
-        md = "- item one\n- item two\n\n[Example](https://example.com)"
-        resp = self.post_json({
-            "title": "MD",
-            "content": md,
-            "contentType": "text/markdown",
-            "visibility": "PUBLIC",
-        })
-        self.assertEqual(resp.status_code, 201)
-
-        entry = Entry.objects.get(id=resp.json()["id"])
-        self.assertEqual(entry.content_type, "text/markdown")
-        self.assertIn("item one", entry.content)
-        self.assertIn("https://example.com", entry.content)
-
-    '''
-    Tests: author can create an image post
-    '''
-    def test_create_entry_image_multipart_success(self):
-        self.login("u1")
-
-        resp = self.post_image_multipart(title="Pic", content="caption here")
-        self.assertEqual(resp.status_code, 201)
-
-        entry = Entry.objects.get(id=resp.json()["id"])
-        self.assertEqual(entry.author, self.user1)
-        self.assertEqual(entry.title, "Pic")
-        self.assertEqual(entry.content, "caption here")
-        self.assertEqual(entry.content_type, "image")
-
-        # Only run this assertion if your model actually has an image field
-        self.assertTrue(hasattr(entry, "image"))
-        self.assertTrue(entry.image.name)  # saved file path
-
-    '''
-    Tests: author cannot upload an invalid file type
-    '''
-    def test_create_entry_rejects_invalid_content_type(self):
-        self.login("u1")
-
-        resp = self.post_json({
-            "title": "Bad",
-            "content": "nope",
-            "contentType": "video/mp4",
-        })
-        self.assertEqual(resp.status_code, 400)
-        self.assertIn("error", resp.json())
-    
-    '''
-    Tests: author cannot save an image post if they have not uploaded an image
-    '''
-    def test_create_entry_image_missing_file_rejected(self):
-        self.login("u1")
-
-        resp = self.client.post(
-            "/posts/api/entries/create/",
-            data={
-                "title": "No image",
-                "content": "caption",
-                "contentType": "image",
-                "visibility": "PUBLIC",
-                # missing "image"
-            },
-        )
-        self.assertEqual(resp.status_code, 400)
-        self.assertIn("error", resp.json())
-
-    '''
-    Tests: author must be logged in to create entries
-    '''
-    def test_create_entry_requires_login(self):
-        resp = self.post_json({
-            "title": "NoAuth",
-            "content": "test",
-            "contentType": "text/plain",
-        })
-        # login_required usually redirects to login page (302)
-        self.assertIn(resp.status_code, [302, 401, 403])
-
-    def test_create_entry_rejects_get(self):
-        self.login("u1")
-        resp = self.client.get("/posts/api/entries/create/")
-        self.assertEqual(resp.status_code, 400)
-        
-    # The following tests by Open AI, Chat GPT 5.2, "please write tests to check an author's ability to create
-    # plaintext, commonmark, and image posts", 2026-02-27 
-    '''
-    Tests: author can create a plaintext post
-    '''
-    def test_create_entry_plaintext_json_success(self):
-        self.login("u1")
-
-        resp = self.post_json({
-            "title": "Plain",
-            "content": "hello world",
-            "contentType": "text/plain",
-            "visibility": "PUBLIC",
-        })
-        self.assertEqual(resp.status_code, 201)
-
-        entry = Entry.objects.get(id=resp.json()["id"])
-        self.assertEqual(entry.author, self.user1)
-        self.assertEqual(entry.title, "Plain")
-        self.assertEqual(entry.content, "hello world")
-        self.assertEqual(entry.content_type, "text/plain")
-        self.assertEqual(entry.visibility, "PUBLIC")
-    
-    '''
-    Tests: author can create a commonmark post
-    '''
-    def test_create_entry_commonmark_json_success(self):
-        self.login("u1")
-
-        md = "- item one\n- item two\n\n[Example](https://example.com)"
-        resp = self.post_json({
-            "title": "MD",
-            "content": md,
-            "contentType": "text/markdown",
-            "visibility": "PUBLIC",
-        })
-        self.assertEqual(resp.status_code, 201)
-
-        entry = Entry.objects.get(id=resp.json()["id"])
-        self.assertEqual(entry.content_type, "text/markdown")
-        self.assertIn("item one", entry.content)
-        self.assertIn("https://example.com", entry.content)
-
-    '''
-    Tests: author can create an image post
-    '''
-    def test_create_entry_image_multipart_success(self):
-        self.login("u1")
-
-        resp = self.post_image_multipart(title="Pic", content="caption here")
-        self.assertEqual(resp.status_code, 201)
-
-        entry = Entry.objects.get(id=resp.json()["id"])
-        self.assertEqual(entry.author, self.user1)
-        self.assertEqual(entry.title, "Pic")
-        self.assertEqual(entry.content, "caption here")
-        self.assertEqual(entry.content_type, "image")
-
-        # Only run this assertion if your model actually has an image field
-        self.assertTrue(hasattr(entry, "image"))
-        self.assertTrue(entry.image.name)  # saved file path
-
-    '''
-    Tests: author cannot upload an invalid file type
-    '''
-    def test_create_entry_rejects_invalid_content_type(self):
-        self.login("u1")
-
-        resp = self.post_json({
-            "title": "Bad",
-            "content": "nope",
-            "contentType": "video/mp4",
-        })
-        self.assertEqual(resp.status_code, 400)
-        self.assertIn("error", resp.json())
-    
-    '''
-    Tests: author cannot save an image post if they have not uploaded an image
-    '''
-    def test_create_entry_image_missing_file_rejected(self):
-        self.login("u1")
-
-        resp = self.client.post(
-            "/posts/api/entries/create/",
-            data={
-                "title": "No image",
-                "content": "caption",
-                "contentType": "image",
-                "visibility": "PUBLIC",
-                # missing "image"
-            },
-        )
-        self.assertEqual(resp.status_code, 400)
-        self.assertIn("error", resp.json())
-
-    '''
-    Tests: author must be logged in to create entries
-    '''
-    def test_create_entry_requires_login(self):
-        resp = self.post_json({
-            "title": "NoAuth",
-            "content": "test",
-            "contentType": "text/plain",
-        })
-        # login_required usually redirects to login page (302)
-        self.assertIn(resp.status_code, [302, 401, 403])
-
-    def test_create_entry_rejects_get(self):
-        self.login("u1")
-        resp = self.client.get("/posts/api/entries/create/")
-        self.assertEqual(resp.status_code, 400)
-
-    # ------------------------------------------------------------------------------------------
-    # UNLISTED Post Tests
-    # ------------------------------------------------------------------------------------------
-    '''
-    Tests: UNLISTED post is hidden from users who are not logged-in
-    Pass Condition: The UNLISTED post is not in the profile page context
-    '''
     def test_unlisted_post_not_visible_to_unauthenticated_user(self):
         response = self.client.get(self.profile_url)
         self.assertNotIn(self.unlisted_post, response.context['posts'])
 
-    '''
-    Tests: UNLISTED post is hidden from logged-in user that is not following the author
-    Pass Condition: The UNLISTED post is not in the profile page context
-    '''
     def test_unlisted_post_not_visible_to_non_follower(self):
         self.client.login(username='non_follower', password='testpass123')
         response = self.client.get(self.profile_url)
         self.assertNotIn(self.unlisted_post, response.context['posts'])
 
-    '''
-    Tests: UNLISTED post is visible to logged-in user that follows the author
-    Pass Condition: The UNLISTED post is in the profile page context
-    '''
     def test_unlisted_post_visible_to_follower(self):
         self.client.login(username='follower', password='testpass123')
         response = self.client.get(self.profile_url)
         self.assertIn(self.unlisted_post, response.context['posts'])
 
-    '''
-    Tests: An author can see their UNLISTED post on their own profile
-    Pass Condition: The UNLISTED post is in the profile page context
-    '''
     def test_unlisted_post_visible_to_friend(self):
         self.client.login(username='friend', password='testpass123')
         response = self.client.get(self.profile_url)
         self.assertIn(self.unlisted_post, response.context['posts'])
 
-    '''
-    Tests: UNLISTED post is visible to the author on their own profile
-    Pass Condition: Unlisted post is in the profile page context
-    '''
     def test_unlisted_post_visible_to_author_on_own_profile(self):
         self.client.login(username='author', password='testpass123')
         response = self.client.get(self.profile_url)
         self.assertIn(self.unlisted_post, response.context['posts'])
 
-    # ------------------------------------------------------------------------------------------
-    # FRIENDS POST TESTS
-    # ------------------------------------------------------------------------------------------
-    '''
-    Tests: FRIENDS post is hidden from users who are not logged-in
-    Pass Condition: The FRIENDS post is not in the profile page context
-    '''
+    # --- FRIENDS ---
+
     def test_friends_post_not_visible_to_unauthenticated_user(self):
         response = self.client.get(self.profile_url)
         self.assertNotIn(self.friends_post, response.context['posts'])
 
-    '''
-    Tests: FRIENDS post is hidden from loggged-in user who does not follow the author
-    Pass Condition: The FRIENDS post is not in the profile page context
-    '''
     def test_friends_post_not_visible_to_non_follower(self):
         self.client.login(username='non_follower', password='testpass123')
         response = self.client.get(self.profile_url)
         self.assertNotIn(self.friends_post, response.context['posts'])
 
-    '''
-    Tests: FRIENDS post is hidden from logged-in user who follows the author but is not a friend
-    Pass Condition: The FRIENDS post is not in the profile page context
-    '''
     def test_friends_post_not_visible_to_one_way_follower(self):
-        """A follower who the author does not follow back is not a friend."""
         self.client.login(username='follower', password='testpass123')
         response = self.client.get(self.profile_url)
         self.assertNotIn(self.friends_post, response.context['posts'])
 
-    '''
-    Tests: FRIENDS post is visible to logged-in user who is friends with the author
-    Pass Condition: The FRIENDS post is in the profile page context
-    '''
     def test_friends_post_visible_to_mutual_follower(self):
-        """A user who mutually follows the author (friend) can see FRIENDS posts."""
         self.client.login(username='friend', password='testpass123')
         response = self.client.get(self.profile_url)
         self.assertIn(self.friends_post, response.context['posts'])
 
-    '''
-    TESTS: FRIENDS post is visible to the author on their own profile
-    Pass Condition: The FRIENDS post is in the profile page context 
-    '''
     def test_friends_post_visible_to_author_on_own_profile(self):
         self.client.login(username='author', password='testpass123')
         response = self.client.get(self.profile_url)
         self.assertIn(self.friends_post, response.context['posts'])
 
-    # --- DELETED post ---
+    # --- DELETED ---
 
     def test_deleted_post_not_visible_to_author_on_own_profile(self):
         self.client.login(username='author', password='testpass123')
