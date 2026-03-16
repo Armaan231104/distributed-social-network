@@ -3,7 +3,7 @@ The following documentation was written with assistance from Claude Haiku 4.5, A
 ```
 ---
 
-# Interactions API
+# Interactions UI
 
 ## Overview
 
