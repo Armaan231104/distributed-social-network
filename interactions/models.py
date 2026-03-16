@@ -21,9 +21,17 @@ class Comment(models.Model):
 
 class Like(models.Model):
     """
-    Represents a like on a post
-    An author can like a post they have access to, with a timestamp of when the like was made.
-    Multiple likes cannot be made on the same post
+    Represents a like on a post or comment.
+
+    An author can like any post or comment they have access to.
+    A Like targets exactly one object: either an Entry or a Comment (never both,
+    never neither). The constraints below ensures that an author
+    cannot like the same entry or the same comment more than once, preventing
+    duplicate rows from accumulating in the database over time.
+
+    Constraints:
+    - unique_like_author_entry: one Like per (author, entry) pair when entry is set.
+    - unique_like_author_comment: one Like per (author, comment) pair when comment is set.
     """
     id = models.UUIDField(primary_key=True, max_length=255, unique=True, default=uuid.uuid4, editable=False)
     author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name='likes')
@@ -32,7 +40,17 @@ class Like(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('author', 'entry')
-        unique_together = ('author', 'comment')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['author', 'entry'],
+                condition=models.Q(entry__isnull=False),
+                name='unique_like_author_entry',
+            ),
+            models.UniqueConstraint(
+                fields=['author', 'comment'],
+                condition=models.Q(comment__isnull=False),
+                name='unique_like_author_comment',
+            ),
+        ]
         ordering = ['-created_at']
 
