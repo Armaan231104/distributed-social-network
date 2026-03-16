@@ -1,6 +1,6 @@
 # Posts API Documentation
 
-This document describes the API endpoints for the posts system which handles entry creation, editing, deletion, visibility enforcement, and direct link access.
+This document describes the API endpoints for the posts system which handles entry creation, editing, deletion, visibility enforcement, direct link access, and stream retrieval.
 
 Entries support multiple visibility levels and content types. Access control is enforced according to visibility rules and user authentication status.
 
@@ -11,23 +11,34 @@ All Entry identifiers are UUIDs.
 ## Overview
 
 Each Entry has:
+
 - A UUID identifier
 - A local Django User as author
 - A visibility level
 - A content type
 - A published timestamp
+- An updated timestamp
 - Optional image upload
 
 Visibility rules determine who can access an entry via API or UI.
 
+Entries may appear:
+
+- on an author's profile page
+- in the stream page
+- through direct API access by ID
+- through the stream API
+
+Deleted entries remain in the database but are hidden from normal users.
+
 ---
 
-## Data Model
+# Data Model
 
-### Entry Fields
+## Entry Fields
 
 | Field | Type | Example | Purpose |
-|-------|------|---------|---------|
+|------|------|------|------|
 | id | UUID | `550e8400-e29b-41d4-a716-446655440000` | Unique identifier for the entry |
 | author | User (ForeignKey) | user id `5` | The local user who created the entry |
 | title | string (max 200 chars) | `"My First Post"` | Title of the entry |
@@ -35,66 +46,80 @@ Visibility rules determine who can access an entry via API or UI.
 | content_type | string (choice) | `"text/plain"` | Defines how content is interpreted |
 | visibility | string (choice) | `"PUBLIC"` | Determines who can access the entry |
 | published_at | datetime (ISO 8601) | `"2026-02-27T15:00:00Z"` | Timestamp automatically set at creation |
+| updated_at | datetime (ISO 8601) | `"2026-02-27T15:05:00Z"` | Timestamp updated when edited |
 | image | file (optional) | `entries/photo.png` | Image file for image posts |
 
 ---
 
-## Visibility Levels
+# Visibility Levels
 
-### PUBLIC
+## PUBLIC
+
 - Accessible by anyone
 - No authentication required
 - Can be shared via direct link
 - Appears in public streams
 
-### UNLISTED
+## UNLISTED
+
 - Accessible by anyone with the direct link
 - No authentication required
 - Does not appear in public listings
+- Appears in the stream of authors who follow the entry author
 
-### FRIENDS
-- Accessible only to the author
+## FRIENDS
+
+- Accessible to the author
 - Requires authentication
-- Returns 403 Forbidden for other users
+- Accessible to authors who mutually follow the entry author
+- Returns **403 Forbidden** for users who are not friends with the author
 
-### DELETED
+## DELETED
+
 - Only accessible to node administrators (`is_staff = True`)
-- Returns 404 Not Found for non-admin users
+- Returns **404 Not Found** for non-admin users
 - Authors cannot view their own deleted entries
+- Does not appear in profile pages or streams
 
 ---
 
-## Supported Content Types
+# Supported Content Types
 
 | Value | Meaning |
-|-------|---------|
+|------|------|
 | text/plain | Plain text |
 | text/markdown | CommonMark markdown |
 | image | Image upload |
 
-Invalid content types return 400 Bad Request.
+Invalid content types return **400 Bad Request**.
 
 ---
 
 # API Endpoints
 
-Base path:
+Base path
 
+```
 /posts/api/
+```
 
 ---
 
-## 1. Create Entry
+# 1. Create Entry
 
+```
 POST /posts/api/entries/create/
+```
 
 Creates a new entry.
 
-Authentication Required: Yes
+Authentication Required: **Yes**
 
-### JSON Request (Text Entries)
+---
 
-Example:
+## JSON Request (Text Entries)
+
+Example
 
 ```json
 {
@@ -105,16 +130,16 @@ Example:
 }
 ```
 
-Request Fields:
+### Request Fields
 
 | Field | Type | Required | Example | Purpose |
-|-------|------|----------|---------|---------|
+|------|------|------|------|------|
 | title | string | Yes | `"My Post"` | Title of entry |
 | content | string | Yes | `"Hello world"` | Body content |
 | contentType | string | Yes | `"text/plain"` | Must match supported types |
 | visibility | string | No | `"PUBLIC"` | Defaults to PUBLIC |
 
-Success Response:
+### Success Response
 
 ```json
 {
@@ -122,30 +147,27 @@ Success Response:
 }
 ```
 
-Response Codes:
+### Response Codes
+
 - 201 Created
 - 400 Bad Request (invalid JSON)
 - 400 Bad Request (invalid contentType)
-
-When to use:
-Use for creating text or markdown entries.
-
-When not to use:
-Do not use JSON format for image uploads.
+- 400 Bad Request (invalid visibility)
 
 ---
 
-### Multipart Request (Image Posts)
+## Multipart Request (Image Posts)
 
 Used for image uploads.
 
 Required fields:
-- title (string)
-- content (optional caption)
-- contentType = "image"
-- image (file upload)
 
-Success Response:
+- title
+- content (optional caption)
+- contentType = `"image"`
+- image file upload
+
+Example response
 
 ```json
 {
@@ -155,13 +177,15 @@ Success Response:
 
 ---
 
-## 2. Get Entry by ID
+# 2. Get Entry by ID
 
+```
 GET /posts/api/entries/{entry_id}/
+```
 
 Returns entry details.
 
-Example Response:
+### Example Response
 
 ```json
 {
@@ -174,25 +198,27 @@ Example Response:
 }
 ```
 
-Response Codes:
+### Response Codes
+
 - 200 OK
 - 403 Forbidden (FRIENDS accessed by non-author)
 - 404 Not Found (DELETED accessed by non-admin)
 
-When to use:
-Use when accessing an entry via direct link.
-
 ---
 
-## 3. Get My Entries
+# 3. Get My Entries
 
+```
 GET /posts/api/entries/mine/
+```
 
-Authentication Required: Yes
+Authentication Required: **Yes**
 
-Returns all entries created by the authenticated user. Deleted entries are excluded.
+Returns all entries created by the authenticated user.
 
-Example Response:
+Deleted entries are excluded.
+
+### Example Response
 
 ```json
 [
@@ -209,14 +235,67 @@ Example Response:
 
 ---
 
-## 4. Edit Entry
+# 4. Get Stream Entries
 
+```
+GET /posts/api/entries/stream/
+```
+
+Authentication Required: **No**
+
+Returns entries that should appear in the user's stream.
+
+### Behavior
+
+Unauthenticated users receive:
+
+- PUBLIC entries only
+
+Authenticated users receive:
+
+- their own entries (excluding DELETED)
+- all PUBLIC entries known to the node
+- UNLISTED entries from authors they follow
+- FRIENDS entries from mutual followers
+
+Deleted entries are never returned.
+
+Entries are returned **newest first**.
+
+### Example Response
+
+```json
+{
+  "type": "entries",
+  "count": 2,
+  "src": [
+    {
+      "id": "uuid",
+      "title": "Example",
+      "content": "Hello world",
+      "contentType": "text/plain",
+      "visibility": "PUBLIC",
+      "published": "2026-03-16T12:00:00Z",
+      "updated": "2026-03-16T12:05:00Z",
+      "isEdited": true
+    }
+  ]
+}
+```
+
+---
+
+# 5. Edit Entry
+
+```
 PUT /posts/api/entries/{entry_id}/edit/
+```
 
-Authentication Required: Yes  
+Authentication Required: **Yes**
+
 Only the author may edit.
 
-Example Request:
+### Example Request
 
 ```json
 {
@@ -226,7 +305,7 @@ Example Request:
 }
 ```
 
-Success Response:
+### Success Response
 
 ```json
 {
@@ -234,22 +313,26 @@ Success Response:
 }
 ```
 
-Response Codes:
+### Response Codes
+
 - 200 OK
-- 403 Forbidden (not author)
-- 404 Not Found (DELETED entry)
-- 400 Bad Request (invalid contentType)
+- 403 Forbidden
+- 404 Not Found
+- 400 Bad Request
 
 ---
 
-## 5. Delete Entry (Soft Delete)
+# 6. Delete Entry (Soft Delete)
 
+```
 DELETE /posts/api/entries/{entry_id}/delete/
+```
 
-Authentication Required: Yes  
+Authentication Required: **Yes**
+
 Only the author may delete.
 
-Success Response:
+### Success Response
 
 ```json
 {
@@ -257,39 +340,68 @@ Success Response:
 }
 ```
 
-Behavior:
-- Sets visibility to "DELETED"
-- Entry remains stored in database
-- Only staff users can access afterward
+### Behavior
 
-Response Codes:
+- Sets visibility to `"DELETED"`
+- Entry remains stored in the database
+- Only staff users can access afterward
+- Deleted entries do not appear in streams or profiles
+
+### Response Codes
+
 - 200 OK
-- 403 Forbidden (not author)
-- 400 Bad Request (wrong method)
+- 403 Forbidden
+- 400 Bad Request
 
 ---
 
-## UI Endpoints
+# UI Endpoints
 
+## Stream Page
+
+```
 GET /posts/stream/
+```
 
 Unauthenticated users:
+
 - See PUBLIC entries only
 
 Authenticated users:
-- See their own entries (excluding DELETED)
-- See PUBLIC and UNLISTED entries from followed authors
-- See FRIENDS entries only if mutual following
 
-Deleted entries never appear in stream.
+- See their own entries (excluding DELETED)
+- See all PUBLIC entries known to the node
+- See UNLISTED entries from followed authors
+- See FRIENDS entries from mutual followers
+
+Deleted entries never appear in the stream.
+
+Entries are shown **newest first**.
+
+Edited entries show their **latest version**.
 
 ---
 
-## User Stories Supported
+## Entry Detail Page
 
-- A reader can share a public or unlisted entry via direct link
-- Authors cannot modify other authors’ entries
-- Authors can delete their own entries
-- Deleted entries are visible only to node administrators
-- Authors can see their own entries until deleted
-- Node admin can host multiple authors on the node
+```
+GET /posts/entry/{entry_id}/
+```
+
+Returns the entry detail page if the user is allowed to access the entry.
+
+If the user is not permitted to view the entry, access is denied.
+
+---
+
+## Delete Entry via UI
+
+```
+POST /posts/entry/{entry_id}/delete/
+```
+
+Authentication Required: **Yes**
+
+Only the author may delete.
+
+If successful, the entry is soft deleted

@@ -8,6 +8,7 @@ urlpatterns = [
     path("api/entries/<uuid:entry_id>/", views.get_entry),
     path("api/entries/<uuid:entry_id>/edit/", views.edit_entry),
     path("api/entries/<uuid:entry_id>/delete/", views.delete_entry),
+    path("api/entries/stream/", views.stream_api, name="stream_api"),
 
     path('stream/', views.stream, name='stream'),
     path('entry/<uuid:entry_id>/', views.entry_detail, name='entry_detail'),
