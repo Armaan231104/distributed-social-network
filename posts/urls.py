@@ -15,4 +15,5 @@ urlpatterns = [
     path('entry/<str:entry_id>/comment/', interaction_views.add_comment, name='add_comment'),
     path("entry/<uuid:entry_id>/delete/", views.delete_entry_ui, name="delete_entry_ui"),
     path("api/images/upload/", views.upload_hosted_image, name="upload_hosted_image"),
+    path("admin/deleted/", views.deleted_entries, name="deleted_entries"),
 ]

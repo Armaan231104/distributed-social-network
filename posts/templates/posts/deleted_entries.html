@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load markdown_extras %}
+
+{% block title %}Deleted Entries{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/accounts/profile.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <h1>Deleted Entries</h1>
+    <p class="empty-state" style="margin-bottom: 1rem;">Node admin view — entries below have been soft-deleted and are hidden from all users.</p>
+
+    {% if entries %}
+    <div class="posts-grid">
+        {% for entry in entries %}
+        <div class="post-card" onclick="window.location.href='{% url 'entry_detail' entry.id %}'">
+
+            <div class="post-header">
+                <div class="post-header-top">
+                    <div class="post-avatar-wrapper">
+                        {% if entry.author.author and entry.author.author.profileImage %}
+                            <img src="{{ entry.author.author.profileImage.url }}"
+                                 alt="{{ entry.author.author.displayName }}"
+                                 class="post-avatar">
+                        {% else %}
+                            <div class="post-avatar-placeholder">
+                                <i class="fa-regular fa-user"></i>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <a class="post-author-name author-link" href="{% url 'author-profile' entry.author.author.id %}">
+                        {{ entry.author.author.displayName|default:entry.author.username }}
+                    </a>
+                </div>
+                <div class="post-title-row">
+                    <h3 class="post-title">{{ entry.title }}</h3>
+                </div>
+            </div>
+
+            {% if entry.content_type == "image" and entry.image %}
+                <figure class="stream-post-media">
+                    <img src="{{ entry.image.url }}" alt="{{ entry.title }}" class="post-content-image">
+                    {% if entry.content %}
+                        <figcaption>{{ entry.content }}</figcaption>
+                    {% endif %}
+                </figure>
+            {% elif entry.content_type == "text/markdown" %}
+                <section class="stream-post-body">
+                    {{ entry.content|render_markdown }}
+                </section>
+            {% else %}
+                <p class="stream-post-body">{{ entry.content }}</p>
+            {% endif %}
+
+            <span class="post-date">
+                Published on {{ entry.published_at|date:"M d, Y H:i" }}<br>
+                Deleted on {{ entry.updated_at|date:"M d, Y H:i" }}
+            </span>
+
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+        <p class="empty-state">No deleted entries.</p>
+    {% endif %}
+</div>
+
+<style>
+    #admin-deleted i {
+        transform: scale(1.5);
+        font-weight: 800;
+    }
+</style>
+{% endblock %}
