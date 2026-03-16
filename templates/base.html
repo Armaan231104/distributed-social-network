@@ -42,6 +42,13 @@
                     <i class="fa-regular fa-bell"></i>
                     <span>Requests</span>
                 </a>
+                {% if user.is_staff %}
+                <a href="{% url 'deleted_entries' %}" id="admin-deleted">
+                    <i class="fa-regular fa-trash-can"></i>
+                    <span>Deleted</span>
+                </a>
+                {% endif %}
+
                 <form method="POST" action="{% url 'logout' %}" style="display: contents;" id="logout">
                     {% csrf_token %}
                     <button type="submit" class="sidebar-link"

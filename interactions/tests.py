@@ -1,6 +1,9 @@
 from django.test import TestCase
 
 from django.test import TestCase, Client
+from django.db import IntegrityError
+from django.apps import apps
+from django.db.models import JSONField
 from django.contrib.auth.models import User
 from interactions.models import Like, Comment
 from posts.models import Entry
@@ -299,3 +302,59 @@ class LikeModelTest(InteractionTestBase):
         Like.objects.create(author=self.author1, comment=comment, entry=None)
         comment.delete()
         self.assertEqual(Like.objects.count(), 0)
+
+
+class LikeUniquenessConstraintTest(InteractionTestBase):
+    def setUp(self):
+        super().setUp()
+        self.comment = Comment.objects.create(
+            entry=self.entry,
+            author=self.author2,
+            content='Test comment',
+        )
+
+    def test_duplicate_entry_like_raises_error(self):
+        """
+        Test that an author cannot like the same entry twice at the DB level
+        """
+        Like.objects.create(author=self.author1, entry=self.entry, comment=None)
+        with self.assertRaises(IntegrityError):
+            Like.objects.create(author=self.author1, entry=self.entry, comment=None)
+
+    def test_duplicate_comment_like_raises_error(self):
+        """
+        Test that an author cannot like the same comment twice at the DB level
+        """
+        Like.objects.create(author=self.author1, entry=None, comment=self.comment)
+        with self.assertRaises(IntegrityError):
+            Like.objects.create(author=self.author1, entry=None, comment=self.comment)
+
+    def test_two_authors_can_like_same_entry(self):
+        """
+        Test that two different authors can each like the same entry
+        """
+        Like.objects.create(author=self.author1, entry=self.entry, comment=None)
+        Like.objects.create(author=self.author2, entry=self.entry, comment=None)
+        self.assertEqual(Like.objects.filter(entry=self.entry).count(), 2)
+
+    def test_author_can_like_entry_and_comment_independently(self):
+        """
+        Test that an author can like both an entry and a comment
+        """
+        Like.objects.create(author=self.author1, entry=self.entry, comment=None)
+        Like.objects.create(author=self.author1, entry=None, comment=self.comment)
+        self.assertEqual(Like.objects.filter(author=self.author1).count(), 2)
+
+    def test_toggle_like_does_not_create_duplicates(self):
+        """
+        Test that toggling a like twice doesn't leave duplicate rows
+        """
+        self.client.login(username='sean', password='test123')
+        r1 = self.client.post(f'/interactions/like/entry/{self.entry.id}/')
+        self.assertTrue(r1.json()['liked'])
+        self.assertEqual(r1.json()['like_count'], 1)
+
+        r2 = self.client.post(f'/interactions/like/entry/{self.entry.id}/')
+        self.assertFalse(r2.json()['liked'])
+        self.assertEqual(r2.json()['like_count'], 0)
+        self.assertEqual(Like.objects.filter(author=self.author1, entry=self.entry).count(), 0)
