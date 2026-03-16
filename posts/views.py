@@ -341,9 +341,23 @@ def delete_entry(request, entry_id):
 
     if entry.author != request.user:
         return HttpResponseForbidden()
-    
+
     if request.method != "DELETE":
         return JsonResponse({"error": "DELETE required"}, status=400)
 
     entry.soft_delete()
     return JsonResponse({"deleted": True})
+
+
+@login_required
+def deleted_entries(request):
+    """
+    Node admin view: lists all soft-deleted entries.
+
+    Only accessible to staff (node admins).
+    """
+    if not request.user.is_staff:
+        return HttpResponseForbidden()
+
+    entries = Entry.objects.filter(visibility="DELETED").select_related('author__author').order_by('-updated_at')
+    return render(request, 'posts/deleted_entries.html', {'entries': entries})

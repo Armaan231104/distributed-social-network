@@ -14,6 +14,8 @@ def user_can_access_entry(user, entry):
     """
     if entry.visibility in ['PUBLIC', 'UNLISTED']:
         return True
+    if entry.visibility == 'DELETED':
+        return user.is_authenticated and user.is_staff
     if entry.visibility == 'FRIENDS':
         if not user.is_authenticated:
             return False
