@@ -483,7 +483,7 @@ def author_followers(request, author_id):
     return render(request, 'accounts/authors_list.html', {
         'authors': followers,
         'current_user_author': current_user_author,
-        'page_title': f"{author.displayName}'s Followers",
+        'page_title': f"{author.displayName.capitalize()}'s Followers",
     })
 
 
@@ -502,7 +502,7 @@ def author_following(request, author_id):
     return render(request, 'accounts/authors_list.html', {
         'authors': following,
         'current_user_author': current_user_author,
-        'page_title': f"{author.displayName} is Following",
+        'page_title': f"{author.displayName.capitalize()} is Following",
     })
 
 
@@ -521,7 +521,7 @@ def author_friends(request, author_id):
     return render(request, 'accounts/authors_list.html', {
         'authors': friends,
         'current_user_author': current_user_author,
-        'page_title': f"{author.displayName}'s Friends",
+        'page_title': f"{author.displayName.capitalize()}'s Friends",
     })
 
 
@@ -753,17 +753,11 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 
 def logout_view(request):
-    """
-    Logs out the user only if the request is POST.
-    Redirects to login page after logout.
-    """
-    if request.method == "POST":
-        if request.user.is_authenticated:
-            logout(request)
-        return redirect('login')  # or 'authors-list'
-    else:
-        # Block GET or other methods
-        return HttpResponseForbidden("Logout must be via POST.")
+    if request.method != "POST":
+        return redirect("login")
+
+    logout(request)
+    return redirect("login")
 
 def signup_view(request):
     if request.method == "POST":
