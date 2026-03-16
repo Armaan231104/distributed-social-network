@@ -417,29 +417,44 @@
 .image-clear:hover {
     background: linear-gradient(45deg, #ff1a62, #ffa023);
     color: white;
-}
-/* Make Upload button identical to the X button */
-.upload-btn {
-    flex: 0 0 40%;                   /* same width as X */
-    border-radius: 16px;              /* same rounded corners */
-    border: 2px solid #ff1a62;        /* same border */
-    color: #ff1a62;                   /* same text/icon color */
+}.upload-btn {
+    position: relative;        /* needed for absolute positioning inside */
+    flex: 0 0 40%;             
+    border-radius: 16px;
+    border: 2px solid #ff1a62;
+    color: #ff1a62;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     height: 180px;
-    font-size: 22px;                  /* same size as X */
-    background: transparent;           /* match X default bg */
-    transition: all 0.25s ease;       /* same hover transition */
-    text-decoration: none;            /* remove underline if text */
+    font-size: 22px;
+    background: transparent;
+    transition: all 0.25s ease;
+    text-decoration: none;
 }
 
-/* Hover effect exactly like X */
 .upload-btn:hover {
     background: linear-gradient(45deg, #ff1a62, #ffa023);
     color: white;
+
+    #markdown-image-status {
+        color: white;         /* matches button text */
+    }
 }
+
+/* Status text inside button, bottom center */
+#markdown-image-status {
+    position: absolute;
+    bottom: 12px;            /* 5px from bottom */
+    left: 50%;
+    transform: translateX(-50%); /* center horizontally */
+    font-size: 16px;        /* smaller text */
+    color: #ff1a62;         /* matches button text */
+    text-align: center;
+    pointer-events: none;    /* doesn't block button clicks */
+}
+
 /* ============================= */
 /* RESPONSIVE                     */
 /* ============================= */
