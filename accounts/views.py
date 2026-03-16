@@ -483,7 +483,7 @@ def author_followers(request, author_id):
     return render(request, 'accounts/authors_list.html', {
         'authors': followers,
         'current_user_author': current_user_author,
-        'page_title': f"{author.displayName}'s Followers",
+        'page_title': f"{author.displayName.capitalize()}'s Followers",
     })
 
 
@@ -502,7 +502,7 @@ def author_following(request, author_id):
     return render(request, 'accounts/authors_list.html', {
         'authors': following,
         'current_user_author': current_user_author,
-        'page_title': f"{author.displayName} is Following",
+        'page_title': f"{author.displayName.capitalize()} is Following",
     })
 
 
@@ -521,7 +521,7 @@ def author_friends(request, author_id):
     return render(request, 'accounts/authors_list.html', {
         'authors': friends,
         'current_user_author': current_user_author,
-        'page_title': f"{author.displayName}'s Friends",
+        'page_title': f"{author.displayName.capitalize()}'s Friends",
     })
 
 
