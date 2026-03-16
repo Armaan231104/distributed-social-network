@@ -317,8 +317,7 @@
     </select>
 
 </div>
-            <textarea name="content" placeholder="Write your post..."></textarea>
-
+    <textarea name="content" id="post-content" placeholder="Write your post..."></textarea> 
             <!-- Image upload row (hidden until “Image” is selected in the dropdown) -->
             <div class="image-row" id="image-row" style="display:none;">
 
@@ -333,6 +332,14 @@
 
             </div>
 
+            <div class="markdown-image-row" id="markdown-image-row" style="display:none;">
+                <input type="file" id="markdown-image-input" accept="image/*">
+                <button type="button" id="upload-markdown-image-btn" class="btn btn-secondary">
+                    Upload Image
+                </button>
+                <p id="markdown-image-status" style="margin-top: 8px;"></p>
+            </div>
+
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Post</button>
                 <button type="button" id="close-create-post" class="btn btn-secondary">Discard</button>
@@ -340,6 +347,17 @@
 
         </form>
     </div>
+</div>
+{% endif %}
+
+{% if current_user_author and current_user_author == profile_author %}
+<div style="margin: 20px 0; padding: 12px; border: 1px solid #ccc;">
+    <h3>Temporary Image Upload Test</h3>
+    <form action="/posts/api/images/upload/" method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="image" accept="image/*" required>
+        <button type="submit">Upload Image</button>
+    </form>
 </div>
 {% endif %}
 

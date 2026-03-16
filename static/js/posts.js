@@ -28,6 +28,10 @@ window.addEventListener('load', () => {
   const imageBox = document.getElementById('image-upload-box');
   const imageRow = document.getElementById('image-row');
   const clearBtn = document.getElementById('clear-image');
+  const markdownImageRow = document.getElementById('markdown-image-row');
+  const markdownImageInput = document.getElementById('markdown-image-input');
+  const uploadMarkdownImageBtn = document.getElementById('upload-markdown-image-btn');
+  const markdownImageStatus = document.getElementById('markdown-image-status');
 
   // =====================
   // HELPER FUNCTIONS
@@ -36,6 +40,11 @@ window.addEventListener('load', () => {
     imageInput.value = '';
     imageBox.style.backgroundImage = '';
     imageBox.classList.remove('has-image');
+  }
+
+  function resetMarkdownImageState() {
+    markdownImageInput.value = '';
+    markdownImageStatus.textContent = '';
   }
 
   function openModal() {
@@ -47,7 +56,9 @@ window.addEventListener('load', () => {
     form.reset();
     textarea.style.display = 'block';
     imageRow.style.display = 'none';
+    markdownImageRow.style.display = 'none';
     resetImageState();
+    resetMarkdownImageState();
     typeSelect.value = 'text/plain';
   }
 
@@ -64,15 +75,22 @@ window.addEventListener('load', () => {
     if (e.target === modal) closeModal();
   });
 
-  // Toggle content type
   typeSelect.addEventListener('change', () => {
     if (typeSelect.value === 'image') {
-      // textarea.style.display = 'none';
       imageRow.style.display = 'flex';
-    } else {
-      // textarea.style.display = 'block';
+      markdownImageRow.style.display = 'none';
+      resetMarkdownImageState();
+
+    } else if (typeSelect.value === 'text/markdown') {
       imageRow.style.display = 'none';
       resetImageState();
+      markdownImageRow.style.display = 'block';
+
+    } else {
+      imageRow.style.display = 'none';
+      markdownImageRow.style.display = 'none';
+      resetImageState();
+      resetMarkdownImageState();
     }
   });
 
@@ -99,6 +117,49 @@ window.addEventListener('load', () => {
     e.stopPropagation();
     resetImageState();
   });
+
+  if (uploadMarkdownImageBtn) {
+    uploadMarkdownImageBtn.addEventListener('click', async () => {
+      const csrf = getCookie('csrftoken');
+
+      if (!markdownImageInput.files || markdownImageInput.files.length === 0) {
+        markdownImageStatus.textContent = 'Please choose an image first.';
+        return;
+      }
+
+      markdownImageStatus.textContent = 'Uploading image...';
+
+      const fd = new FormData();
+      fd.append('image', markdownImageInput.files[0]);
+
+      try {
+        const res = await fetch('/posts/api/images/upload/', {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrf
+          },
+          body: fd
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          markdownImageStatus.textContent = data.error || 'Upload failed.';
+          return;
+        }
+
+        const imageMarkdown = `\n![Uploaded image](${data.url})\n`;
+        textarea.value += imageMarkdown;
+
+        markdownImageStatus.textContent = 'Image uploaded and link inserted.';
+        markdownImageInput.value = '';
+
+      } catch (err) {
+        console.error(err);
+        markdownImageStatus.textContent = 'Network error uploading image.';
+      }
+    });
+  }
 
   // =====================
   // FORM SUBMISSION

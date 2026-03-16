@@ -73,3 +73,12 @@ class Entry(models.Model):
     @property
     def is_edited(self):
         return (self.updated_at - self.published_at) > timedelta(seconds=1)
+    
+class HostedImage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="hosted_images")
+    image = models.ImageField(upload_to="hosted_images/")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.author.username} - {self.id}"

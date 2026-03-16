@@ -3,7 +3,7 @@ from django.http import JsonResponse, HttpResponseForbidden
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.db.models import Q
-from .models import Entry
+from .models import Entry, HostedImage
 from accounts.models import Author, Follow
 from interactions.views import user_can_access_entry
 import json
@@ -184,6 +184,13 @@ def get_entry(request, entry_id):
         if request.user != entry.author:
             return JsonResponse({"error": "Forbidden"}, status=403)
 
+    image_url = None
+    if entry.image:
+        try:
+            image_url = request.build_absolute_uri(entry.image.url)
+        except ValueError:
+            image_url = None
+
     return JsonResponse({
         "id": str(entry.id),
         "title": entry.title,
@@ -191,7 +198,29 @@ def get_entry(request, entry_id):
         "contentType": entry.content_type,
         "visibility": entry.visibility,
         "published": entry.published_at.isoformat(),
-    })  
+        "image": image_url,
+    })
+
+@login_required
+def upload_hosted_image(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=400)
+
+    image_file = request.FILES.get("image")
+    if not image_file:
+        return JsonResponse({"error": "Image file required"}, status=400)
+
+    hosted_image = HostedImage.objects.create(
+        author=request.user,
+        image=image_file
+    )
+
+    image_url = request.build_absolute_uri(hosted_image.image.url)
+
+    return JsonResponse({
+        "id": str(hosted_image.id),
+        "url": image_url
+    }, status=201)
 
 @login_required
 def my_entries(request):
