@@ -1,3 +1,6 @@
+```
+The following documentation was written with assistance from Claude Haiku 4.5, Anthropic, 2026-03-16:
+```
 # Interactions API Documentation
 
 The interactions API exposes endpoints for managing comments and likes on entries.

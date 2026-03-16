@@ -7,7 +7,7 @@ The following documentation was written with assistance from Claude Haiku 4.5, A
 
 ## Overview
 
-The Interactions API handles likes and comments on entries (posts) and comments. All endpoints require authentication.
+The Interactions UI endpoints handle likes and comments on entries (posts) and comments. All endpoints require authentication.
 
 **Access Control**: Users can only interact with entries they can see:
 - PUBLIC/UNLISTED: Anyone with a link can like/comment
