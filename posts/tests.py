@@ -19,7 +19,7 @@ class PostsApiTests(TestCase):
 
     def post_json(self, payload):
         return self.client.post(
-            "/posts/api/entries/create/",
+            "/posts/api/entries/",
             data=json.dumps(payload),
             content_type="application/json",
         )
@@ -31,7 +31,7 @@ class PostsApiTests(TestCase):
             content_type="image/png",
         )
         return self.client.post(
-            "/posts/api/entries/create/",
+            "/posts/api/entries/",
             data={
                 "title": title,
                 "content": content,
@@ -49,7 +49,7 @@ class PostsApiTests(TestCase):
         self.login("u1")
 
         resp = self.client.post(
-            "/posts/api/entries/create/",
+            "/posts/api/entries/",
             data=json.dumps(
                 {
                     "title": "Unlisted Post",
@@ -148,16 +148,16 @@ class PostsApiTests(TestCase):
         )
 
         self.login("u2")
-        resp = self.client.put(
-            f"/posts/api/entries/{e.id}/edit/",
+        resp = self.client.patch(
+            f"/posts/api/entries/{e.id}/",
             data=json.dumps({"title": "Hacked"}),
             content_type="application/json",
         )
         self.assertEqual(resp.status_code, 403)
 
         self.login("u1")
-        resp2 = self.client.put(
-            f"/posts/api/entries/{e.id}/edit/",
+        resp2 = self.client.patch(
+            f"/posts/api/entries/{e.id}/",
             data=json.dumps({"title": "Updated"}),
             content_type="application/json",
         )
@@ -172,11 +172,11 @@ class PostsApiTests(TestCase):
         )
 
         self.login("u2")
-        resp = self.client.delete(f"/posts/api/entries/{e.id}/delete/")
+        resp = self.client.delete(f"/posts/api/entries/{e.id}/")
         self.assertEqual(resp.status_code, 403)
 
         self.login("u1")
-        resp2 = self.client.delete(f"/posts/api/entries/{e.id}/delete/")
+        resp2 = self.client.delete(f"/posts/api/entries/{e.id}/")
         self.assertEqual(resp2.status_code, 200)
 
         e.refresh_from_db()
@@ -253,7 +253,7 @@ class PostsApiTests(TestCase):
         self.login("u1")
 
         resp = self.client.post(
-            "/posts/api/entries/create/",
+            "/posts/api/entries/",
             data={
                 "title": "No image",
                 "content": "caption",
@@ -276,7 +276,7 @@ class PostsApiTests(TestCase):
 
     def test_create_entry_rejects_get(self):
         self.login("u1")
-        resp = self.client.get("/posts/api/entries/create/")
+        resp = self.client.get("/posts/api/entries/")
         self.assertEqual(resp.status_code, 400)
 
 

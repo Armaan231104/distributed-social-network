@@ -96,8 +96,8 @@ editForm?.addEventListener('submit', async (e) => {
     }
 
     try {
-        const res = await fetch(`/posts/api/entries/${postId}/update/`, {
-            method: 'PUT',
+        const res = await fetch(`/posts/api/entries/${postId}/`, {
+            method: 'PATCH',
             credentials: 'same-origin',   // 🔥 ADD THIS
             headers: {
                 'Content-Type': 'application/json',

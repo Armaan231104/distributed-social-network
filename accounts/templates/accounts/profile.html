@@ -261,7 +261,7 @@
 
     <div id="post-options-menu-{{ post.id }}" class="post-options-menu hidden">
         <button class="menu-edit-btn" type="button"
-        onclick="event.stopPropagation();window.openEditPostDescription('{{ post.id }}', `{{ post.content|escapejs }}`);", '{% url 'entry_detail' post.id %}');">
+        onclick="event.stopPropagation();window.openEditPostDescription('{{ post.id }}', `{{ post.content|escapejs }}`);">
             <i class="fa-solid fa-pen-to-square"></i> Edit Post
         </button>
         <button class="menu-delete-btn" type="button"

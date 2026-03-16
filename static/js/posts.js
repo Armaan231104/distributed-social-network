@@ -171,7 +171,7 @@ window.addEventListener('load', () => {
           alert('Please choose an image file.');
           return;
         }
-        res = await fetch('/posts/api/entries/create/', { method:'POST', headers:{'X-CSRFToken':csrf}, body:fd });
+        res = await fetch('/posts/api/entries/', { method:'POST', headers:{'X-CSRFToken':csrf}, body:fd });
       } else {
         const payload = {
           title: form.elements.title.value,
@@ -179,7 +179,7 @@ window.addEventListener('load', () => {
           contentType: contentType,
           visibility: visibilitySelect.value
         };
-        res = await fetch('/posts/api/entries/create/', { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body:JSON.stringify(payload) });
+        res = await fetch('/posts/api/entries/', { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf}, body:JSON.stringify(payload) });
       }
       if(!res.ok){
         const err = await res.json().catch(()=>({}));

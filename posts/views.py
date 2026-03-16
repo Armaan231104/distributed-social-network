@@ -233,89 +233,94 @@ def create_entry(request):
     return JsonResponse({"id": str(entry.id)}, status=201)
 
 
-@login_required
-@require_http_methods(["PUT"])
-def update_entry(request, entry_id):
+@require_http_methods(["GET", "PATCH", "DELETE"])
+def entry_detail_api(request, entry_id):
     """
-    Updates an existing entry's content.
-    """
-
-    try:
-        entry = Entry.objects.get(id=entry_id, author=request.user)
-    except Entry.DoesNotExist:
-        return JsonResponse({"error": "Entry not found or not yours"}, status=404)
-
-    try:
-        data = json.loads(request.body.decode("utf-8") or "{}")
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON"}, status=400)
-
-    if "content" in data:
-        entry.content = data["content"].strip()
+    Handles GET (read), PATCH (partial update), and DELETE for a single entry.
     
-    # Only update content if provided
-    entry.save()
-
-    return JsonResponse({
-        "id": str(entry.id),
-        "message": "Updated successfully",
-        "content": entry.content
-    }, status=200)
-
-
-def get_entry(request, entry_id):
+    - GET: Returns a JSON representation of an entry.
+    - PATCH: Partially updates an entry (only author).
+    - DELETE: Soft deletes an entry (only author).
     """
-    Returns a JSON representation of an entry.
-
-    Visibility Enforcement:
-    - DELETED entries are only accessible to node administrators.
-    - PUBLIC and UNLISTED entries are accessible to anyone.
-    - FRIENDS entries are accessible only to the author or mutual followers.
-    """
-
     entry = get_object_or_404(Entry, id=entry_id)
+    
+    # GET - Read entry
+    if request.method == "GET":
+        if entry.visibility == "DELETED":
+            if not request.user.is_authenticated or not request.user.is_staff:
+                return JsonResponse({"error": "Not found"}, status=404)
 
-    if entry.visibility == "DELETED":
-        if not request.user.is_authenticated or not request.user.is_staff:
-            return JsonResponse({"error": "Not found"}, status=404)
-
-    if entry.visibility in ["PUBLIC", "UNLISTED"]:
-        pass
-
-    elif entry.visibility == "FRIENDS":
-
-        if not request.user.is_authenticated:
-            return JsonResponse({"error": "Forbidden"}, status=403)
-
-        if request.user == entry.author:
+        if entry.visibility in ["PUBLIC", "UNLISTED"]:
             pass
-        else:
+        elif entry.visibility == "FRIENDS":
+            if not request.user.is_authenticated:
+                return JsonResponse({"error": "Forbidden"}, status=403)
+            if request.user != entry.author:
+                try:
+                    viewer_author = request.user.author
+                    entry_author = entry.author.author
+                except Author.DoesNotExist:
+                    return JsonResponse({"error": "Forbidden"}, status=403)
+                if not viewer_author.is_friend(entry_author):
+                    return JsonResponse({"error": "Forbidden"}, status=403)
+
+        image_url = None
+        if entry.image:
             try:
-                viewer_author = request.user.author
-                entry_author = entry.author.author
-            except Author.DoesNotExist:
-                return JsonResponse({"error": "Forbidden"}, status=403)
+                image_url = request.build_absolute_uri(entry.image.url)
+            except ValueError:
+                image_url = None
 
-            if not viewer_author.is_friend(entry_author):
-                return JsonResponse({"error": "Forbidden"}, status=403)
-
-    image_url = None
-
-    if entry.image:
+        return JsonResponse({
+            "id": str(entry.id),
+            "title": entry.title,
+            "content": entry.content,
+            "contentType": entry.content_type,
+            "visibility": entry.visibility,
+            "published": entry.published_at.isoformat(),
+            "image": image_url,
+        })
+    
+    # PATCH - Partial update (only author)
+    if request.method == "PATCH":
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Authentication required"}, status=401)
+        
+        if entry.author != request.user:
+            return HttpResponseForbidden()
+        
+        if entry.visibility == "DELETED":
+            return JsonResponse({"error": "Entry not found"}, status=404)
+        
         try:
-            image_url = request.build_absolute_uri(entry.image.url)
-        except ValueError:
-            image_url = None
+            data = json.loads(request.body.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-    return JsonResponse({
-        "id": str(entry.id),
-        "title": entry.title,
-        "content": entry.content,
-        "contentType": entry.content_type,
-        "visibility": entry.visibility,
-        "published": entry.published_at.isoformat(),
-        "image": image_url,
-    })
+        if "content" in data:
+            entry.content = data["content"].strip()
+        
+        if "title" in data:
+            entry.title = data["title"]
+        
+        entry.save()
+
+        return JsonResponse({
+            "id": str(entry.id),
+            "message": "Updated successfully",
+            "content": entry.content
+        }, status=200)
+    
+    # DELETE - Soft delete (only author)
+    if request.method == "DELETE":
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Authentication required"}, status=401)
+        
+        if entry.author != request.user:
+            return HttpResponseForbidden()
+        
+        entry.soft_delete()
+        return JsonResponse({"deleted": True})
 
 
 @login_required
@@ -383,74 +388,6 @@ def my_entries(request):
 
 
 @login_required
-def edit_entry(request, entry_id):
-    """
-    Updates an existing entry.
-
-    Only the author may edit.
-    Deleted entries cannot be edited.
-    """
-
-    entry = get_object_or_404(Entry, id=entry_id)
-
-    if entry.author != request.user:
-        return HttpResponseForbidden()
-
-    if entry.visibility == "DELETED":
-        return JsonResponse({"error": "Entry not found"}, status=404)
-
-    if request.method != "PUT":
-        return JsonResponse({"error": "PUT required"}, status=400)
-
-    # A) multipart/form-data => editing image/caption/title, optionally replace image
-    if request.content_type and request.content_type.startswith("multipart/form-data"):
-
-        entry.title = request.POST.get("title", entry.title)
-        entry.content = request.POST.get("content", entry.content)
-
-        ct = request.POST.get("contentType", getattr(entry, "content_type", "text/plain"))
-
-        if ct not in dict(Entry.CONTENT_TYPES).keys():
-            return JsonResponse({"error": "Invalid contentType"}, status=400)
-
-        entry.content_type = ct
-
-        new_image = request.FILES.get("image")
-
-        if new_image:
-            entry.image = new_image
-
-        entry.save()
-
-        return JsonResponse({"updated": True}, status=200)
-    
-    # B) JSON => editing title/content/contentType for text posts
-    try:
-        data = json.loads(request.body.decode("utf-8") or "{}")
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON"}, status=400)
-
-    if "title" in data:
-        entry.title = data["title"]
-
-    if "content" in data:
-        entry.content = data["content"]
-
-    if "contentType" in data:
-
-        ct = data["contentType"]
-
-        if ct not in dict(Entry.CONTENT_TYPES).keys():
-            return JsonResponse({"error": "Invalid contentType"}, status=400)
-
-        entry.content_type = ct
-
-    entry.save()
-
-    return JsonResponse({"updated": True}, status=200)
-
-
-@login_required
 @require_POST
 def delete_entry_ui(request, entry_id):
     """
@@ -472,26 +409,6 @@ def delete_entry_ui(request, entry_id):
         return redirect(referrer)
     else:
         return redirect("stream")
-
-
-@login_required
-def delete_entry(request, entry_id):
-    """
-    Soft deletes an entry via the API.
-
-    Only the author may delete.
-    """
-
-    entry = get_object_or_404(Entry, id=entry_id)
-
-    if entry.author != request.user:
-        return HttpResponseForbidden()
-
-    if request.method != "DELETE":
-        return JsonResponse({"error": "DELETE required"}, status=400)
-
-    entry.soft_delete()
-    return JsonResponse({"deleted": True})
 
 
 @login_required
