@@ -11,6 +11,12 @@ from .models import Like
 def user_can_access_entry(user, entry):
     """
     Checks if the user has access to the entry based on entry visibility
+
+    Visibility rules:
+    - PUBLIC / UNLISTED: Accessible by anyone
+    - DELETED: Accessible only to node admins (is_staff). All other users types are denied
+    - FRIENDS: Accessible only to the author or mutual followers (friends)
+    - Any other visibility types: denied
     """
     if entry.visibility in ['PUBLIC', 'UNLISTED']:
         return True
@@ -21,7 +27,7 @@ def user_can_access_entry(user, entry):
             return False
         if user == entry.author:
             return True
-        # check if they are friends (mutual follow)
+        # checks if they are friends (mutual follow)
         try:
             author = user.author
             return author.is_friend(entry.author.author)

@@ -637,3 +637,221 @@ class PostVisibilityOnProfileTest(TestCase):
         self.client.login(username='friend', password='testpass123')
         response = self.client.get(self.profile_url)
         self.assertNotIn(self.deleted_post, response.context['posts'])
+
+
+class NodeAdminDeletedEntriesTest(TestCase):
+    """
+    Tests for the node-admin deleted entries page (/posts/admin/deleted/).
+
+    User Story: As a node admin, I want deleted entries to stay in the
+    database and only be removed from the UI and API, so I can see what
+    was deleted.
+
+    Access rules under test:
+    - Unauthenticated users are redirected to the login page (302).
+    - Authenticated non-staff users receive 403 Forbidden.
+    - Staff users (node admins) receive 200 and see all DELETED entries.
+
+    Data-retention rules under test:
+    - Soft-deleted entries remain in the database with visibility="DELETED".
+    - They are absent from the stream and profile pages for all non-admin users.
+    - Staff can also view the full detail page of a deleted entry.
+    """
+
+    def setUp(self):
+        self.client = Client()
+
+        self.regular_user = User.objects.create_user(
+            username='regular', password='pass12345'
+        )
+        self.admin_user = User.objects.create_user(
+            username='nodeadmin', password='pass12345', is_staff=True
+        )
+        self.author_user = User.objects.create_user(
+            username='postauthor', password='pass12345'
+        )
+
+        self.live_entry = Entry.objects.create(
+            author=self.author_user,
+            title='Live Entry',
+            content='Still visible',
+            content_type='text/plain',
+            visibility='PUBLIC',
+        )
+        self.deleted_entry = Entry.objects.create(
+            author=self.author_user,
+            title='Deleted Entry',
+            content='Was deleted',
+            content_type='text/plain',
+            visibility='PUBLIC',
+        )
+        self.deleted_entry.soft_delete()
+
+        self.url = reverse('deleted_entries')
+
+    # ------------------------------------------------------------------
+    # Access control: /posts/admin/deleted/
+    # ------------------------------------------------------------------
+
+    '''
+    Tests: Unauthenticated users cannot access the deleted entries page.
+    Pass Condition: Response is a redirect (302) to the login page.
+    '''
+    def test_unauthenticated_user_redirected(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login', response['Location'])
+
+    '''
+    Tests: A regular (non-staff) authenticated user is denied access.
+    Pass Condition: Response status is 403 Forbidden.
+    '''
+    def test_non_staff_user_gets_403(self):
+        self.client.login(username='regular', password='pass12345')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 403)
+
+    '''
+    Tests: The entry author (non-staff) cannot access the deleted entries page.
+    Pass Condition: Response status is 403 Forbidden.
+    '''
+    def test_entry_author_non_staff_gets_403(self):
+        self.client.login(username='postauthor', password='pass12345')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 403)
+
+    '''
+    Tests: A node admin (is_staff=True) can access the deleted entries page.
+    Pass Condition: Response status is 200 OK.
+    '''
+    def test_staff_user_gets_200(self):
+        self.client.login(username='nodeadmin', password='pass12345')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    # ------------------------------------------------------------------
+    # Content: deleted entries page shows correct entries
+    # ------------------------------------------------------------------
+
+    '''
+    Tests: The deleted entries page contains the soft-deleted entry.
+    Pass Condition: deleted_entry is present in the template context.
+    '''
+    def test_admin_sees_deleted_entry_in_context(self):
+        self.client.login(username='nodeadmin', password='pass12345')
+        response = self.client.get(self.url)
+        self.assertIn(self.deleted_entry, response.context['entries'])
+
+    '''
+    Tests: The deleted entries page does NOT show live (non-deleted) entries.
+    Pass Condition: live_entry is absent from the template context.
+    '''
+    def test_admin_does_not_see_live_entry_in_context(self):
+        self.client.login(username='nodeadmin', password='pass12345')
+        response = self.client.get(self.url)
+        self.assertNotIn(self.live_entry, response.context['entries'])
+
+    '''
+    Tests: All soft-deleted entries from multiple authors appear on the page.
+    Pass Condition: Both deleted entries are present in the template context.
+    '''
+    def test_admin_sees_deleted_entries_from_all_authors(self):
+        other_user = User.objects.create_user(username='other', password='pass12345')
+        other_entry = Entry.objects.create(
+            author=other_user,
+            title='Other Deleted',
+            content='Also deleted',
+            content_type='text/plain',
+        )
+        other_entry.soft_delete()
+
+        self.client.login(username='nodeadmin', password='pass12345')
+        response = self.client.get(self.url)
+        self.assertIn(self.deleted_entry, response.context['entries'])
+        self.assertIn(other_entry, response.context['entries'])
+
+    # ------------------------------------------------------------------
+    # Data retention: entries stay in DB after soft delete
+    # ------------------------------------------------------------------
+
+    '''
+    Tests: Soft-deleting an entry does not remove it from the database.
+    Pass Condition: Entry still exists in DB with visibility="DELETED".
+    '''
+    def test_soft_delete_retains_entry_in_database(self):
+        entry = Entry.objects.create(
+            author=self.author_user,
+            title='To Be Deleted',
+            content='content',
+            content_type='text/plain',
+        )
+        entry.soft_delete()
+        entry.refresh_from_db()
+        self.assertEqual(entry.visibility, 'DELETED')
+        self.assertTrue(Entry.objects.filter(id=entry.id).exists())
+
+    '''
+    Tests: Soft-deleting an entry hides it from the public stream.
+    Pass Condition: deleted entry is absent from stream view context.
+    '''
+    def test_deleted_entry_absent_from_stream(self):
+        self.client.login(username='regular', password='pass12345')
+        response = self.client.get('/posts/stream/')
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(self.deleted_entry, response.context['posts'])
+
+    '''
+    Tests: A live entry still appears in the author's own stream after another entry is deleted.
+    Pass Condition: live_entry is present in stream view context for its author.
+    '''
+    def test_live_entry_still_in_stream_after_deletion(self):
+        self.client.login(username='postauthor', password='pass12345')
+        response = self.client.get('/posts/stream/')
+        self.assertIn(self.live_entry, response.context['posts'])
+
+    # ------------------------------------------------------------------
+    # Entry detail page: access control for deleted entries
+    # ------------------------------------------------------------------
+
+    '''
+    Tests: A node admin can open the detail page of a deleted entry.
+    Pass Condition: Response status is 200 OK.
+    '''
+    def test_admin_can_view_deleted_entry_detail(self):
+        self.client.login(username='nodeadmin', password='pass12345')
+        response = self.client.get(
+            reverse('entry_detail', kwargs={'entry_id': self.deleted_entry.id})
+        )
+        self.assertEqual(response.status_code, 200)
+
+    '''
+    Tests: A regular user cannot access the detail page of a deleted entry.
+    Pass Condition: Response status is 403 Forbidden.
+    '''
+    def test_non_staff_cannot_view_deleted_entry_detail(self):
+        self.client.login(username='regular', password='pass12345')
+        response = self.client.get(
+            reverse('entry_detail', kwargs={'entry_id': self.deleted_entry.id})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    '''
+    Tests: The entry author (non-staff) cannot access the detail page of their deleted entry.
+    Pass Condition: Response status is 403 Forbidden.
+    '''
+    def test_author_non_staff_cannot_view_own_deleted_entry_detail(self):
+        self.client.login(username='postauthor', password='pass12345')
+        response = self.client.get(
+            reverse('entry_detail', kwargs={'entry_id': self.deleted_entry.id})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    '''
+    Tests: An unauthenticated user cannot access the detail page of a deleted entry.
+    Pass Condition: Response is a redirect (302) to login.
+    '''
+    def test_unauthenticated_cannot_view_deleted_entry_detail(self):
+        response = self.client.get(
+            reverse('entry_detail', kwargs={'entry_id': self.deleted_entry.id})
+        )
+        self.assertEqual(response.status_code, 302)

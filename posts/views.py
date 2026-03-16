@@ -352,9 +352,16 @@ def delete_entry(request, entry_id):
 @login_required
 def deleted_entries(request):
     """
-    Node admin view: lists all soft-deleted entries.
+    Node admin view: lists all soft-deleted entries across all authors.
 
-    Only accessible to staff (node admins).
+    Access Control:
+    - Must be authenticated (enforced by @login_required → redirects to login).
+    - Must be staff (is_staff=True); non-staff receive 403 Forbidden.
+
+    Behaviour:
+    - Entries are never hard-deleted; soft_delete() sets visibility to "DELETED".
+    - This view is the only place in the UI where DELETED entries are visible.
+    - Results are ordered by updated_at descending (most recently deleted first).
     """
     if not request.user.is_staff:
         return HttpResponseForbidden()
