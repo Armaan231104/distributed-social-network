@@ -4,7 +4,7 @@ from django.conf import settings
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, BasePermission
 from django.contrib.admin.views.decorators import staff_member_required
 from .models import Author, FollowRequest, Follow
 from django.contrib.auth.models import User
@@ -136,8 +136,45 @@ def create_follow_request(actor, target):
         status=FollowRequest.Status.PENDING
     ), 'created'
 
+class IsApprovedAuthor(BasePermission):
+    """
+    Allows access only to approved authors.
+    Staff users are always allowed.
+    """
+    def has_permission(self, request, view):
+        user = request.user
 
+        if not user or not user.is_authenticated:
+            return False
+
+        if user.is_staff:
+            return True
+
+        try:
+            return user.author.is_approved
+        except Author.DoesNotExist:
+            return False
+        
 # API Views
+def approved_author_required(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect("login")
+
+        if request.user.is_staff:
+            return view_func(request, *args, **kwargs)
+
+        try:
+            author = request.user.author
+        except Author.DoesNotExist:
+            return redirect("login")
+
+        if not author.is_approved:
+            return redirect("pending-approval")
+
+        return view_func(request, *args, **kwargs)
+    return wrapper
 
 class AuthorListView(APIView):
     """List all authors on this node."""
@@ -451,7 +488,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden
 
-
+@approved_author_required
 def authors_list(request):
     """Show all authors on the node."""
     authors = Author.objects.filter(is_approved=True)
@@ -467,7 +504,7 @@ def authors_list(request):
         'current_user_author': current_user_author,
     })
 
-
+@approved_author_required
 def author_followers(request, author_id):
     """Show list of an author's followers."""
     author = get_object_or_404(Author, id=author_id)
@@ -486,7 +523,7 @@ def author_followers(request, author_id):
         'page_title': f"{author.displayName.capitalize()}'s Followers",
     })
 
-
+@approved_author_required
 def author_following(request, author_id):
     """Show list of authors that this author is following."""
     author = get_object_or_404(Author, id=author_id)
@@ -505,7 +542,7 @@ def author_following(request, author_id):
         'page_title': f"{author.displayName.capitalize()} is Following",
     })
 
-
+@approved_author_required
 def author_friends(request, author_id):
     """Show list of an author's friends (mutual follows)."""
     author = get_object_or_404(Author, id=author_id)
@@ -524,7 +561,7 @@ def author_friends(request, author_id):
         'page_title': f"{author.displayName.capitalize()}'s Friends",
     })
 
-
+@approved_author_required
 def author_profile(request, author_id):
     """Show an author's profile along with their posts."""
     author = get_object_or_404(Author, id=author_id)
@@ -579,6 +616,7 @@ def author_profile(request, author_id):
         'posts': posts,
     })
 
+@approved_author_required
 @login_required
 def follow_author(request, author_id):
     """Follow an author from the UI."""
@@ -608,7 +646,7 @@ def follow_author(request, author_id):
     send_follow_to_remote(current_author, target_author)
     return redirect('author-profile', author_id=author_id)
 
-
+@approved_author_required
 @login_required
 def unfollow_author(request, author_id):
     """Unfollow an author from the UI."""
@@ -629,7 +667,7 @@ def unfollow_author(request, author_id):
     
     return redirect('author-profile', author_id=author_id)
 
-
+@approved_author_required
 @login_required
 def cancel_follow_request(request, author_id):
     """Cancel a pending follow request (withdraw request)."""
@@ -654,7 +692,7 @@ def cancel_follow_request(request, author_id):
     
     return redirect('author-profile', author_id=author_id)
 
-
+@approved_author_required
 @login_required
 def follow_requests(request):
     """Show pending follow requests."""
@@ -672,7 +710,7 @@ def follow_requests(request):
         'pending_requests': pending_requests,
     })
 
-
+@approved_author_required
 @login_required
 def accept_follow_request(request, request_id):
     """Accept a follow request."""
@@ -696,7 +734,7 @@ def accept_follow_request(request, request_id):
     
     return redirect('follow-requests')
 
-
+@approved_author_required
 @login_required
 def reject_follow_request(request, request_id):
     """Reject a follow request."""
@@ -715,7 +753,7 @@ def reject_follow_request(request, request_id):
     
     return redirect('follow-requests')
 
-
+@approved_author_required
 @login_required
 def my_profile(request):
     """Go to current user's profile."""
@@ -727,6 +765,7 @@ def my_profile(request):
 
 from .forms import AuthorUpdateForm
 
+@approved_author_required
 @login_required
 def edit_profile(request):
     try:
@@ -793,26 +832,7 @@ def pending_approval(request):
 
     return render(request, "accounts/pending_approval.html")
 
-def approved_author_required(view_func):
-    @wraps(view_func)
-    def wrapper(request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return redirect("login")
-
-        if request.user.is_staff:
-            return view_func(request, *args, **kwargs)
-
-        try:
-            author = request.user.author
-        except Author.DoesNotExist:
-            return redirect("login")
-
-        if not author.is_approved:
-            return redirect("pending-approval")
-
-        return view_func(request, *args, **kwargs)
-    return wrapper
-
+@approved_author_required
 @login_required
 def pending_authors(request):
     if not request.user.is_staff:
@@ -827,6 +847,7 @@ def pending_authors(request):
         "pending_authors_admin": pending_authors
     })
 
+@approved_author_required
 @staff_member_required
 def pending_authors_admin(request):
     pending_authors = Author.objects.filter(
@@ -838,6 +859,7 @@ def pending_authors_admin(request):
         "pending_authors": pending_authors
     })
 
+@approved_author_required
 @login_required
 def approve_author(request, author_id):
     if not request.user.is_staff:
@@ -849,6 +871,7 @@ def approve_author(request, author_id):
 
     return redirect("pending-authors-admin")
 
+@approved_author_required
 @login_required
 def reject_author(request, author_id):
     if not request.user.is_staff:
