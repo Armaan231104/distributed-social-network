@@ -317,8 +317,7 @@
     </select>
 
 </div>
-            <textarea name="content" placeholder="Write your post..."></textarea>
-
+    <textarea name="content" id="post-content" placeholder="Write your post..."></textarea> 
             <!-- Image upload row (hidden until “Image” is selected in the dropdown) -->
             <div class="image-row" id="image-row" style="display:none;">
 
@@ -331,6 +330,14 @@
                     <i class="fa-solid fa-xmark"></i>
                 </div>
 
+            </div>
+
+            <div class="markdown-image-row" id="markdown-image-row" style="display:none;">
+                <input type="file" id="markdown-image-input" accept="image/*">
+                <button type="button" id="upload-markdown-image-btn" class="btn btn-secondary">
+                    Upload Image
+                </button>
+                <p id="markdown-image-status" style="margin-top: 8px;"></p>
             </div>
 
             <div class="modal-actions">
