@@ -40,8 +40,8 @@ class Entry(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
     title = models.CharField(max_length=200)
     content = models.TextField(blank=True)
-    visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default="PUBLIC")
-    published_at = models.DateTimeField(auto_now_add=True)
+    visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default="PUBLIC", db_index=True)
+    published_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     updated_at = models.DateTimeField(auto_now=True)
     
