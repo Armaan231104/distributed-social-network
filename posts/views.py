@@ -8,7 +8,27 @@ from .models import Entry, HostedImage
 from accounts.models import Author, Follow
 from interactions.views import user_can_access_entry
 import json
+from functools import wraps
 
+def approved_author_required(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect("login")
+
+        if request.user.is_staff:
+            return view_func(request, *args, **kwargs)
+
+        try:
+            author = request.user.author
+        except Author.DoesNotExist:
+            return redirect("login")
+
+        if not author.is_approved:
+            return redirect("pending-approval")
+
+        return view_func(request, *args, **kwargs)
+    return wrapper
 
 def get_stream_entries_for_user(user):
     """
@@ -59,7 +79,7 @@ def get_stream_entries_for_user(user):
         Q(author__in=friend_users, visibility="FRIENDS")
     ).order_by('-published_at').distinct()
 
-
+@approved_author_required
 def stream(request):
     """
     Renders the main timeline page.
@@ -387,6 +407,74 @@ def my_entries(request):
     return JsonResponse(data, safe=False)
 
 
+@login_required
+def edit_entry(request, entry_id):
+    """
+    Updates an existing entry.
+
+    Only the author may edit.
+    Deleted entries cannot be edited.
+    """
+
+    entry = get_object_or_404(Entry, id=entry_id)
+
+    if entry.author != request.user:
+        return HttpResponseForbidden()
+
+    if entry.visibility == "DELETED":
+        return JsonResponse({"error": "Entry not found"}, status=404)
+
+    if request.method != "PUT":
+        return JsonResponse({"error": "PUT required"}, status=400)
+
+    # A) multipart/form-data => editing image/caption/title, optionally replace image
+    if request.content_type and request.content_type.startswith("multipart/form-data"):
+
+        entry.title = request.POST.get("title", entry.title)
+        entry.content = request.POST.get("content", entry.content)
+
+        ct = request.POST.get("contentType", getattr(entry, "content_type", "text/plain"))
+
+        if ct not in dict(Entry.CONTENT_TYPES).keys():
+            return JsonResponse({"error": "Invalid contentType"}, status=400)
+
+        entry.content_type = ct
+
+        new_image = request.FILES.get("image")
+
+        if new_image:
+            entry.image = new_image
+
+        entry.save()
+
+        return JsonResponse({"updated": True}, status=200)
+    
+    # B) JSON => editing title/content/contentType for text posts
+    try:
+        data = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    if "title" in data:
+        entry.title = data["title"]
+
+    if "content" in data:
+        entry.content = data["content"]
+
+    if "contentType" in data:
+
+        ct = data["contentType"]
+
+        if ct not in dict(Entry.CONTENT_TYPES).keys():
+            return JsonResponse({"error": "Invalid contentType"}, status=400)
+
+        entry.content_type = ct
+
+    entry.save()
+
+    return JsonResponse({"updated": True}, status=200)
+
+@approved_author_required
 @login_required
 @require_POST
 def delete_entry_ui(request, entry_id):
