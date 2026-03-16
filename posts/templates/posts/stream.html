@@ -103,8 +103,7 @@
         onclick="event.stopPropagation();
         window.openEditPostDescription(
             '{{ post.id }}',
-            `{{ post.content|escapejs }}`,
-            '{% url "update_entry" post.id %}'
+            `{{ post.content|escapejs }}`
         );">
             <i class="fa-solid fa-pen-to-square"></i> Edit Post
         </button>

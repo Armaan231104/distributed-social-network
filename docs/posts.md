@@ -108,7 +108,7 @@ Base path
 # 1. Create Entry
 
 ```
-POST /posts/api/entries/create/
+POST /posts/api/entries/
 ```
 
 Creates a new entry.
@@ -285,23 +285,23 @@ Entries are returned **newest first**.
 
 ---
 
-# 5. Edit Entry
+# 5. Edit Entry (Partial Update)
 
 ```
-PUT /posts/api/entries/{entry_id}/edit/
+PATCH /posts/api/entries/{entry_id}/
 ```
 
 Authentication Required: **Yes**
 
-Only the author may edit.
+Only the author may edit. This is a partial update - only fields provided will be updated.
 
 ### Example Request
 
 ```json
+PATCH /posts/api/entries/{entry_id}/
 {
   "title": "Updated Title",
-  "content": "Updated content",
-  "contentType": "text/plain"
+  "content": "Updated content"
 }
 ```
 
@@ -325,7 +325,7 @@ Only the author may edit.
 # 6. Delete Entry (Soft Delete)
 
 ```
-DELETE /posts/api/entries/{entry_id}/delete/
+DELETE /posts/api/entries/{entry_id}/
 ```
 
 Authentication Required: **Yes**
