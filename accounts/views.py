@@ -221,6 +221,36 @@ class FollowersListView(APIView):
         })
 
 
+class FriendsListView(APIView):
+    """Get list of friends (mutual follows) for an author."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, author_id):
+        try:
+            author = Author.objects.get(user_id=author_id)
+        except Author.DoesNotExist:
+            return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        page = int(request.query_params.get('page', 1))
+        size = int(request.query_params.get('size', 50))
+        
+        all_friends = list(author.get_friends())
+        total = len(all_friends)
+        
+        start = (page - 1) * size
+        end = start + size
+        paginated_friends = all_friends[start:end]
+        
+        serializer = AuthorSerializer(paginated_friends, many=True)
+        return Response({
+            'type': 'friends',
+            'friends': serializer.data,
+            'page_number': page,
+            'size': size,
+            'count': total
+        })
+
+
 class FollowView(APIView):
     """
     Handle following and unfollowing authors.
@@ -428,6 +458,64 @@ def authors_list(request):
         'authors': authors,
         'current_user_author': current_user_author,
     })
+
+
+def author_followers(request, author_id):
+    """Show list of an author's followers."""
+    author = get_object_or_404(Author, id=author_id)
+    followers = [f.follower for f in author.followers.all()]
+    
+    current_user_author = None
+    if request.user.is_authenticated:
+        try:
+            current_user_author = request.user.author
+        except Author.DoesNotExist:
+            pass
+    
+    return render(request, 'accounts/authors_list.html', {
+        'authors': followers,
+        'current_user_author': current_user_author,
+        'page_title': f"{author.displayName}'s Followers",
+    })
+
+
+def author_following(request, author_id):
+    """Show list of authors that this author is following."""
+    author = get_object_or_404(Author, id=author_id)
+    following = [f.followee for f in author.following.all()]
+    
+    current_user_author = None
+    if request.user.is_authenticated:
+        try:
+            current_user_author = request.user.author
+        except Author.DoesNotExist:
+            pass
+    
+    return render(request, 'accounts/authors_list.html', {
+        'authors': following,
+        'current_user_author': current_user_author,
+        'page_title': f"{author.displayName} is Following",
+    })
+
+
+def author_friends(request, author_id):
+    """Show list of an author's friends (mutual follows)."""
+    author = get_object_or_404(Author, id=author_id)
+    friends = list(author.get_friends())
+    
+    current_user_author = None
+    if request.user.is_authenticated:
+        try:
+            current_user_author = request.user.author
+        except Author.DoesNotExist:
+            pass
+    
+    return render(request, 'accounts/authors_list.html', {
+        'authors': friends,
+        'current_user_author': current_user_author,
+        'page_title': f"{author.displayName}'s Friends",
+    })
+
 
 def author_profile(request, author_id):
     """Show an author's profile along with their posts."""

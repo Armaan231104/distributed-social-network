@@ -194,6 +194,8 @@
     color: #222;
 }
 .profile-stats .label { font-size: 14px; color: #666; }
+.profile-stats a:visited,
+.profile-stats a { color: inherit; text-decoration: none; }
 
 /* ============================= */
 /* ACTION BUTTONS                */

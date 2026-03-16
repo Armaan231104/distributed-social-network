@@ -65,12 +65,14 @@ class Author(models.Model):
         Returns the number of friends (mutual followers).
         A friend is someone you follow AND who follows you back.
         """
-        # 'following' is the related_name for Follow.follower -> followee
-        # 'followers' is the related_name for Follow.followee <- follower
+        return self.get_friends().count()
+    
+    def get_friends(self):
+        """Returns queryset of friends (mutual followers)."""
         following_ids = set(self.following.values_list('followee_id', flat=True))
         follower_ids = set(self.followers.values_list('follower_id', flat=True))
-        mutual_ids = following_ids & follower_ids  # intersection = friends
-        return len(mutual_ids)
+        friend_ids = following_ids & follower_ids
+        return Author.objects.filter(id__in=friend_ids)
     
     def delete(self, *args, **kwargs):
         """

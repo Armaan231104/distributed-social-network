@@ -204,6 +204,65 @@ class FollowersAPITest(TestCase):
         self.assertEqual(len(data['followers']), 1)
 
 
+class FriendsAPITest(TestCase):
+    """Tests for the friends list API endpoint."""
+    
+    def setUp(self):
+        self.client = Client()
+        self.user1 = User.objects.create_user(username='author1', password='testpass123')
+        self.author1 = self.user1.author
+        
+        self.user2 = User.objects.create_user(username='author2', password='testpass123')
+        self.author2 = self.user2.author
+    
+    def test_list_friends_empty(self):
+        """Verifies friends list returns empty array when no friends."""
+        response = self.client.get(f'/api/authors/{self.user1.id}/friends/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['type'], 'friends')
+        self.assertEqual(data['friends'], [])
+    
+    def test_list_friends_with_friends(self):
+        """Verifies friends list returns correct authors when mutual follows exist."""
+        Follow.objects.create(follower=self.author1, followee=self.author2)
+        Follow.objects.create(follower=self.author2, followee=self.author1)
+        response = self.client.get(f'/api/authors/{self.user1.id}/friends/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data['friends']), 1)
+    
+    def test_list_friends_not_mutual(self):
+        """Verifies one-way follow does not create friend."""
+        Follow.objects.create(follower=self.author1, followee=self.author2)
+        response = self.client.get(f'/api/authors/{self.user1.id}/friends/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data['friends']), 0)
+    
+    def test_list_friends_pagination(self):
+        """Verifies friends list pagination works correctly."""
+        # Create 5 mutual follows (friends)
+        for i in range(5):
+            user = User.objects.create_user(username=f'friend{i}', password='testpass123')
+            author = user.author
+            Follow.objects.create(follower=self.author1, followee=author)
+            Follow.objects.create(follower=author, followee=self.author1)
+        
+        # Page 1, size 2
+        response = self.client.get(f'/api/authors/{self.user1.id}/friends/?page=1&size=2')
+        data = response.json()
+        self.assertEqual(data['count'], 5)
+        self.assertEqual(len(data['friends']), 2)
+        self.assertEqual(data['page_number'], 1)
+        self.assertEqual(data['size'], 2)
+        
+        # Page 3, size 2
+        response = self.client.get(f'/api/authors/{self.user1.id}/friends/?page=3&size=2')
+        data = response.json()
+        self.assertEqual(len(data['friends']), 1)
+
+
 class FollowRequestAPITest(TestCase):
     """Tests for the follow requests list API endpoint (Story 4)."""
     

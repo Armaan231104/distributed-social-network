@@ -143,6 +143,31 @@ Rejects a pending follow request or removes an existing follower.
 
 ---
 
+### GET /api/authors/{author_id}/friends/
+
+Returns list of authors who are friends with {author_id} (mutual follows).
+
+**Auth:** Required
+
+**Pagination:** Supported
+
+**Response:**
+```json
+{
+    "type": "friends",
+    "friends": [
+        { "type": "author", "id": "http://localhost/api/authors/2/", ... }
+    ],
+    "page_number": 1,
+    "size": 50,
+    "count": 5
+}
+```
+
+**User story:** See your friends (node knows about your friends)
+
+---
+
 ### GET /api/authors/{author_id}/follow_requests/
 
 Returns all pending follow requests for an author.

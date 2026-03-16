@@ -72,18 +72,18 @@
 
                 <!-- Social stats summary -->
                 <div class="profile-stats">
-                    <div class="stat">
+                    <a href="{% url 'author-followers' author_id=profile_author.id %}" class="stat">
                         <span class="number">{{ profile_author.get_followers_count }}</span>
                         <span class="label">Followers</span>
-                    </div>
-                    <div class="stat">
+                    </a>
+                    <a href="{% url 'author-following' author_id=profile_author.id %}" class="stat">
                         <span class="number">{{ profile_author.get_following_count }}</span>
                         <span class="label">Following</span>
-                    </div>
-                    <div class="stat">
+                    </a>
+                    <a href="{% url 'author-friends' author_id=profile_author.id %}" class="stat">
                         <span class="number">{{ profile_author.get_friends_count }}</span>
                         <span class="label">Friends</span>
-                    </div>
+                    </a>
                 </div>
 
                 <!--

@@ -6,6 +6,9 @@ import posts.views
 urlpatterns = [
     path('authors/all/', views.authors_list, name='authors-list'),
     path('authors/<path:author_id>/profile/', views.author_profile, name='author-profile'),
+    path('authors/<path:author_id>/followers/', views.author_followers, name='author-followers'),
+    path('authors/<path:author_id>/following/', views.author_following, name='author-following'),
+    path('authors/<path:author_id>/friends/', views.author_friends, name='author-friends'),
     path('follow/<path:author_id>/', views.follow_author, name='follow-author'),
     path('unfollow/<path:author_id>/', views.unfollow_author, name='unfollow-author'),
     path('cancel-request/<path:author_id>/', views.cancel_follow_request, name='cancel-follow-request'),
