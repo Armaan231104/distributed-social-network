@@ -327,7 +327,7 @@
 
                 <div class="image-box" id="image-upload-box">
                     Click to add image
-                    <input type="file" name="image" id="image-input" hidden>
+                    <input type="file" name="image" id="image-input" accept="image/*" hidden>
                 </div>
 
                 <div class="image-clear" id="clear-image">
@@ -337,11 +337,19 @@
             </div>
 
             <div class="markdown-image-row" id="markdown-image-row" style="display:none;">
-                <input type="file" id="markdown-image-input" accept="image/*">
-                <button type="button" id="upload-markdown-image-btn" class="btn btn-secondary">
-                    Upload Image
+
+                <div class="image-box" id="markdown-image-upload-box">
+                    Click to add image
+                    <input type="file" id="markdown-image-input" accept="image/*" hidden>
+                </div>
+
+                <!-- Upload button instead of X -->
+                <button type="button" id="upload-markdown-image-btn" class="upload-btn">
+                    <i class="fa-solid fa-upload"></i>
                 </button>
-                <p id="markdown-image-status" style="margin-top: 8px;"></p>
+
+                <p id="markdown-image-status"></p>
+
             </div>
 
             <div class="modal-actions">
@@ -354,16 +362,6 @@
 </div>
 {% endif %}
 
-{% if current_user_author and current_user_author == profile_author %}
-<div style="margin: 20px 0; padding: 12px; border: 1px solid #ccc;">
-    <h3>Temporary Image Upload Test</h3>
-    <form action="/posts/api/images/upload/" method="POST" enctype="multipart/form-data">
-        {% csrf_token %}
-        <input type="file" name="image" accept="image/*" required>
-        <button type="submit">Upload Image</button>
-    </form>
-</div>
-{% endif %}
 
 <!-- Edit Description Modal – only bio/description editable -->
 <div id="edit-description-modal" class="modal hidden">
