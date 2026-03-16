@@ -14,7 +14,7 @@
     
         <h1>The Sacred Timeline...</h1>
 
-    {% if posts and current_user_author.is_approved %}
+    {% if posts %}
     <div class="posts-grid">
         {% for post in posts %}
         <div class="post-card" onclick="window.location.href='{% url 'entry_detail' post.id %}'">
