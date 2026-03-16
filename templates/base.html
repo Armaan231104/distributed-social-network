@@ -43,10 +43,17 @@
                     <span>Requests</span>
                 </a>
                 {% if user.is_staff %}
+
+                <a href="{% url 'pending-authors-admin' %}" id="admin-approvals">
+                    <i class="fa-solid fa-user-clock"></i>
+                    <span>Pending Authors</span>
+                </a>
+
                 <a href="{% url 'deleted_entries' %}" id="admin-deleted">
                     <i class="fa-regular fa-trash-can"></i>
                     <span>Deleted</span>
                 </a>
+
                 {% endif %}
 
                 <form method="POST" action="{% url 'logout' %}" style="display: contents;" id="logout">

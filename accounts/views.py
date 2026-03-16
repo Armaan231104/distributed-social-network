@@ -5,14 +5,22 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-
+from django.contrib.admin.views.decorators import staff_member_required
 from .models import Author, FollowRequest, Follow
+from django.contrib.auth.models import User
+from django.contrib.auth import authenticate, login
+from django.contrib.auth.forms import AuthenticationForm
 from posts.models import Entry
+from .forms import SignUpForm
+from functools import wraps
 from .serializers import (
     AuthorSerializer, AuthorListSerializer, 
     FollowRequestSerializer
 )
 
+def build_local_author_id(user):
+    host = get_host_url()
+    return f"{host}/api/authors/{user.id}"
 
 def get_host_url():
     """Get this node's base URL for constructing FQIDs."""
@@ -756,3 +764,132 @@ def logout_view(request):
     else:
         # Block GET or other methods
         return HttpResponseForbidden("Logout must be via POST.")
+
+def signup_view(request):
+    if request.method == "POST":
+        form = SignUpForm(request.POST)
+        if form.is_valid():
+            user = User.objects.create_user(
+                username=form.cleaned_data["username"],
+                email=form.cleaned_data["email"],
+                password=form.cleaned_data["password"]
+            )
+
+            author = user.author
+            author.displayName = form.cleaned_data["display_name"]
+            author.is_approved = False
+            author.save()
+
+            login(request, user)
+            return redirect("pending-approval")
+    else:
+        form = SignUpForm()
+
+    return render(request, "accounts/signup.html", {"form": form})
+
+@login_required
+def pending_approval(request):
+    try:
+        author = request.user.author
+    except Author.DoesNotExist:
+        return redirect("login")
+
+    if author.is_approved:
+        return redirect("home")
+
+    return render(request, "accounts/pending_approval.html")
+
+def approved_author_required(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect("login")
+
+        if request.user.is_staff:
+            return view_func(request, *args, **kwargs)
+
+        try:
+            author = request.user.author
+        except Author.DoesNotExist:
+            return redirect("login")
+
+        if not author.is_approved:
+            return redirect("pending-approval")
+
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+@login_required
+def pending_authors(request):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Admins only.")
+
+    pending_authors = Author.objects.filter(
+        user__isnull=False,
+        is_approved=False
+    ).select_related("user")
+
+    return render(request, "accounts/pending_authors_admin.html", {
+        "pending_authors_admin": pending_authors
+    })
+
+@staff_member_required
+def pending_authors_admin(request):
+    pending_authors = Author.objects.filter(
+        is_approved=False,
+        user__isnull=False
+    )
+
+    return render(request, "accounts/pending_authors_admin.html", {
+        "pending_authors": pending_authors
+    })
+
+@login_required
+def approve_author(request, author_id):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Admins only.")
+
+    author = get_object_or_404(Author, id=author_id, user__isnull=False)
+    author.is_approved = True
+    author.save()
+
+    return redirect("pending-authors-admin")
+
+@login_required
+def reject_author(request, author_id):
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Admins only.")
+
+    author = get_object_or_404(Author, id=author_id, user__isnull=False)
+
+    if author.user:
+        author.user.delete()
+    else:
+        author.delete()
+
+    return redirect("pending-authors-admin")
+
+def login_view(request):
+    if request.method == "POST":
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+
+            if user.is_staff:
+                return redirect("home")
+
+            try:
+                author = user.author
+            except Author.DoesNotExist:
+                return redirect("login")
+
+            if not author.is_approved:
+                return redirect("pending-approval")
+
+            return redirect("home")
+    else:
+        form = AuthenticationForm()
+
+    return render(request, "accounts/login.html", {"form": form})
+

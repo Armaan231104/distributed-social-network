@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block title %}Pending Authors{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <h1>Pending Author Approvals</h1>
+
+    {% if pending_authors %}
+        <ul>
+            {% for author in pending_authors %}
+                <li style="margin-bottom: 20px;">
+                    <strong>{{ author.displayName }}</strong>
+                    {% if author.user %}
+                        — {{ author.user.username }} ({{ author.user.email }})
+                    {% endif %}
+
+                    <div style="margin-top: 10px;">
+                        <a href="{% url 'approve-author' author.id %}" class="btn btn-primary">Approve</a>
+                        <a href="{% url 'reject-author' author.id %}" class="btn btn-secondary">Reject</a>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No pending authors.</p>
+    {% endif %}
+</div>
+{% endblock %}
