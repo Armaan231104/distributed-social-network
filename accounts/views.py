@@ -753,17 +753,11 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 
 def logout_view(request):
-    """
-    Logs out the user only if the request is POST.
-    Redirects to login page after logout.
-    """
-    if request.method == "POST":
-        if request.user.is_authenticated:
-            logout(request)
-        return redirect('login')  # or 'authors-list'
-    else:
-        # Block GET or other methods
-        return HttpResponseForbidden("Logout must be via POST.")
+    if request.method != "POST":
+        return redirect("login")
+
+    logout(request)
+    return redirect("login")
 
 def signup_view(request):
     if request.method == "POST":
