@@ -230,6 +230,10 @@
             <!-- Timestamp under each post -->
             <span class="post-date">
                 Published on {{ post.published_at|date:"M d, Y H:i" }}
+            {% if post.is_edited %}
+               <br>(edited)
+            {% endif %}
+            </span>
             </span>
 <div class="post-interactions">
     <!-- COMMENT BUTTON -->

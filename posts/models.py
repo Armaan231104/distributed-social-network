@@ -32,6 +32,11 @@ class Entry(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    github_event_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True
+    )
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
     title = models.CharField(max_length=200)
     content = models.TextField(blank=True)

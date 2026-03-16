@@ -119,7 +119,7 @@ function applyMasonryRowWise() {
                     const currentTransform = item.style.transform || '';
                     const translateMatch = currentTransform.match(/translateY\([^)]+\)/);
                     const translateValue = translateMatch ? translateMatch[0] : 'translateY(0px)';
-                    item.style.transform = `${translateValue} scale(1.02)`;
+                    item.style.transform = `${translateValue} scale(1.01)`;
                 });
                 item.addEventListener('mouseleave', () => {
                     const currentTransform = item.style.transform || '';
@@ -143,7 +143,7 @@ function applyMasonryRowWise() {
                     const currentTransform = item.style.transform || '';
                     const translateMatch = currentTransform.match(/translateY\([^)]+\)/);
                     const translateValue = translateMatch ? translateMatch[0] : 'translateY(0px)';
-                    item.style.transform = `${translateValue} scale(1.02)`;
+                    item.style.transform = `${translateValue} scale(1.01)`;
                 });
                 item.addEventListener('mouseleave', () => {
                     const currentTransform = item.style.transform || '';

@@ -73,6 +73,9 @@
 
 <span class="post-date">
     Published on {{ entry.published_at|date:"M d, Y H:i" }}
+            {% if entry.is_edited %}
+               <br>(edited)
+            {% endif %}
 </span>
 
     <!-- POST OPTIONS (three dots menu) -->
