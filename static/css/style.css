@@ -212,6 +212,33 @@ body::before {
     transform: perspective(3000px) rotateY(-78deg) translateX(72%);
 }
 
+
+/* tablet */
+@media (max-width: 1024px) {
+    .mirror-left,
+    .mirror-right {
+        width: 70%;
+        opacity: 0.6;
+    }
+}
+
+/* small tablet / large phone */
+@media (max-width: 768px) {
+    .mirror-left,
+    .mirror-right {
+        width: 50%;
+        opacity: 0.4;
+    }
+}
+
+/* phone */
+@media (max-width: 480px) {
+    .mirror-left,
+    .mirror-right {
+        display: none; /* just hide it — looks bad at this size no matter what */
+    }
+}
+
 .main-content {
     width: 100%;
     max-width: 960px;
@@ -221,6 +248,7 @@ body::before {
     box-sizing: border-box;
     z-index: 10;
 }
+
 /* FOOTER */
 .footer {
     position: fixed;

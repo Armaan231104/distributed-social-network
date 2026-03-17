@@ -117,10 +117,17 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.appendChild(mirrorLeft);
     document.body.appendChild(mirrorRight);
 
-    const TX           = 65;
-    const RY           = 75;
+    // scale based on viewport width
+    function getConstants() {
+        const w = window.innerWidth;
+        if (w > 1400) return { TX: 65, RY: 75 };
+        if (w > 1024) return { TX: 58, RY: 68 };
+        if (w > 768)  return { TX: 51, RY: 61 };
+        return { TX: 44, RY: 54 };
+    }
+
     const RR           = 2;
-    const PARALLAX     = 0.02;
+    const PARALLAX     = 0.005;
     const PARALLAX_MAX = 0.1;
     const BLUR         = 10;
     const LERP         = 0.008;
@@ -133,6 +140,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function tick() {
         current += (target - current) * LERP;
 
+        const { TX, RY } = getConstants();
         const wave     = Math.sin((current / CYCLE) * Math.PI * 2);
         const rotate   = RY + wave * RR;
         const parallax = Math.min(current * PARALLAX, PARALLAX_MAX);
@@ -149,6 +157,11 @@ document.addEventListener("DOMContentLoaded", () => {
         target = window.scrollY;
         if (!rafId) rafId = requestAnimationFrame(tick);
     }, { passive: true });
+
+    // re-run tick on resize so constants update immediately
+    window.addEventListener('resize', () => {
+        if (!rafId) rafId = requestAnimationFrame(tick);
+    });
 
     tick();
 });
