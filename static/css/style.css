@@ -186,29 +186,27 @@ body::before {
 .mirror-left,
 .mirror-right {
     position: fixed;
-    top: 100px;
+    top: 60px;
     height: 100vh;
     width: 95%;
     pointer-events: none;
     z-index: 0;
     will-change: transform, filter;
     overflow: hidden;
+    mask-image: linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);
 }
 
 .mirror-left {
     left: 5%;
     filter: blur(10px);
-    mask-image: linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);
-    transform: perspective(3000px) rotateY(78deg) translateX(-72%);
+    transform: perspective(3000px) rotateY(78deg) translateX(-72%) scaleX(-1);
 }
 
 .mirror-right {
     right: 5%;
     left: auto;
     filter: blur(10px);
-    mask-image: linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);
     transform: perspective(3000px) rotateY(-78deg) translateX(72%);
 }
 

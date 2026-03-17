@@ -144,8 +144,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const wave     = Math.sin((current / CYCLE) * Math.PI * 2);
         const rotate   = RY + wave * RR;
         const parallax = Math.min(current * PARALLAX, PARALLAX_MAX);
-
-        mirrorLeft.style.transform  = `perspective(3000px) rotateY(${rotate}deg)  translateX(calc(-${TX}% + ${parallax}px))`;
+        mirrorLeft.style.transform  = `perspective(3000px) rotateY(${rotate}deg) translateX(calc(-${TX}% + ${parallax}px)) scaleX(-1)`;
         mirrorRight.style.transform = `perspective(3000px) rotateY(-${rotate}deg) translateX(calc(${TX}%  - ${parallax}px))`;
         mirrorLeft.style.filter     = `blur(${BLUR}px)`;
         mirrorRight.style.filter    = `blur(${BLUR}px)`;
