@@ -68,9 +68,14 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 function applyMasonryRowWise() {
-    const grid = document.querySelector('.posts-grid');
-    const items = Array.from(grid.children);
+  
+    const main = document.querySelector('.main-content');
+    if (!main) return;
 
+    const grid = main.querySelector('.posts-grid');
+    if (!grid) return;
+
+    const items = Array.from(grid.children);
     // Determine number of columns
     let COLS = 3;
     if (window.innerWidth <= 700) COLS = 1;

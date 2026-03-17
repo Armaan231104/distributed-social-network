@@ -75,11 +75,13 @@
     </aside>
 
     <!-- Content Area -->
-    <div class="content-wrapper">
+<div class="content-wrapper">
+    <div class="mirror-container">
         <main class="main-content">
             {% block content %}
             {% endblock %}
         </main>
+    </div>
 
         <footer class="footer">
             <span>&copy; {{ now|date:"Y" }} Crimson. All rights reserved.</span>
@@ -94,4 +96,58 @@
 <span id="toggle-torch"><i class="fa-regular fa-moon"></i></span>
 </body>
     <script src="{% static 'js/script.js' %}"></script>
+{%if request.user.is_authenticated%}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const main      = document.querySelector('.main-content');
+    const container = document.querySelector('.mirror-container');
+    if (!main || !container) return;
+
+    function createMirror(side) {
+        const mirror = main.cloneNode(true);
+        mirror.classList.remove('main-content');
+        mirror.classList.add(side);
+        mirror.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+        mirror.removeAttribute('id');
+        return mirror;
+    }
+
+    const mirrorLeft  = createMirror('mirror-left');
+    const mirrorRight = createMirror('mirror-right');
+    document.body.appendChild(mirrorLeft);
+    document.body.appendChild(mirrorRight);
+
+    const TX           = 65;
+    const RY           = 75;
+    const RR           = 2;
+    const PARALLAX     = 0.005;
+    const PARALLAX_MAX = 0.1;
+    const BLUR         = 10;
+    const LERP         = 0.008;
+    const CYCLE        = 8000;
+    let current = window.scrollY;
+    let target  = window.scrollY;
+    let rafId   = null;
+
+    window.addEventListener('scroll', () => {
+        target = window.scrollY;
+        if (!rafId) rafId = requestAnimationFrame(tick);
+    }, { passive: true });
+
+    function tick() {
+        current += (target - current) * LERP;
+        const wave     = Math.sin((current / CYCLE) * Math.PI * 2);
+        const rotate   = RY + wave * RR;
+        const parallax = Math.min(current * PARALLAX, PARALLAX_MAX);
+
+        mirrorLeft.style.transform  = `perspective(3000px) rotateY(${rotate}deg)  translateX(calc(-${TX}% + ${parallax}px))`;
+        mirrorRight.style.transform = `perspective(3000px) rotateY(-${rotate}deg) translateX(calc(${TX}%  - ${parallax}px))`;
+        mirrorLeft.style.filter     = `blur(${BLUR}px)`;
+        mirrorRight.style.filter    = `blur(${BLUR}px)`;
+
+        rafId = Math.abs(current - target) < 0.3 ? null : requestAnimationFrame(tick);
+    }
+});
+</script>
+{%endif%}
 </html>
