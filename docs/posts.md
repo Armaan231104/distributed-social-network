@@ -405,3 +405,39 @@ Authentication Required: **Yes**
 Only the author may delete.
 
 If successful, the entry is soft deleted
+
+---
+
+## Admin: View Deleted Entries
+
+```
+GET /posts/admin/deleted/
+```
+
+Authentication Required: **Yes** (staff only)
+
+Lists all soft-deleted entries across all authors, ordered by most recently deleted first
+
+### Access Control
+
+Must be authenticated (unauthenticated users are redirected to login)
+
+Must be a node admin(`is_staff = True`)
+
+Non-staff authenticated users receive **403 Forbidden**
+
+### Behavior
+
+Displays all entries where `visibility = "DELETED"`
+
+Entries are never hard-deleted; this is the only UI location where deleted entries are visible
+
+Results are ordered by `updated_at` descending (most recently deleted first)
+
+### Response Codes
+
+200 OK (staff user)
+
+302 Found (unauthenticated - redirects to login)
+
+403 Forbidden (authenticated but no staff)
