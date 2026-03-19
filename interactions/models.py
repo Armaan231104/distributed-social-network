@@ -21,7 +21,7 @@ class Comment(models.Model):
 
 class Like(models.Model):
     """
-    Represents a like on a post or comment.
+    Represents a like on a post or comment
 
     An author can like any post or comment they have access to.
     A Like targets exactly one object: either an Entry or a Comment (never both,
