@@ -177,18 +177,25 @@ def approved_author_required(view_func):
     return wrapper
 
 class AuthorListView(APIView):
-    """List all authors on this node."""
+    """List authors on this node."""
     permission_classes = [AllowAny]
 
     def get(self, request):
-        authors = Author.objects.filter(is_approved=True)
+        user = request.user
+
+        # If admin → see all authors
+        if user.is_authenticated and user.is_superuser:
+            authors = Author.objects.all()
+        else:
+            # Everyone else → only approved authors
+            authors = Author.objects.filter(is_approved=True)
+
         serializer = AuthorListSerializer(authors, many=True)
         return Response({
             'type': 'authors',
             'authors': serializer.data
         })
-
-
+    
 class AuthorDetailView(APIView):
     """Get details for a specific author."""
     permission_classes = [AllowAny]
@@ -487,11 +494,16 @@ class InboxView(APIView):
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden
-
 @approved_author_required
 def authors_list(request):
     """Show all authors on the node."""
-    authors = Author.objects.filter(is_approved=True)
+    if request.user.is_authenticated and request.user.is_superuser:
+        # Admin sees all authors
+        authors = Author.objects.all()
+    else:
+        # Everyone else sees only approved authors
+        authors = Author.objects.filter(is_approved=True)
+
     current_user_author = None
     if request.user.is_authenticated:
         try:
@@ -765,29 +777,50 @@ def my_profile(request):
 
 from .forms import AuthorUpdateForm
 
+from django.shortcuts import get_object_or_404
+
 @approved_author_required
 @login_required
-def edit_profile(request):
-    try:
-        author = request.user.author
-    except Author.DoesNotExist:
-        return redirect('authors-list')  # fallback if user has no author
+def edit_profile(request, author_id=None):
+    # Admin editing someone OR direct URL
+    if author_id:
+        author = get_object_or_404(Author, id=author_id)
+    else:
+        # Normal user editing themselves
+        try:
+            author = request.user.author
+        except Author.DoesNotExist:
+            return redirect('authors-list')
 
-    # Optional: prevent editing remote authors
+    # Permission check
+    if not request.user.is_superuser:
+        if author != getattr(request.user, "author", None):
+            return redirect('author-profile', author_id=author.id)
+
+    # Prevent editing remote authors
     if not author.is_local:
         return redirect('author-profile', author_id=author.id)
 
+
+    current_user_author = getattr(request.user, "author", None)
     if request.method == "POST":
-        # Pass request.FILES to handle uploaded images
-        form = AuthorUpdateForm(request.POST, request.FILES, instance=author)
+        form = AuthorUpdateForm(
+            request.POST,
+            request.FILES,
+            instance=author,
+            user=request.user   # needed for is_approved
+        )
         if form.is_valid():
             form.save()
             return redirect('author-profile', author_id=author.id)
     else:
-        form = AuthorUpdateForm(instance=author)
+        form = AuthorUpdateForm(instance=author, user=request.user)
 
-    return render(request, "accounts/edit_profile.html", {"form": form})
-
+    return render(request, "accounts/edit_profile.html", {
+        "form": form,
+        "author": author,
+        "current_user_author": current_user_author,
+    })
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 

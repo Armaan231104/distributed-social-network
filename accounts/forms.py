@@ -3,22 +3,37 @@ from .models import Author
 import re
 from django.contrib.auth.models import User
 
-
 class AuthorUpdateForm(forms.ModelForm):
+    is_approved = forms.BooleanField(
+        required=False,
+        label="Approved",
+        help_text="Allow this author to access the platform",
+        widget=forms.CheckboxInput(attrs={'id': 'id_is_approved'})
+    )
+
     class Meta:
         model = Author
-        fields = ['displayName', 'description', 'github', 'profileImage', 'web']
+        fields = ['displayName', 'description', 'github', 'profileImage', 'web', 'is_approved']
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        # Preload the toggle from the model
+        self.fields['is_approved'].initial = getattr(self.instance, 'is_approved', False)
+
+        # Hide toggle for non-superusers
+        if not (user and user.is_superuser):
+            self.fields.pop('is_approved')
 
     def clean_github(self):
         github = self.cleaned_data.get("github")
-
         if github:
             pattern = r"^https:\/\/(www\.)?github\.com\/[A-Za-z0-9_-]+\/?$"
             if not re.match(pattern, github):
                 raise forms.ValidationError(
                     "Enter a valid GitHub profile URL (https://github.com/username)"
                 )
-
         return github
     
 class SignUpForm(forms.ModelForm):
