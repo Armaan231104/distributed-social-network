@@ -163,3 +163,204 @@ created_at: DateTime
 - **Comments are permanent**: Created entries stay until manually deleted (no soft-delete)
 - **Cascade delete**: Deleting an entry deletes all its comments and likes
 - **No pagination**: Like/comment counts fetched with entry data (fine for typical post sizes)
+
+---
+
+# Account Approval & Authentication UI
+
+## Overview
+
+These endpoints handle user login, pending approval flow, and admin approval/rejection of authors. Newly registered users must be approved before accessing full system functionality.
+
+---
+
+## GET `/pending-approval/`
+
+Displays the pending approval page for users who are not yet approved.
+
+**Auth:** Required
+
+---
+
+### Behavior
+
+- Retrieves the logged-in user's associated `Author`
+- If no author exists → redirects to login
+- If `is_approved = True` → redirects to home
+- Otherwise → renders pending approval page
+
+---
+
+### Response
+
+- `200 OK` — renders `pending_approval.html`
+- `302 Redirect` → `/login/` (no author found)
+- `302 Redirect` → `/home/` (already approved)
+
+---
+
+## GET `/pending-authors/`
+
+Displays a list of authors awaiting approval (admin view).
+
+**Auth:** Required  
+**Access:** Staff only
+
+---
+
+### Behavior
+
+- Requires authenticated user with `is_staff = True`
+- Fetches all authors where:
+  - `is_approved = False`
+  - `user` is not null
+- Returns admin dashboard view
+
+---
+
+### Response
+
+- `200 OK` — renders `pending_authors_admin.html`
+- `403 Forbidden` — non-admin access
+
+---
+
+## GET `/pending-authors-admin/`
+
+Alternative admin endpoint for viewing pending authors.
+
+**Auth:** Required  
+**Access:** Staff only
+
+---
+
+### Behavior
+
+- Requires approved author + staff privileges
+- Fetches all unapproved authors
+- Renders admin approval interface
+
+---
+
+### Response
+
+- `200 OK` — renders `pending_authors_admin.html`
+- `403 Forbidden` — non-admin access
+
+---
+
+## POST `/approve-author/{author_id}/`
+
+Approves a pending author.
+
+**Auth:** Required  
+**Access:** Staff only
+
+---
+
+### URL Parameters
+
+| Parameter | Type | Description |
+|----------|------|-------------|
+| `author_id` | integer | ID of the author to approve |
+
+---
+
+### Behavior
+
+- Verifies user is staff
+- Retrieves author by ID
+- Sets `is_approved = True`
+- Saves author
+- Redirects to admin pending authors page
+
+---
+
+### Response
+
+- `302 Redirect` → `/pending-authors-admin/`
+- `403 Forbidden` — non-admin access
+- `404 Not Found` — author does not exist
+
+---
+
+## POST `/reject-author/{author_id}/`
+
+Rejects and deletes a pending author.
+
+**Auth:** Required  
+**Access:** Staff only
+
+---
+
+### URL Parameters
+
+| Parameter | Type | Description |
+|----------|------|-------------|
+| `author_id` | integer | ID of the author to reject |
+
+---
+
+### Behavior
+
+- Verifies user is staff
+- Retrieves author by ID
+- If linked user exists → deletes user (cascades author)
+- Otherwise → deletes author directly
+- Redirects to admin pending authors page
+
+---
+
+### Response
+
+- `302 Redirect` → `/pending-authors-admin/`
+- `403 Forbidden` — non-admin access
+- `404 Not Found` — author does not exist
+
+---
+
+## POST `/login/`
+
+Authenticates a user and redirects based on approval status.
+
+**Auth:** Not required
+
+---
+
+### Request (Form Data)
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `username` | string | Yes | User's username |
+| `password` | string | Yes | User's password |
+
+---
+
+### Behavior
+
+- Validates credentials using Django `AuthenticationForm`
+- Logs user in if valid
+- If user is staff → redirects to home
+- If user has no author → redirects to login
+- If author is not approved → redirects to pending approval page
+- Otherwise → redirects to home
+
+---
+
+### Response
+
+- `302 Redirect` → `/home/` (approved user or staff)
+- `302 Redirect` → `/pending-approval/` (not approved)
+- `302 Redirect` → `/login/` (no author)
+- `200 OK` — form re-rendered with errors
+
+---
+
+## Notes
+
+- Approval system enforces moderation before access  
+- Only staff users can approve/reject authors  
+- Authentication uses Django session-based login  
+- Users without approval cannot access full platform features  
+
+---

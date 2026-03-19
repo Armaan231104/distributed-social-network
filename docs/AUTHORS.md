@@ -228,3 +228,73 @@ python manage.py test accounts.tests
 ```
 
 This runs all tests covering author model, follow/unfollow API, and follow request workflow.
+
+### POST `/signup/`
+
+Creates a new user account and associated author.
+
+**When to use:** When registering a new user through the UI.
+
+**Auth:** Not required
+
+---
+
+## Request (Form Data)
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `username` | string | Yes | Unique username |
+| `email` | string | Yes | Valid email address |
+| `display_name` | string | Yes | Author display name |
+| `password` | string | Yes | Account password |
+| `confirm_password` | string | Yes | Must match `password` |
+
+---
+
+## Validation Rules
+
+- `username` must be unique  
+- `email` must be a valid email format  
+- `password` and `confirm_password` must match  
+- All fields are required  
+
+---
+
+## Behavior
+
+- Creates a new `User` instance  
+- Creates a linked `Author` instance  
+- Sets `is_approved = False` (user cannot access full features yet)  
+- Logs the user in automatically after signup  
+- Redirects user to the pending approval page  
+
+---
+
+## Response
+
+### Success
+
+- `302 Redirect` → `/pending-approval/`
+
+---
+
+## Error Responses
+
+- `200 OK` — form is re-rendered with validation errors
+
+### Possible Errors
+
+- Passwords do not match  
+- Missing required fields  
+- Invalid email format  
+- Username already exists  
+
+---
+
+## Notes
+
+- Password is securely handled using Django’s authentication system  
+- `confirm_password` is used only for validation and is not stored  
+- Newly created users require approval before full access is granted  
+
+---

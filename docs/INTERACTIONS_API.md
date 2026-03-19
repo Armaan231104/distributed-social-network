@@ -432,3 +432,120 @@ GET /api/authors/1/entries/b2c3d4.../comments/?page=2&size=10
 
 The response always includes `count` (total items) so you can calculate the number
 of pages: `ceil(count / size)`.
+
+---
+
+# GitHub Activity Integration
+
+## Overview
+
+The system integrates with the GitHub Events API to automatically generate entries from an author's public GitHub activity. This allows user profiles to reflect development activity as posts within the platform.
+
+This feature can be triggered manually via an API endpoint and also runs automatically as a background task.
+
+---
+
+## Endpoint
+
+### Trigger GitHub Sync
+
+```
+POST /posts/api/github/sync/{author_id}/
+```
+
+**Purpose:**  
+Manually triggers synchronization of GitHub activity for a specific author.
+
+**Auth:** Required (must be the author or an admin)
+
+---
+
+## URL Parameters
+
+| Parameter | Type | Description |
+|----------|------|-------------|
+| `author_id` | string | The ID of the author whose GitHub activity will be synced |
+
+---
+
+## Response
+
+### Success (200 OK)
+
+```json
+{
+  "status": "sync completed",
+  "entries_created": 3
+}
+```
+
+| Field | Type | Description |
+|------|------|-------------|
+| `status` | string | Indicates sync completion |
+| `entries_created` | integer | Number of new entries generated |
+
+---
+
+## Behavior
+
+- Fetches public events from the GitHub API  
+- Processes only `PushEvent` types  
+- Ignores unsupported event types  
+- Creates entries only for new events (prevents duplicates)  
+- Generated entries are always marked as `PUBLIC`
+
+---
+
+## Data Processing
+
+For each valid `PushEvent`:
+
+- Extract repository name  
+- Extract commit messages  
+- Extract event timestamp  
+- Construct a formatted entry  
+
+### Example Generated Entry
+
+```json
+{
+  "title": "GitHub Activity: user/repo",
+  "content": "- Fix authentication bug\n- Refactor API routes",
+  "contentType": "text/plain",
+  "visibility": "PUBLIC"
+}
+```
+
+---
+
+## Execution Model
+
+- Runs automatically in the background at regular intervals (~20 seconds)  
+- Can also be triggered manually via the endpoint above  
+- Does not block normal API requests or user interactions  
+
+---
+
+## Deduplication Strategy
+
+- Each GitHub event is tracked using its unique event ID  
+- Previously processed events are skipped  
+- Ensures no duplicate entries are created across sync cycles  
+
+---
+
+## Requirements
+
+- Author must have a valid GitHub profile URL configured  
+- GitHub activity must be public  
+
+---
+
+## Limitations
+
+- Only `PushEvent` is supported  
+- No support for private repositories  
+- No webhook integration (polling-based system)  
+- Subject to GitHub API rate limits  
+
+---
