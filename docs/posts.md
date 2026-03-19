@@ -111,7 +111,16 @@ Base path
 POST /posts/api/entries/
 ```
 
-Creates a new entry.
+Creates a new entry. Allows users to create entries with different content types, including:
+- text/plain (plain text)
+- text/markdown (CommonMark)
+- image (image upload)
+
+Behavior
+- Users can select the type of post they want to create.
+- The backend validates the contentType field against supported types.
+- Image posts must be submitted using multipart/form-data.
+- Text and markdown posts must be submitted as JSON
 
 Authentication Required: **Yes**
 
@@ -177,7 +186,36 @@ Example response
 
 ---
 
-# 2. Get Entry by ID
+# 2. Upload Hosted Image (For Commonmark Embedding)
+
+POST /posts/api/images/
+
+Authentication Required: **Yes**
+
+Example response
+
+{
+  "id": "uuid",
+  "url": "http://localhost/media/hosted_images/example.png"
+}
+
+Behavior
+- The uploaded image is stored on the node.
+- A publicly accessible URL is generated.
+- This URL can be inserted into CommonMark content using standard markdown syntax:
+
+![alt text](image_url)
+
+- This enables inline image rendering within markdown posts.
+
+## Response Codes
+- 201 Created
+- 400 Bad Request (missing image)
+- 400 Bad Request (invalid request method)
+
+-- 
+
+# 3. Get Entry by ID
 
 ```
 GET /posts/api/entries/{entry_id}/
@@ -206,7 +244,7 @@ Returns entry details.
 
 ---
 
-# 3. Get My Entries
+# 4. Get My Entries
 
 ```
 GET /posts/api/entries/mine/
@@ -235,7 +273,7 @@ Deleted entries are excluded.
 
 ---
 
-# 4. Get Stream Entries
+# 5. Get Stream Entries
 
 ```
 GET /posts/api/entries/stream/
@@ -285,7 +323,7 @@ Entries are returned **newest first**.
 
 ---
 
-# 5. Edit Entry (Partial Update)
+# 6. Edit Entry (Partial Update)
 
 ```
 PATCH /posts/api/entries/{entry_id}/
@@ -322,7 +360,7 @@ PATCH /posts/api/entries/{entry_id}/
 
 ---
 
-# 6. Delete Entry (Soft Delete)
+# 7. Delete Entry (Soft Delete)
 
 ```
 DELETE /posts/api/entries/{entry_id}/
