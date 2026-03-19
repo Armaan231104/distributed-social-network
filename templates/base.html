@@ -121,8 +121,8 @@ document.addEventListener("DOMContentLoaded", () => {
     function getConstants() {
         const w = window.innerWidth;
         if (w > 1400) return { TX: 65, RY: 75 };
-        if (w > 1024) return { TX: 58, RY: 68 };
-        if (w > 768)  return { TX: 51, RY: 61 };
+        if (w > 1024) return { TX: 55, RY: 65 };
+        if (w > 900)  return { TX: 45, RY: 55 };
         return { TX: 44, RY: 54 };
     }
 
@@ -145,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const rotate   = RY + wave * RR;
         const parallax = Math.min(current * PARALLAX, PARALLAX_MAX);
         mirrorLeft.style.transform  = `perspective(3000px) rotateY(${rotate}deg) translateX(calc(-${TX}% + ${parallax}px)) scaleX(-1)`;
-        mirrorRight.style.transform = `perspective(3000px) rotateY(-${rotate}deg) translateX(calc(${TX}%  - ${parallax}px))`;
+        mirrorRight.style.transform = `perspective(3000px) rotateY(-${rotate}deg) translateX(calc(${TX}%  - ${parallax}px)) scaleX(-1)`;
         mirrorLeft.style.filter     = `blur(${BLUR}px)`;
         mirrorRight.style.filter    = `blur(${BLUR}px)`;
 

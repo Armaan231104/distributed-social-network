@@ -45,7 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
         circle ${radius}px at ${mouseX}px ${mouseY}px,
         transparent 0%,
         rgba(0,0,0,0.6) ${softEdge * 100}%,
-        rgba(0,0,0,0.95) 100%
+        rgba(0,0,0,0.97) 100%
       )
     `;
     pulse += pulseSpeed;
