@@ -2,6 +2,7 @@ from django import forms
 from .models import Author
 import re
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
 
 class AuthorUpdateForm(forms.ModelForm):
     is_approved = forms.BooleanField(
@@ -81,8 +82,14 @@ class SignUpForm(forms.ModelForm):
         cleaned_data = super().clean()
         password = cleaned_data.get("password")
         confirm_password = cleaned_data.get("confirm_password")
-
+        
         if password and confirm_password and password != confirm_password:
             raise forms.ValidationError("Passwords do not match.")
-
+        
+        if password:
+            try:
+                validate_password(password)
+            except forms.ValidationError as e:
+                self.add_error("password", e)
+        
         return cleaned_data
