@@ -113,17 +113,21 @@ def send_follow_to_remote(actor, target):
 
 
 def create_follow_request(actor, target):
-    """
-    Returns the created/updated request.
-    """
     existing = FollowRequest.objects.filter(actor=actor, object=target).first()
     
-    # edge cases for existing follow requests
     if existing:
         if existing.status == FollowRequest.Status.PENDING:
             return None, 'pending'
         elif existing.status == FollowRequest.Status.ACCEPTED:
-            return None, 'accepted'
+            # Check if Follow actually exists — if not, the relationship is broken
+            actually_following = Follow.objects.filter(follower=actor, followee=target).exists()
+            if actually_following:
+                return None, 'accepted'
+            else:
+                # stale accepted request, reset it
+                existing.status = FollowRequest.Status.PENDING
+                existing.save()
+                return existing, 'resent'
         else:
             existing.status = FollowRequest.Status.PENDING
             existing.save()
@@ -631,8 +635,8 @@ def author_profile(request, author_id):
 @approved_author_required
 @login_required
 def follow_author(request, author_id):
-    """Follow an author from the UI."""
     author_id = unquote(author_id)
+    print("DEBUG follow author_id:", author_id)
     
     try:
         current_author = request.user.author
@@ -642,7 +646,13 @@ def follow_author(request, author_id):
     try:
         target_author = Author.objects.get(id=author_id)
     except Author.DoesNotExist:
+        print("DEBUG target author not found")
         return redirect('authors-list')
+    
+    print("DEBUG current_author:", current_author)
+    print("DEBUG target_author:", target_author)
+    print("DEBUG same author?", current_author == target_author)
+    print("DEBUG already following?", current_author.is_following(target_author))
     
     if current_author == target_author:
         return redirect('author-profile', author_id=author_id)
@@ -651,6 +661,7 @@ def follow_author(request, author_id):
         return redirect('author-profile', author_id=author_id)
     
     request_result, state = create_follow_request(current_author, target_author)
+    print("DEBUG create_follow_request state:", state)
     
     if state in ('pending', 'accepted'):
         return redirect('author-profile', author_id=author_id)

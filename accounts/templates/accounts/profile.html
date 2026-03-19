@@ -102,30 +102,30 @@
                                 <i class="fa-solid fa-plus"></i> Create
                             </button>
                         {% else %}
-                    {% if current_user_author.user.is_superuser %}
-                        <a href="{% url 'edit-profile' profile_author.id%}" class="btn btn-primary">
-                            <i class="fa-solid fa-pen-to-square"></i> Edit
-                        </a>
-                        <br>
-                    {% endif %}
-                        {% if is_following %}
-                        <a href="{% url 'unfollow-author' author_id=profile_author.id %}"
-                        class="btn btn-secondary"
-                        onclick="return confirm('Unfollow alert! °(°¯᷄◠¯᷅°)°\n{{ profile_author.displayName|capfirst}} will lose 1 cool follower (you).');">
-                            Unfollow
-                        </a>
-                            {% elif has_pending_request %}
-                                <a href="{% url 'cancel-follow-request' author_id=profile_author.id %}" 
-                                   class="btn btn-secondary">
-                                    Cancel Request
-                                </a>
-                            {% else %}
-                                <a href="{% url 'follow-author' author_id=profile_author.id %}" 
-                                   class="btn btn-primary">
-                                    Follow
+                            {% if current_user_author.user.is_superuser %}
+                                <a href="{% url 'edit-profile' profile_author.id %}" class="btn btn-primary">
+                                    <i class="fa-solid fa-pen-to-square"></i> Edit
                                 </a>
                             {% endif %}
+
+                        {% if is_following %}
+                            <a href="{% url 'unfollow-author' author_id=profile_author.id %}"
+                            class="btn btn-secondary"
+                            onclick="return confirm('Unfollow alert! °(°¯᷄◠¯᷅°)°\n{{ profile_author.displayName|capfirst}} will lose 1 cool follower (you).');">
+                                Unfollow
+                            </a>
+                        {% elif has_pending_request %}
+                            <a href="{% url 'cancel-follow-request' author_id=profile_author.id %}"
+                            class="btn btn-secondary">
+                                Cancel Request
+                            </a>
+                        {% else %}
+                            <a href="{% url 'follow-author' author_id=profile_author.id %}"
+                            class="btn btn-primary">
+                                Follow
+                            </a>
                         {% endif %}
+                    {% endif %}
                     {% endif %}
                 </div>
 
