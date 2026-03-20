@@ -1,55 +1,240 @@
 {% extends 'base.html' %}
-
 {% block title %}Pending Authors{% endblock %}
 
 {% block content %}
-<div class="profile-container">
+<style>
+    .requests-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+        margin-top: 30px;
+    }
 
-    <div class="profile-hero" style="padding:30px;">
-        <div class="profile-info">
-            <h1>Pending Author Approvals</h1>
+    @media (max-width: 1000px) {
+        .requests-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+        .requests-grid { grid-template-columns: 1fr; }
+    }
+
+    .request-card {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 20px;
+        padding: 22px;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        box-shadow: 0 15px 35px rgba(244, 23, 23, 0.12);
+        border: 1px solid rgba(255, 26, 98, 0.1);
+        aspect-ratio: 1 / 1;
+        position: relative;
+        overflow: hidden;
+        transition: box-shadow 0.3s ease;
+    }
+
+    .request-card::before {
+        content: "";
+        position: absolute;
+        top: 0; right: 0; bottom: 0; left: 0;
+        background: linear-gradient(45deg, #ff1a62, #f41717, #ffa023);
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        pointer-events: none;
+    }
+    .request-card:hover::before { opacity: 0.05; }
+    .request-card:hover {
+        box-shadow: 0 25px 60px rgba(244, 23, 23, 0.2);
+    }
+
+    .request-avatar-bubble,
+    .request-avatar-placeholder-bubble {
+        position: absolute;
+        width: 130px;
+        height: 130px;
+        border-radius: 50%;
+        top: 18%;
+        left: 12%;
+        object-fit: cover;
+        border: 4px solid rgba(255, 26, 98, 0.25);
+        box-shadow: 0 10px 30px rgba(244, 23, 23, 0.2);
+        animation: floatA 5s ease-in-out infinite alternate;
+        z-index: 1;
+    }
+
+    .request-avatar-placeholder-bubble {
+        background: linear-gradient(135deg, #ff1a62, #ffa023);
+        color: white;
+        font-size: 48px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .bubble-accept {
+        position: absolute;
+        width: 58px;
+        height: 58px;
+        border-radius: 50%;
+        top: 12%;
+        right: 14%;
+        background: linear-gradient(45deg, #ff1a62, #f41717, #ffa023);
+        color: #fff !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        text-decoration: none;
+        box-shadow: 0 8px 20px rgba(244, 23, 23, 0.3);
+        animation: floatB 4s ease-in-out infinite alternate;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        z-index: 2;
+    }
+    .bubble-accept:hover {
+        transform: scale(1.2);
+        box-shadow: 0 12px 30px rgba(244, 23, 23, 0.5);
+    }
+
+    .bubble-reject {
+        position: absolute;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        top: 44%;
+        right: 10%;
+        background: #fff;
+        color: #ff1a62 !important;
+        border: 2.5px solid #ff1a62;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 17px;
+        text-decoration: none;
+        box-shadow: 0 6px 16px rgba(255, 26, 98, 0.2);
+        animation: floatC 6s ease-in-out infinite alternate;
+        transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+        z-index: 2;
+    }
+    .bubble-reject:hover {
+        transform: scale(1.2);
+        background: #ff1a62;
+        color: #fff !important;
+        box-shadow: 0 10px 24px rgba(255, 26, 98, 0.4);
+    }
+
+    @keyframes floatA {
+        0%   { transform: translate(0px, 0px) rotate(-1deg); }
+        100% { transform: translate(6px, -10px) rotate(1.5deg); }
+    }
+    @keyframes floatB {
+        0%   { transform: translate(0px, 0px); }
+        100% { transform: translate(-8px, 8px); }
+    }
+    @keyframes floatC {
+        0%   { transform: translate(0px, 0px); }
+        100% { transform: translate(5px, -12px); }
+    }
+
+    .request-footer {
+        position: absolute;
+        bottom: 18px;
+        left: 22px;
+        right: 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        z-index: 3;
+    }
+
+    .request-name {
+        font-size: 15px;
+        font-weight: 700;
+        color: #222;
+        text-decoration: none;
+        position: relative;
+    }
+    .request-name::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -3px;
+        width: 0;
+        height: 2px;
+        background: linear-gradient(90deg, #ff1a62, #ffa023);
+        border-radius: 3px;
+        transition: width 0.3s ease;
+    }
+    .request-name:hover::after { width: 100%; }
+    .request-name:hover { color: #ff1a62; }
+
+    .request-meta {
+        font-size: 11px;
+        color: #999;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .empty-state {
+        text-align: center;
+        font-size: 18px;
+        color: #666;
+        padding: 60px 20px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(255, 26, 98, 0.15);
+        margin-top: 30px;
+    }
+
+    #admin-approvals i {
+        transform: scale(1.5);
+        font-weight: 800;
+    }
+</style>
+
+<h2 style="font-size:28px; color:#222;">Pending Author Approvals</h2>
+
+{% if pending_authors %}
+<div class="requests-grid">
+    {% for author in pending_authors %}
+    <div class="request-card">
+
+        <!-- BIG avatar bubble -->
+        {% if author.profileImage %}
+            <img src="{{ author.profileImage.url }}"
+                 alt="{{ author.displayName }}"
+                 class="request-avatar-bubble">
+        {% else %}
+            <div class="request-avatar-placeholder-bubble">
+                {{ author.displayName|make_list|first }}
+            </div>
+        {% endif %}
+
+        <!-- APPROVE bubble -->
+        <a href="{% url 'approve-author' author.id %}" class="bubble-accept">
+            <i class="fa-solid fa-check"></i>
+        </a>
+
+        <!-- REJECT bubble -->
+        <a href="{% url 'reject-author' author.id %}" class="bubble-reject">
+            <i class="fa-solid fa-xmark"></i>
+        </a>
+
+        <!-- FOOTER: name + username/email -->
+        <div class="request-footer">
+            <span class="request-name">{{ author.displayName }}</span>
+            {% if author.user %}
+                <span class="request-meta">{{ author.user.username }} · {{ author.user.email }}</span>
+            {% endif %}
         </div>
-    </div>
-
-    <div class="profile-content" style="margin-top:30px;">
-
-    {% if pending_authors %}
-        <ul style="list-style:none; padding:10px; margin:0;">
-
-            {% for author in pending_authors %}
-                <li class="post-card" style="margin-bottom:20px;">
-
-                    <strong style="font-size:18px;">{{ author.displayName }}</strong>
-
-                    {% if author.user %}
-                        <span style="color:#666; font-size:14px;">
-                            — {{ author.user.username }} ({{ author.user.email }})
-                        </span>
-                    {% endif %}
-<br><br>
-                    <div class="profile-actions" style="margin-top:15px;">
-                        <a href="{% url 'approve-author' author.id %}" class="btn btn-primary">Approve</a>
-                        <a href="{% url 'reject-author' author.id %}" class="btn btn-secondary">Reject</a>
-                    </div>
-
-                </li>
-            {% endfor %}
-
-        </ul>
-    {% else %}
-        <div class="empty-state">
-            No pending authors.
-        </div>
-    {% endif %}
 
     </div>
+    {% endfor %}
 </div>
 
-<style>
-#admin-approvals i{
-    transform: scale(1.5);
-    font-weight: 800;
-}
-</style>
+{% else %}
+<div class="empty-state">
+    No pending authors.
+</div>
+{% endif %}
 
 {% endblock %}
