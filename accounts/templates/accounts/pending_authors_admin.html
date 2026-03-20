@@ -1,6 +1,5 @@
 {% extends 'base.html' %}
 {% block title %}Pending Authors{% endblock %}
-
 {% block content %}
 <style>
     .requests-grid {
@@ -140,8 +139,10 @@
         left: 22px;
         right: 22px;
         display: flex;
-        flex-direction: column;
-        gap: 2px;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
         z-index: 3;
     }
 
@@ -172,6 +173,8 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        text-align: right;
+        max-width: 55%;
     }
 
     .empty-state {
@@ -219,9 +222,11 @@
             <i class="fa-solid fa-xmark"></i>
         </a>
 
-        <!-- FOOTER: name + username/email -->
+        <!-- FOOTER: name left, username·email right -->
         <div class="request-footer">
-            <span class="request-name">{{ author.displayName }}</span>
+            <a href="{% url 'author-profile' author.id %}" class="request-name">
+                {{ author.displayName }}
+            </a>
             {% if author.user %}
                 <span class="request-meta">{{ author.user.username }} · {{ author.user.email }}</span>
             {% endif %}
