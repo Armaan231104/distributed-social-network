@@ -40,7 +40,19 @@ body {
     transform: rotate(-15deg);
 }
 
-#toggle-torch:hover {
+#toggle-grid {
+    position: fixed;
+    bottom: 60px;
+    right: 20px;
+    z-index: 100001;
+    font-size: 32px;
+    color: black;
+    cursor: pointer;
+    -webkit-transition: -webkit-transform 0.5s, color 0.2s;
+    transition: transform 0.5s, color 0.2s;
+}
+
+#toggle-torch:hover,#toggle-grid:hover {
     -webkit-transform: scale(1.5) rotate(-20deg);
     transform: scale(1.5) rotate(-20deg);
     color: #ce0041;
@@ -114,19 +126,24 @@ body::before {
 .sidebar:hover {
     width: 180px;
 }
-
 .logo {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    z-index: 2000;
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 10000;
 }
 
 .logo a {
-    font-weight: bold;
-    font-size: 26px;
-    text-decoration: none;
-    color: #222;
+  position: relative;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 26px;
+  text-decoration: none;
+  color: #222;
+  cursor: pointer;
+}
+.logo a:hover{
+    
 }
 
 /* LINKS */

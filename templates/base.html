@@ -11,14 +11,13 @@
 </head>
 <body>
 
-<div class="layout">
+<div class="logo">
+  <a href="/posts/stream">Crimson</a>
+</div>
 
     <!-- Sidebar -->
     <aside class="sidebar">
-        <div class="logo">
-            <a href="/posts/stream"">Crimson</a> 
-            <br>
-        </div>
+
 
         <nav class="sidebar-links">
 
@@ -98,6 +97,10 @@
     <script src="{% static 'js/script.js' %}"></script>
 {%if request.user.is_authenticated%}
 <script>
+const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+
+if (!isFirefox) {
+
 document.addEventListener("DOMContentLoaded", () => {
     const main      = document.querySelector('.main-content');
     const container = document.querySelector('.mirror-container');
@@ -163,6 +166,29 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     tick();
+});
+}
+let scrambled = false;
+
+document.getElementById('toggle-grid')?.addEventListener('click', () => {
+    const cards = document.querySelectorAll('.posts-grid .post-card');
+
+    if (scrambled) {
+        cards.forEach(card => {
+            card.style.transform = '';
+            card.style.zIndex    = '';
+        });
+        scrambled = false;
+        applyMasonryRowWise();
+    } else {
+        cards.forEach(card => {
+            const rotation = (Math.random() * 20) - 10;
+            const scale = Math.random() * 4.1 + 0.9; // 0.9 to 5
+            card.style.transform = `rotate(${rotation}deg) scale(${1.2})`;
+            card.style.zIndex    = '10';
+        });
+        scrambled = true;
+    }
 });
 </script>
 {%endif%}

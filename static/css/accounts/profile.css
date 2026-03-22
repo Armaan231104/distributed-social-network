@@ -309,8 +309,8 @@
     -webkit-backdrop-filter: blur(12px); /* Safari */
     backdrop-filter: blur(12px);
     box-shadow: 0 15px 35px rgba(244,23,23,0.12);
-    -webkit-transition: -webkit-transform 0s ease;
-    transition: transform 0s ease;
+    -webkit-transition: -webkit-all 0s linear,transform 0.8s ease-out;
+    transition: all 0s linear,transform 0.8s ease-out;
     cursor: pointer;
     position: relative;
     overflow: hidden;
