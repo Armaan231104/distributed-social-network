@@ -31,6 +31,8 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") + [
     "https://cmput404-crimson-swcarson-55711a031595.herokuapp.com/",
 ]
 
+CSRF_TRUSTED_ORIGINS = ['https://cmput404-crimson-swcarson-55711a031595.herokuapp.com']
+
 # Application definition
 
 INSTALLED_APPS = [
