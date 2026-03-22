@@ -28,7 +28,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me")
 DEBUG = os.getenv("DEBUG", "False") == "True"
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") + [
-    "https://cmput404-crimson-swcarson-55711a031595.herokuapp.com/",
+    "cmput404-crimson-swcarson-55711a031595.herokuapp.com",
 ]
 
 CSRF_TRUSTED_ORIGINS = ['https://cmput404-crimson-swcarson-55711a031595.herokuapp.com']
