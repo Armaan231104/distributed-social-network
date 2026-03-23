@@ -18,7 +18,7 @@ from .serializers import (
     AuthorSerializer, AuthorListSerializer, 
     FollowRequestSerializer
 )
-from .utils import get_host_url, is_local_author
+from .utils import get_host_url, is_local_author, normalize_fqid
 
 def build_local_author_id(user):
     host = get_host_url()
@@ -31,9 +31,7 @@ def get_or_create_author(author_data):
     if not author_id:
         return None
 
-    # Enforce trailing slash for consistency
-    if not author_id.endswith('/'):
-        author_id += '/'
+    author_id = normalize_fqid(author_id)
     
     existing = Author.objects.filter(id=author_id).first()
     if existing:
@@ -51,7 +49,7 @@ def get_or_create_author(author_data):
     )
 
 
-# Helpers for autho lookup
+# Helpers for author lookup
 # These handle the difference between local authors (user_id) and remote authors (FQID)
 
 def get_current_author(request):
@@ -60,18 +58,8 @@ def get_current_author(request):
 
 
 def get_author_by_id(author_id):
-    """
-    Look up author by FQID. 
-    If a local integer/UUID slips through from the UI, format it into a proper FQID first.
-    """
-    author_id_str = str(author_id)
-    
-    # If it's a raw local ID, build the FQID
-    if not author_id_str.startswith('http'):
-        host_url = get_host_url()
-        author_id_str = f"{host_url}/api/authors/{author_id_str}/"
-    
-    return Author.objects.get(id=author_id_str)
+    """Look up author by FQID using centralized normalization."""
+    return Author.objects.get(id=normalize_fqid(author_id))
 
 
 def get_or_create_remote_author(foreign_id):
@@ -79,10 +67,12 @@ def get_or_create_remote_author(foreign_id):
     On first follow, create remote author.
     Extracts host from the FQID (basically everything before /api/authors/).
     """
+    foreign_id = normalize_fqid(foreign_id)
+    
     return Author.objects.get_or_create(
-        id=str(foreign_id),
+        id=foreign_id,
         defaults={
-            'host': str(foreign_id).split('/api/authors/')[0] + '/api/',
+            'host': foreign_id.split('/api/authors/')[0] + '/api/',
             'displayName': 'Remote Author',
             'is_approved': True,
         }
@@ -229,8 +219,9 @@ class AuthorDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, author_id):
+        author_id = normalize_fqid(author_id)
         try:
-            author = Author.objects.get(user_id=author_id)
+            author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
         
@@ -244,8 +235,7 @@ class FollowingListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, author_id):
-        if not author_id.endswith('/'):
-            author_id += '/'
+        author_id = normalize_fqid(author_id)
         try:
             author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
@@ -278,8 +268,7 @@ class FollowersListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, author_id):
-        if not author_id.endswith('/'):
-            author_id += '/'
+        author_id = normalize_fqid(author_id)
         try:
             author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
@@ -313,8 +302,7 @@ class FriendsListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, author_id):
-        if not author_id.endswith('/'):
-            author_id += '/'
+        author_id = normalize_fqid(author_id)
         try:
             author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
@@ -352,7 +340,10 @@ class FollowView(APIView):
         """Send a follow request to another author."""
         current_author = get_current_author(request)
         
-        if str(current_author.user_id) != str(author_id):
+        # Normalize author_id to FQID for comparison
+        author_id = normalize_fqid(author_id)
+        
+        if current_author.id != author_id:
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
         is_remote = str(foreign_id).startswith('http')
@@ -382,7 +373,10 @@ class FollowView(APIView):
         """Unfollow an author."""
         current_author = get_current_author(request)
         
-        if str(current_author.user_id) != str(author_id):
+        # Normalize author_id to FQID for comparison
+        author_id = normalize_fqid(author_id)
+        
+        if current_author.id != author_id:
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
         foreign_author = get_author_by_id(foreign_id)
@@ -403,7 +397,10 @@ class AcceptFollowView(APIView):
         """Accept a follow request."""
         current_author = get_current_author(request)
         
-        if str(current_author.user_id) != str(author_id):
+        # Normalize author_id to FQID for comparison
+        author_id = normalize_fqid(author_id)
+        
+        if current_author.id != author_id:
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
         foreign_author = get_author_by_id(foreign_id)
@@ -428,7 +425,10 @@ class AcceptFollowView(APIView):
         """Reject or remove a follower."""
         current_author = get_current_author(request)
         
-        if str(current_author.user_id) != str(author_id):
+        # Normalize author_id to FQID for comparison
+        author_id = normalize_fqid(author_id)
+        
+        if current_author.id != author_id:
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
         foreign_author = get_author_by_id(foreign_id)
@@ -451,7 +451,10 @@ class FollowRequestListView(APIView):
     def get(self, request, author_id):
         current_author = get_current_author(request)
         
-        if str(current_author.user_id) != str(author_id):
+        # Normalize author_id to FQID for comparison
+        author_id = normalize_fqid(author_id)
+        
+        if current_author.id != author_id:
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
         page = int(request.query_params.get('page', 1))
@@ -488,8 +491,7 @@ class InboxView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, author_id):
-        if not author_id.endswith('/'):
-            author_id += '/'
+        author_id = normalize_fqid(author_id)
         try:
             author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
@@ -561,6 +563,8 @@ def authors_list(request):
 @approved_author_required
 def author_followers(request, author_id):
     """Show list of an author's followers."""
+    if not author_id.endswith('/'):
+        author_id += '/'
     author = get_object_or_404(Author, id=author_id)
     followers = [f.follower for f in author.followers.all()]
     
@@ -580,6 +584,8 @@ def author_followers(request, author_id):
 @approved_author_required
 def author_following(request, author_id):
     """Show list of authors that this author is following."""
+    if not author_id.endswith('/'):
+        author_id += '/'
     author = get_object_or_404(Author, id=author_id)
     following = [f.followee for f in author.following.all()]
     
@@ -599,6 +605,8 @@ def author_following(request, author_id):
 @approved_author_required
 def author_friends(request, author_id):
     """Show list of an author's friends (mutual follows)."""
+    if not author_id.endswith('/'):
+        author_id += '/'
     author = get_object_or_404(Author, id=author_id)
     friends = list(author.get_friends())
     
@@ -618,6 +626,8 @@ def author_friends(request, author_id):
 @approved_author_required
 def author_profile(request, author_id):
     """Show an author's profile along with their posts."""
+    if not author_id.endswith('/'):
+        author_id += '/'
     author = get_object_or_404(Author, id=author_id)
 
     current_user_author = None
@@ -708,6 +718,8 @@ def follow_author(request, author_id):
 def unfollow_author(request, author_id):
     """Unfollow an author from the UI."""
     author_id = unquote(author_id)
+    if not author_id.endswith('/'):
+        author_id += '/'
     
     try:
         current_author = request.user.author
@@ -829,6 +841,7 @@ from .forms import AuthorUpdateForm
 def edit_profile(request, author_id=None):
     # Admin editing someone OR direct URL
     if author_id:
+        author_id = normalize_fqid(author_id)
         author = get_object_or_404(Author, id=author_id)
     else:
         # Normal user editing themselves
@@ -943,6 +956,8 @@ def approve_author(request, author_id):
     if not request.user.is_staff:
         return HttpResponseForbidden("Admins only.")
 
+    if not author_id.endswith('/'):
+        author_id += '/'
     author = get_object_or_404(Author, id=author_id, user__isnull=False)
     author.is_approved = True
     author.save()
@@ -955,6 +970,8 @@ def reject_author(request, author_id):
     if not request.user.is_staff:
         return HttpResponseForbidden("Admins only.")
 
+    if not author_id.endswith('/'):
+        author_id += '/'
     author = get_object_or_404(Author, id=author_id, user__isnull=False)
 
     if author.user:

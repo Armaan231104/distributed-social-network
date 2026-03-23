@@ -141,7 +141,7 @@ class AuthorAPITest(TestCase):
     
     def test_get_author_detail(self):
         """Verifies GET /api/authors/{id}/ returns author with correct type."""
-        response = self.client.get(f'/api/authors/{self.user1.id}/')
+        response = self.client.get(f'/api/authors/{self.author1.id.rstrip("/")}/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data['type'], 'author')
@@ -295,13 +295,13 @@ class FollowRequestAPITest(TestCase):
     
     def test_list_follow_requests_requires_auth(self):
         """Verifies 403 returned when not authenticated."""
-        response = self.client.get(f'/api/authors/{self.user1.id}/follow_requests/')
+        response = self.client.get(f'/api/authors/{self.author1.id.rstrip("/")}/follow_requests/')
         self.assertEqual(response.status_code, 403)
     
     def test_list_follow_requests_empty(self):
         """Verifies empty array returned when no pending requests."""
         self.client.login(username='author1', password='testpass123')
-        response = self.client.get(f'/api/authors/{self.user1.id}/follow_requests/')
+        response = self.client.get(f'/api/authors/{self.author1.id.rstrip("/")}/follow_requests/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data['follow_requests'], [])
@@ -314,7 +314,7 @@ class FollowRequestAPITest(TestCase):
             summary='Author Two wants to follow Author One'
         )
         self.client.login(username='author1', password='testpass123')
-        response = self.client.get(f'/api/authors/{self.user1.id}/follow_requests/')
+        response = self.client.get(f'/api/authors/{self.author1.id.rstrip("/")}/follow_requests/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(len(data['follow_requests']), 1)
@@ -334,7 +334,7 @@ class FollowViewTest(TestCase):
     def test_follow_requires_auth(self):
         """Verifies 403 returned when not authenticated."""
         response = self.client.put(
-            f'/api/authors/{self.user1.id}/following/{self.user2.id}/',
+            f'/api/authors/{self.author1.id.rstrip("/")}/following/{self.author2.id.rstrip("/")}/',
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 403)
@@ -345,7 +345,7 @@ class FollowViewTest(TestCase):
         mock_post.return_value = MagicMock(status_code=201)
         self.client.login(username='author1', password='testpass123')
         response = self.client.put(
-            f'/api/authors/{self.user1.id}/following/{self.user2.id}/',
+            f'/api/authors/{self.author1.id.rstrip("/")}/following/{self.author2.id.rstrip("/")}/',
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 201)
@@ -362,7 +362,7 @@ class FollowViewTest(TestCase):
         """Verifies unfollow removes follow relationship."""
         Follow.objects.create(follower=self.author1, followee=self.author2)
         self.client.login(username='author1', password='testpass123')
-        response = self.client.delete(f'/api/authors/{self.user1.id}/following/{self.user2.id}/')
+        response = self.client.delete(f'/api/authors/{self.author1.id.rstrip("/")}/following/{self.author2.id.rstrip("/")}/')
         self.assertEqual(response.status_code, 200)
         self.assertFalse(self.author1.is_following(self.author2))
     
@@ -372,14 +372,14 @@ class FollowViewTest(TestCase):
         Follow.objects.create(follower=self.author2, followee=self.author1)
         self.assertTrue(self.author1.is_friend(self.author2))
         self.client.login(username='author1', password='testpass123')
-        self.client.delete(f'/api/authors/{self.user1.id}/following/{self.user2.id}/')
+        self.client.delete(f'/api/authors/{self.author1.id.rstrip("/")}/following/{self.author2.id.rstrip("/")}/')
         self.assertFalse(self.author1.is_friend(self.author2))
     
     def test_cannot_follow_self(self):
         """Verifies 400 returned when trying to follow yourself."""
         self.client.login(username='author1', password='testpass123')
         response = self.client.put(
-            f'/api/authors/{self.user1.id}/following/{self.user1.id}/',
+            f'/api/authors/{self.author1.id.rstrip("/")}/following/{self.author1.id.rstrip("/")}/',
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 400)
@@ -390,7 +390,7 @@ class FollowViewTest(TestCase):
         Follow.objects.create(follower=self.author1, followee=self.author2)
         self.client.login(username='author1', password='testpass123')
         response = self.client.put(
-            f'/api/authors/{self.user1.id}/following/{self.user2.id}/',
+            f'/api/authors/{self.author1.id.rstrip("/")}/following/{self.author2.id.rstrip("/")}/',
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 400)
@@ -406,7 +406,7 @@ class FollowViewTest(TestCase):
         )
         self.client.login(username='author1', password='testpass123')
         response = self.client.put(
-            f'/api/authors/{self.user1.id}/following/{self.user2.id}/',
+            f'/api/authors/{self.author1.id.rstrip("/")}/following/{self.author2.id.rstrip("/")}/',
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 201)
@@ -423,7 +423,7 @@ class FollowViewTest(TestCase):
         )
         self.client.login(username='author1', password='testpass123')
         response = self.client.put(
-            f'/api/authors/{self.user1.id}/following/{self.user2.id}/',
+            f'/api/authors/{self.author1.id.rstrip("/")}/following/{self.author2.id.rstrip("/")}/',
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 400)
@@ -473,7 +473,7 @@ class AcceptRejectFollowTest(TestCase):
         
         self.client.login(username='author1', password='testpass123')
         response = self.client.put(
-            f'/api/authors/{self.user1.id}/followers/{self.user2.id}/',
+            f'/api/authors/{self.author1.id.rstrip("/")}/followers/{self.author2.id.rstrip("/")}/',
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 200)
@@ -490,7 +490,7 @@ class AcceptRejectFollowTest(TestCase):
         )
         
         self.client.login(username='author1', password='testpass123')
-        response = self.client.delete(f'/api/authors/{self.user1.id}/followers/{self.user2.id}/')
+        response = self.client.delete(f'/api/authors/{self.author1.id.rstrip("/")}/followers/{self.author2.id.rstrip("/")}/')
         self.assertEqual(response.status_code, 200)
         follow_request = FollowRequest.objects.first()
         self.assertEqual(follow_request.status, FollowRequest.Status.REJECTED)
