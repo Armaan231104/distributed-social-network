@@ -96,7 +96,7 @@
                 <div class="profile-actions">
                     {% if current_user_author %}
                         {% if current_user_author == profile_author%}
-                            <a href="{% url 'edit-profile' %}" class="btn btn-primary">
+                            <a href="{% url 'edit-my-profile' %}" class="btn btn-primary">
                                 <i class="fa-solid fa-pen-to-square"></i> Edit
                             </a>
 
@@ -146,6 +146,7 @@
                 <p class="empty-desc">No description provided.</p>
             {% endif %}
         </div>
+
                 <!-- Optional GitHub link if they added it -->
                 {% if profile_author.github %}
                 <p class="profile-links">
@@ -202,6 +203,7 @@
                         {{ post.author.author.displayName|default:post.author.username }}
                     </a>
                 </div>
+                <hr class="menu-divider">
 
                 <!-- Row 2: title -->
                 <div class="post-title-row">

@@ -6,9 +6,11 @@ from django.db.models import Q
 from django.contrib.auth.models import User
 from .models import Entry, HostedImage
 from accounts.models import Author, Follow
+from nodes.models import RemoteNode
 from interactions.views import user_can_access_entry
 import json
 from functools import wraps
+import requests
 
 def approved_author_required(view_func):
     @wraps(view_func)
@@ -250,6 +252,8 @@ def create_entry(request):
         visibility=visibility
     )
 
+    fanout_entry_to_remote_followers(entry, request.user)
+
     return JsonResponse({"id": str(entry.id)}, status=201)
 
 
@@ -340,6 +344,9 @@ def entry_detail_api(request, entry_id):
             return HttpResponseForbidden()
         
         entry.soft_delete()
+
+        fanout_entry_to_remote_followers(entry, request.user)
+        
         return JsonResponse({"deleted": True})
 
 
@@ -472,6 +479,8 @@ def edit_entry(request, entry_id):
 
     entry.save()
 
+    fanout_entry_to_remote_followers(entry, request.user)
+
     return JsonResponse({"updated": True}, status=200)
 
 @approved_author_required
@@ -490,6 +499,8 @@ def delete_entry_ui(request, entry_id):
         return HttpResponseForbidden("You cannot delete this entry.")
 
     entry.soft_delete()
+
+    fanout_entry_to_remote_followers(entry, request.user)
 
     referrer = request.META.get("HTTP_REFERER")
 
@@ -518,3 +529,64 @@ def deleted_entries(request):
 
     entries = Entry.objects.filter(visibility="DELETED").select_related('author__author').order_by('-updated_at')
     return render(request, 'posts/deleted_entries.html', {'entries': entries})
+
+
+# ----- REMOTE API ----- #
+
+
+def send_entry_to_inbox(entry, author, inbox_url, node):
+    """Send a spec-compliant entry object to a remote inbox."""
+    payload = {
+        "type": "entry",
+        "id": str(entry.id),
+        "title": entry.title,
+        "content": entry.content,
+        "contentType": entry.content_type,
+        "visibility": entry.visibility,
+        "published": entry.published_at.isoformat(),
+        "author": {
+            "type": "author",
+            "id": author.id,
+            "displayName": author.displayName,
+            "host": author.host,
+            "github": author.github or None,
+            "profileImage": author.profileImage.url if author.profileImage else None,
+            "web": author.web or None,
+        }
+    }
+    try:
+        requests.post(
+            inbox_url,
+            json=payload,
+            auth=(node.username, node.password),
+            timeout=5
+        )
+    except requests.RequestException:
+        pass  # don't let a failed remote request break local functionality
+
+def fanout_entry_to_remote_followers(entry, user):
+    """Send entry to all remote followers' inboxes."""
+    try:
+        author = user.author
+    except Author.DoesNotExist:
+        return
+
+    # get all followers who are remote (no local user account)
+    remote_followers = Follow.objects.filter(
+        followee=author,
+        follower__user__isnull=True  # remote authors have no local user
+    ).select_related('follower')
+
+    for follow in remote_followers:
+        remote_author = follow.follower
+
+        # find which node this remote author belongs to
+        node = RemoteNode.objects.filter(
+            is_active=True,
+            url__contains=remote_author.host
+        ).first()
+        if not node:
+            continue
+
+        inbox_url = f"{remote_author.id.rstrip('/')}/inbox/"
+        send_entry_to_inbox(entry, author, inbox_url, node)
