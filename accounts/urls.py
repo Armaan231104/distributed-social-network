@@ -1,5 +1,5 @@
-from django.urls import path
-from . import views
+from django.urls import path, re_path
+import accounts.views as views
 import posts.views
 
 apiurlpatterns = [
@@ -11,7 +11,8 @@ apiurlpatterns = [
     path('api/authors/<path:author_id>/followers/<path:foreign_id>/', views.AcceptFollowView.as_view(), name='author-followers-manage-api'),
     path('api/authors/<path:author_id>/friends/', views.FriendsListView.as_view(), name='author-friends-api'),
     path('api/authors/<path:author_id>/follow_requests/', views.FollowRequestListView.as_view(), name='author-follow-requests'),
-    path('api/authors/<path:author_id>/', views.AuthorDetailView.as_view(), name='author-detail'),
+    # ugly but helps to avoid regex matching things it is not supposed to
+    re_path(r'^api/authors/(?P<author_id>(?:https?://[^/]+.*/api/authors/[^/]+/?|[^/]+))/$', views.AuthorDetailView.as_view(), name='author-detail'),
 ]
 
 uiurlpatterns = [
