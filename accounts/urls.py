@@ -3,31 +3,29 @@ from . import views
 import posts.views
 
 apiurlpatterns = [
-    # API endpoints (Prefixed with api/ and using <path:> for FQIDs)
     path('api/authors/', views.AuthorListView.as_view(), name='author-list'),
-    path('api/authors/<path:author_id>/', views.AuthorDetailView.as_view(), name='author-detail'),
+    path('api/authors/<path:author_id>/inbox/', views.InboxView.as_view(), name='author-inbox'),
     path('api/authors/<path:author_id>/following/', views.FollowingListView.as_view(), name='author-following'),
     path('api/authors/<path:author_id>/following/<path:foreign_id>/', views.FollowView.as_view(), name='author-follow'),
     path('api/authors/<path:author_id>/followers/', views.FollowersListView.as_view(), name='author-followers'),
     path('api/authors/<path:author_id>/followers/<path:foreign_id>/', views.AcceptFollowView.as_view(), name='author-followers-manage'),
     path('api/authors/<path:author_id>/friends/', views.FriendsListView.as_view(), name='author-friends-api'),
     path('api/authors/<path:author_id>/follow_requests/', views.FollowRequestListView.as_view(), name='author-follow-requests'),
-    path('api/authors/<path:author_id>/inbox/', views.InboxView.as_view(), name='author-inbox'),
+    path('api/authors/<path:author_id>/', views.AuthorDetailView.as_view(), name='author-detail'),
 ]
 
 uiurlpatterns = [
-    # UI endpoints (No api/ prefix)
-    path('authors/all/', views.authors_list, name='authors-list-ui'),
+    path('authors/all/', views.authors_list, name='authors-list'),
     path('authors/<path:author_id>/profile/', views.author_profile, name='author-profile'),
-    path('authors/<path:author_id>/followers_ui/', views.author_followers, name='author-followers-ui'),
-    path('authors/<path:author_id>/following_ui/', views.author_following, name='author-following-ui'),
-    path('authors/<path:author_id>/friends_ui/', views.author_friends, name='author-friends-ui'),
+    path('authors/<path:author_id>/followers/', views.author_followers, name='author-followers'),
+    path('authors/<path:author_id>/following/', views.author_following, name='author-following'),
+    path('authors/<path:author_id>/friends/', views.author_friends, name='author-friends'),
     
     path('follow/<path:author_id>/', views.follow_author, name='follow-author'),
     path('unfollow/<path:author_id>/', views.unfollow_author, name='unfollow-author'),
     path('cancel-request/<path:author_id>/', views.cancel_follow_request, name='cancel-follow-request'),
     
-    path('follow-requests/', views.follow_requests, name='follow-requests-ui'),
+    path('follow-requests/', views.follow_requests, name='follow-requests'),
     path('follow-requests/<int:request_id>/accept/', views.accept_follow_request, name='accept-follow-request'),
     path('follow-requests/<int:request_id>/reject/', views.reject_follow_request, name='reject-follow-request'),
     
