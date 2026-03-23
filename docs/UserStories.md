@@ -14,6 +14,22 @@ DB Indexing:
 UI: `GET /posts/stream/`
 API: `GET /posts/api/entries/stream/`
 
+**How it works**
+
+Both endpoints delegate to `get_stream_entries_for_user(user)` in `posts/views.py`. This function builds a queryset of entries and always appends `.order_by('-published_at')` before returning, regardless of the user's authentication status:
+
+- Unauthenticated users: `filter(visibility="PUBLIC").order_by('-published_at')`
+- Authenticated users (no Author profile): `filter(...).order_by('-published_at').distinct()`
+- Authenticated authors: `filter(own | PUBLIC | UNLISTED-from-followed | FRIENDS-from-mutual).order_by('-published_at').distinct()`
+
+The `published_at` field is set once at creation time and never updated on edits, so the sort order reflects when an entry was originally posted. The `published_at` column is indexed (see DB Indexing at the top of this file) to keep stream queries fast as the table grows.
+
+The UI stream page (`posts/stream.html`) renders entries in the order returned by the queryset — newest first. The API endpoint wraps the same ordered queryset into a JSON response with `type`, `count`, and `src` fields, preserving the same order.
+
+**Why it is complete**
+
+Ordering is applied unconditionally inside `get_stream_entries_for_user`, so every path through both the UI and API stream endpoints returns entries sorted newest-first. No additional client-side sorting is required or performed.
+
 ## As a node admin, I don't want arrays to be stored in database fields, so that my node won't get slower over time. (Complete)
 
 This has been implemented throughout the codebase. All collection-like data uses separate relational tables with ForeignKey relationships instead of array or JSON columns. No `JSONField` or `ArrayField` is used anywhere in the project.
