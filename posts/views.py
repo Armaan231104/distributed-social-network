@@ -275,13 +275,10 @@ def create_entry(request):
 
     from nodes.utils import send_entry_to_remote
 
-    # keep their fanout too
     fanout_entry_to_remote_followers(entry, request.user)
 
-    # your remote send (Part 3 requirement)
     send_entry_to_remote(entry)
 
-    # your FQID (CRITICAL)
     return JsonResponse({"id": entry.fqid}, status=201)
 
 @require_http_methods(["GET", "PATCH", "DELETE"])
