@@ -156,7 +156,95 @@ Each team member must deploy their own node to Heroku using:
   - Static content
   - Backend API
 
-Deployment instructions will be added in future project parts.
+---
+
+## Deploying to Heroku
+
+### Prerequisites
+- Heroku CLI installed and logged in (`heroku login`)
+- A Heroku app already created
+
+### 1. Connect your local repo to Heroku
+```bash
+heroku git:remote -a your-app-name
+```
+
+### 2. Add a Procfile
+Create a file called `Procfile` (capital P, no extension) in the same folder as `manage.py`:
+```
+web: gunicorn socialdistribution.wsgi
+```
+
+### 3. Set the Python buildpack
+```bash
+heroku buildpacks:set heroku/python -a your-app-name
+```
+
+### 4. Add Postgres
+```bash
+heroku addons:create heroku-postgresql:essential-0 -a your-app-name
+```
+Note: this costs ~$5/month. Check if you have Heroku credits via the GitHub Student Developer Pack.
+
+### 5. Install psycopg2 and update requirements.txt
+```bash
+pip install psycopg2-binary
+pip freeze > requirements.txt
+```
+
+### 6. Update ALLOWED_HOSTS in settings.py
+Make sure the Heroku URL is in `ALLOWED_HOSTS` with no `https://` and no trailing `/`:
+```python
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") + [
+    "your-app-name.herokuapp.com",
+]
+```
+
+### 7. Deploy
+Since our main branch is called `staging`, push it like this:
+```bash
+git add .
+git commit -m "your message"
+git push heroku staging:main
+```
+
+### 8. Run migrations and collect static files
+```bash
+heroku run python manage.py migrate -a your-app-name
+heroku run "python manage.py collectstatic --noinput" -a your-app-name
+```
+
+### 9. Open the app
+```bash
+heroku open -a your-app-name
+```
+
+---
+
+### Ongoing deploys
+Every time you want to redeploy after making changes:
+```bash
+git add .
+git commit -m "your message"
+git push heroku staging:main
+```
+
+---
+
+### Debugging
+If something is broken, temporarily enable debug mode to see the full error in the browser:
+```bash
+heroku config:set DEBUG=True -a your-app-name
+```
+Then turn it off again once fixed:
+```bash
+heroku config:set DEBUG=False -a your-app-name
+```
+
+For logs:
+```bash
+heroku logs --tail -a your-app-name
+```
 
 ---
 
