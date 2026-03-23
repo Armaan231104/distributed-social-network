@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Pending Authors{% endblock %}
+{% block title %}Pending Approvals{% endblock %}
 {% block content %}
 <style>
     .requests-grid {
@@ -192,9 +192,12 @@
         transform: scale(1.5);
         font-weight: 800;
     }
+    .request-card i{
+        transform: scale(2);
+    }
 </style>
 
-<h2 style="font-size:28px; color:#222;">Pending Author Approvals</h2>
+<h2 style="font-size:28px; color:#222;">Pending Approvals</h2>
 
 {% if pending_authors %}
 <div class="requests-grid">
@@ -219,7 +222,7 @@
 
         <!-- REJECT bubble -->
         <a href="{% url 'reject-author' author.id %}" class="bubble-reject">
-            <i class="fa-solid fa-xmark"></i>
+            <i class="fa-solid fa-trash"></i>
         </a>
 
         <!-- FOOTER: name left, username·email right -->
