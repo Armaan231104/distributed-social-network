@@ -11,14 +11,13 @@
 </head>
 <body>
 
-<div class="layout">
+<div class="logo">
+  <a href="/posts/stream">Crimson</a>
+</div>
 
     <!-- Sidebar -->
     <aside class="sidebar">
-        <div class="logo">
-            <a href="/posts/stream"">Crimson</a> 
-            <br>
-        </div>
+
 
         <nav class="sidebar-links">
 
@@ -52,6 +51,11 @@
                 <a href="{% url 'deleted_entries' %}" id="admin-deleted">
                     <i class="fa-regular fa-trash-can"></i>
                     <span>Deleted</span>
+                </a>
+
+                <a href="{% url 'nodes-list' %}" id="nodes">
+                    <i class="fa-solid fa-network-wired"></i>
+                    <span>Nodes</span>
                 </a>
 
                 {% endif %}
@@ -98,6 +102,10 @@
     <script src="{% static 'js/script.js' %}"></script>
 {%if request.user.is_authenticated%}
 <script>
+const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+
+if (!isFirefox) {
+
 document.addEventListener("DOMContentLoaded", () => {
     const main      = document.querySelector('.main-content');
     const container = document.querySelector('.mirror-container');
@@ -164,6 +172,64 @@ document.addEventListener("DOMContentLoaded", () => {
 
     tick();
 });
+}
+let scrambled = false;
+
+document.getElementById('toggle-grid')?.addEventListener('click', () => {
+    const cards = document.querySelectorAll('.posts-grid .post-card');
+
+    if (scrambled) {
+        cards.forEach(card => {
+            card.style.transform = '';
+            card.style.zIndex    = '';
+        });
+        scrambled = false;
+        applyMasonryRowWise();
+    } else {
+        cards.forEach(card => {
+            const rotation = (Math.random() * 20) - 10;
+            const scale = Math.random() * 4.1 + 0.9; // 0.9 to 5
+            card.style.transform = `rotate(${rotation}deg) scale(${1.2})`;
+            card.style.zIndex    = '10';
+        });
+        scrambled = true;
+    }
+});
+(function () {
+  const CYCLE_DURATION = 8000;  // total loop duration ms
+  const BEAM_WIDTH     = 0.45;
+  const STRIDE         = 3;
+
+  const cards = Array.from(document.querySelectorAll('.posts-grid .post-card'));
+  if (!cards.length) return;
+
+  function applyBeam(card, progress) {
+    const center = -BEAM_WIDTH / 2 + progress * (1 + BEAM_WIDTH);
+    const left   = (center - BEAM_WIDTH / 2) * 100;
+    const right  = (center + BEAM_WIDTH / 2) * 100;
+
+    card.style.background = `linear-gradient(
+      to right,
+      #ffffffCC ${left}%,
+      #ffffff ${(left + right) / 1.75}%,
+      #ffffffCC ${right}%
+    )`;
+  }
+
+  function tick(timestamp) {
+    const t = (timestamp % CYCLE_DURATION) / CYCLE_DURATION; // 0→1 looping
+
+    cards.forEach((card, i) => {
+      const groupOffset = (i % STRIDE) * 0.5;             // 0, 0.333, 0.666
+      const progress    = (t - groupOffset + 1) % 1;         // each group phase-shifted
+      applyBeam(card, progress);
+    });
+
+    requestAnimationFrame(tick);
+  }
+
+  requestAnimationFrame(tick);
+})();
 </script>
 {%endif%}
 </html>

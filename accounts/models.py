@@ -37,12 +37,8 @@ class Author(models.Model):
     @property
     def is_local(self):
         """Check if this author is from this node (not a remote author)."""
-        from django.conf import settings
-        allowed = settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else '127.0.0.1'
-        # Strip protocol for comparison
-        allowed = allowed.replace('https://', '').replace('http://', '').rstrip('/')
-        host = self.host.replace('https://', '').replace('http://', '').rstrip('/')
-        return allowed in host or host in allowed
+        from .utils import is_local_author
+        return is_local_author(self.id)
 
     def get_followers_count(self):
         return self.followers.count()

@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from .models import Author, FollowRequest, Follow
 
-
 class AuthorSerializer(serializers.ModelSerializer):
     """Serialize Author objects for the API."""
     type = serializers.SerializerMethodField()
@@ -17,7 +16,10 @@ class AuthorSerializer(serializers.ModelSerializer):
     def get_web(self, obj):
         if obj.web:
             return obj.web
-        return f"/authors/{obj.id.split('/')[-1]}/"
+        
+        # hadle trailing slash too
+        author_uuid = str(obj.id).rstrip('/').split('/')[-1]
+        return f"/authors/{author_uuid}/"
 
 
 class AuthorListSerializer(AuthorSerializer):
@@ -33,6 +35,7 @@ class FollowRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FollowRequest
+        # Note: 'status' and 'created_at' are fine to include, remote nodes will just ignore them if they don't need them.
         fields = ['type', 'summary', 'actor', 'object', 'status', 'created_at']
 
     def get_type(self, obj):

@@ -18,17 +18,16 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from django.conf import settings
-from django.conf.urls.static import static
 
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/", include("accounts.api_urls")),
-    path("", include("accounts.ui_urls")),
+
+    path("", include("accounts.urls")),
     path("interactions/", include("interactions.urls")),
     # path("", include("core.urls")),
-    path("posts/", include("posts.urls"))
+    path("posts/", include("posts.urls")),
+    path("nodes/", include("nodes.urls")),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

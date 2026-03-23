@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Connected Nodes{% endblock %}
+
+{% block content %}
+
+<div class="authors-wrapper">
+    <h1>
+        Connected Nodes
+        <br><br>
+        <a href="{% url 'home' %}" onclick="event.preventDefault(); history.back();" class="btn btn-secondary">
+            <i class="fa-solid fa-hand-point-left"></i> Back
+        </a>
+    </h1>
+
+    <div class="add-node-wrapper">
+        <a href="{% url 'add-node' %}" class="btn btn-primary">
+            <i class="fa-solid fa-plus"></i> Add Node
+        </a>
+    </div>
+
+    {% if nodes %}
+        {% for node in nodes %}
+        <div class="profile-hero author-card">
+            <div class="profile-main" style="flex: 1;">
+                <div class="profile-avatar-wrapper">
+                    <div class="profile-avatar-placeholder" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <i class="fa-solid fa-network-wired" style="font-size: 24px;"></i>
+                    </div>
+                </div>
+
+                <div class="profile-info">
+                    <h2 class="author-name">{{ node.url }}</h2>
+                    <p class="profile-links">
+                        <i class="fa-regular fa-user"></i>
+                        {{ node.username }}
+                    </p>
+                    <div class="node-status {% if node.is_active %}active{% else %}inactive{% endif %}">
+                        {% if node.is_active %}
+                            <i class="fa-solid fa-circle-check"></i> Active
+                        {% else %}
+                            <i class="fa-solid fa-circle-xmark"></i> Disabled
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="profile-description-side">
+                <div class="node-actions">
+                    <a href="{% url 'edit-node' node.id %}" class="btn btn-secondary">
+                        <i class="fa-solid fa-pen"></i> Edit
+                    </a>
+                    <form method="POST" action="{% url 'toggle-node' node.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn {% if node.is_active %}btn-warning{% else %}btn-success{% endif %}">
+                            <i class="fa-solid fa-power-off"></i>
+                            {% if node.is_active %}Disable{% else %}Enable{% endif %}
+                        </button>
+                    </form>
+                    <form method="POST" action="{% url 'delete-node' node.id %}" style="display: inline;" 
+                          onsubmit="return confirm('Remove Node\n\nAre you sure you want to stop sharing with {{ node.url }}? This cannot be undone.');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fa-regular fa-trash-can"></i> Remove
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <br><br>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <i class="fa-solid fa-network-wired"></i>
+            <p>No connected nodes yet.</p>
+            <p>Add a node to start sharing with other servers.</p>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.add-node-wrapper {
+    margin-bottom: 30px;
+}
+
+.node-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+    margin-top: 8px;
+}
+
+.node-status.active {
+    background: rgba(40, 167, 69, 0.15);
+    color: #28a745;
+}
+
+.node-status.inactive {
+    background: rgba(220, 53, 69, 0.15);
+    color: #dc3545;
+}
+
+.node-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: #666;
+}
+
+.empty-state i {
+    font-size: 64px;
+    margin-bottom: 20px;
+    opacity: 0.3;
+    background: linear-gradient(90deg, #ff1a62, #ffa023);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.empty-state p {
+    margin: 8px 0;
+    font-size: 16px;
+}
+</style>
+
+{% endblock %}

@@ -1,172 +1,247 @@
 {% extends 'base.html' %}
-
 {% block title %}Follow Requests - SocialDistribution{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h1>Follow Requests</h1>
-    <p class="subtitle">Authors who want to follow you.</p>
-    
-    {% if pending_requests %}
-        <div class="requests-list">
-            {% for req in pending_requests %}
-                <div class="request-card">
-                    <div class="request-info">
-                        {% if req.actor.profileImage %}
-                            <img src="{{ req.actor.profileImage }}" alt="{{ req.actor.displayName }}" class="request-avatar">
-                        {% else %}
-                            <div class="request-avatar-placeholder">{{ req.actor.displayName|make_list|first }}</div>
-                        {% endif %}
-                        
-                        <div class="request-details">
-                            <h3>{{ req.actor.displayName }}</h3>
-                            <p class="request-summary">{{ req.summary }}</p>
-                            <p class="request-time">Requested {{ req.created_at|timesince }} ago</p>
-                        </div>
-                    </div>
-                    
-                    <div class="request-actions">
-                        <a href="{% url 'accept-follow-request' request_id=req.id %}" class="btn btn-accept">Accept</a>
-                        <a href="{% url 'reject-follow-request' request_id=req.id %}" class="btn btn-reject">Reject</a>
-                    </div>
-                </div>
-            {% endfor %}
+<style>
+    .requests-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+        margin-top: 30px;
+    }
+
+    @media (max-width: 1000px) {
+        .requests-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+        .requests-grid { grid-template-columns: 1fr; }
+    }
+
+    .request-card {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 20px;
+        padding: 22px;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        box-shadow: 0 15px 35px rgba(244, 23, 23, 0.12);
+        border: 1px solid rgba(255, 26, 98, 0.1);
+        aspect-ratio: 1 / 1;
+        position: relative;
+        overflow: hidden;
+        transition: box-shadow 0.3s ease;
+    }
+
+    .request-card::before {
+        content: "";
+        position: absolute;
+        top: 0; right: 0; bottom: 0; left: 0;
+        background: linear-gradient(45deg, #ff1a62, #f41717, #ffa023);
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        pointer-events: none;
+    }
+    .request-card:hover::before { opacity: 0.05; }
+    .request-card:hover {
+        box-shadow: 0 25px 60px rgba(244, 23, 23, 0.2);
+    }
+
+    /* BIG AVATAR — floats in top-left area */
+    .request-avatar-bubble,
+    .request-avatar-placeholder-bubble {
+        position: absolute;
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        top: 18%;
+        left: 12%;
+        object-fit: cover;
+        border: 4px solid rgba(255, 26, 98, 0.25);
+        box-shadow: 0 10px 30px rgba(244, 23, 23, 0.2);
+        animation: floatA 5s ease-in-out infinite alternate;
+        z-index: 1;
+    }
+
+    .request-avatar-placeholder-bubble {
+        background: linear-gradient(135deg, #ff1a62, #ffa023);
+        color: white;
+        font-size: 48px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* ACCEPT bubble — floats top-right */
+    .bubble-accept {
+        position: absolute;
+        width: 58px;
+        height: 58px;
+        border-radius: 50%;
+        top: 12%;
+        right: 14%;
+        background: linear-gradient(45deg, #ff1a62, #f41717, #ffa023);
+        color: #fff !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        text-decoration: none;
+        box-shadow: 0 8px 20px rgba(244, 23, 23, 0.3);
+        animation: floatB 4s ease-in-out infinite alternate;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        z-index: 2;
+    }
+    .bubble-accept:hover {
+        transform: scale(1.2);
+        box-shadow: 0 12px 30px rgba(244, 23, 23, 0.5);
+    }
+
+    /* REJECT bubble — floats mid-right */
+    .bubble-reject {
+        position: absolute;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        top: 44%;
+        right: 10%;
+        background: #fff;
+        color: #ff1a62 !important;
+        border: 2.5px solid #ff1a62;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 17px;
+        text-decoration: none;
+        box-shadow: 0 6px 16px rgba(255, 26, 98, 0.2);
+        animation: floatC 6s ease-in-out infinite alternate;
+        transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+        z-index: 2;
+    }
+    .bubble-reject:hover {
+        transform: scale(1.2);
+        background: #ff1a62;
+        color: #fff !important;
+        box-shadow: 0 10px 24px rgba(255, 26, 98, 0.4);
+    }
+
+    /* floating animations — each bubble drifts differently */
+    @keyframes floatA {
+        0%   { transform: translate(0px, 0px) rotate(-1deg); }
+        100% { transform: translate(6px, -10px) rotate(1.5deg); }
+    }
+    @keyframes floatB {
+        0%   { transform: translate(0px, 0px); }
+        100% { transform: translate(-8px, 8px); }
+    }
+    @keyframes floatC {
+        0%   { transform: translate(0px, 0px); }
+        100% { transform: translate(5px, -12px); }
+    }
+
+    /* BOTTOM FOOTER */
+    .request-footer {
+        position: absolute;
+        bottom: 18px;
+        left: 22px;
+        right: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        z-index: 3;
+    }
+
+    .request-name {
+        font-size: 15px;
+        font-weight: 700;
+        color: #222;
+        text-decoration: none;
+        position: relative;
+    }
+    .request-name::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -3px;
+        width: 0;
+        height: 2px;
+        background: linear-gradient(90deg, #ff1a62, #ffa023);
+        border-radius: 3px;
+        transition: width 0.3s ease;
+    }
+    .request-name:hover::after { width: 100%; }
+    .request-name:hover { color: #ff1a62; }
+
+    .request-time {
+        font-size: 11px;
+        color: #999;
+        white-space: nowrap;
+    }
+
+    .empty-state {
+        text-align: center;
+        font-size: 18px;
+        color: #666;
+        padding: 60px 20px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(255, 26, 98, 0.15);
+        margin-top: 30px;
+    }
+
+    #requests i {
+        transform: rotate(-5deg) scale(1.5);
+        font-weight: 800;
+    }
+    .request-card i{
+        transform: scale(2);
+    }
+</style>
+
+<h2 style="font-size:28px; color:#222;">Follow Requests</h2>
+
+{% if pending_requests %}
+<div class="requests-grid">
+    {% for req in pending_requests %}
+    <div class="request-card">
+
+        <!-- BIG avatar bubble -->
+        {% if req.actor.profileImage %}
+            <img src="{{ req.actor.profileImage.url }}"
+                 alt="{{ req.actor.displayName }}"
+                 class="request-avatar-bubble">
+        {% else %}
+            <div class="request-avatar-placeholder-bubble">
+                {{ req.actor.displayName|make_list|first }}
+            </div>
+        {% endif %}
+
+        <!-- ACCEPT bubble -->
+        <a href="{% url 'accept-follow-request' request_id=req.id %}" class="bubble-accept">
+            <i class="fa-solid fa-check"></i>
+        </a>
+
+        <!-- REJECT bubble -->
+        <a href="{% url 'reject-follow-request' request_id=req.id %}" class="bubble-reject">
+            <i class="fa-solid fa-xmark"></i>
+        </a>
+
+        <!-- FOOTER: name + time -->
+        <div class="request-footer">
+            <a href="{% url 'author-profile' req.actor.id %}" class="request-name">
+                {{ req.actor.displayName }}
+            </a>
+            <span class="request-time">{{ req.created_at|timesince }} ago</span>
         </div>
-    {% else %}
-        <div class="empty-state">
-            <p>No pending follow requests.</p>
-            <p class="empty-subtitle">When someone wants to follow you, their request will appear here.</p>
-        </div>
-    {% endif %}
+
+    </div>
+    {% endfor %}
 </div>
 
-<style>
-.container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
-}
+{% else %}
+<div class="empty-state">
+    <p>No pending follow requests.</p>
+    <p style="margin-top:10px; color:#999; font-size:14px;">When someone wants to follow you, their request will appear here.</p>
+</div>
+{% endif %}
 
-h1 {
-    margin-bottom: 10px;
-}
-
-.subtitle {
-    color: #666;
-    margin-bottom: 30px;
-}
-
-.requests-list {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.request-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 20px;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-}
-
-.request-info {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-.request-avatar {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    object-fit: cover;
-}
-
-.request-avatar-placeholder {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    background: #4a90d9;
-    color: white;
-    font-size: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.request-details h3 {
-    margin: 0 0 5px;
-    font-size: 1.1rem;
-}
-
-.request-summary {
-    margin: 0 0 5px;
-    color: #666;
-    font-size: 0.9rem;
-}
-
-.request-time {
-    margin: 0;
-    color: #999;
-    font-size: 0.8rem;
-}
-
-.request-actions {
-    display: flex;
-    gap: 10px;
-}
-
-.btn {
-    display: inline-block;
-    padding: 8px 16px;
-    border-radius: 4px;
-    text-decoration: none;
-    font-weight: 500;
-    cursor: pointer;
-    border: none;
-}
-
-.btn-accept {
-    background: #28a745;
-    color: white;
-}
-
-.btn-accept:hover {
-    background: #218838;
-}
-
-.btn-reject {
-    background: #dc3545;
-    color: white;
-}
-
-.btn-reject:hover {
-    background: #c82333;
-}
-
-.empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    background: #f8f9fa;
-    border-radius: 8px;
-}
-
-.empty-state p {
-    margin: 0;
-    color: #666;
-}
-
-.empty-subtitle {
-    margin-top: 10px !important;
-    color: #999 !important;
-}
-
-#requests i{
-    transform: rotate(-5deg) scale(1.5);
-    font-weight: 800;
-}
-</style>
 {% endblock %}

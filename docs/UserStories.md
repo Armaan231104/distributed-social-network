@@ -48,3 +48,45 @@ This has been implemented throughout the codebase. All collection-like data uses
 Each item that would conceptually belong to a list is stored as its own row with a ForeignKey back to its parent. Arrays are constructed at request time by querying the related table (e.g. `entry.likes.all()`, `author.followers.all()`). Duplicate-prevention is enforced via `unique_together` and `UniqueConstraint` on the relevant models rather than deduplicating in application code.
 
 Friends (mutual followers) are not stored at all — they are computed at query time as the intersection of the `following` and `followers` querysets in `Author.get_friends()` (`accounts/models.py`).
+
+## Sean
+
+*"As a node admin, I want everything to be stored in a well-indexed relational database..."*
+
+- Indexed Fields:
+    - entry.visibility - accessed all the time in stream
+    - entry.published_at - accessed all the time in stream
+    - author.host - accessed
+
+*"As a node admin, I want my node's UI to only communicate with my nodes web server..."*
+
+- Our UI does not make any network requests outside of the localhost server
+- JS Fetch calls are only to the UI
+
+*"As a node admin, I don't want to have separate frontend and backend web servers..."*
+
+- We only have one server for the frontend and the backend
+
+*"As an author, comments on my friends-only entries are visible only to my friends and the comment's author..."*
+
+- Post visibility is now working, and since comments are only seen inside post detail, this one is good
+
+*"As an author, I want to like comments that I can access..."*
+
+- See Interactions UI docs
+
+*"As an author, I want to unfriend other authors by unfollowing them..."*
+
+- See Authors docs
+
+*"As an author, I want to like entries that I can access..."*
+
+- See Interactions UI docs
+
+*"As an author, when someone sends me a public entry I want to see the likes..."*
+
+- Entry UI includes like count, so done
+
+*"As an author, I want to comment on entries that I can access..."*
+
+- See Interactions UI docs
