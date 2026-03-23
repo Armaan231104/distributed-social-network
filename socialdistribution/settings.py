@@ -40,7 +40,8 @@ NODE_PASSWORD = os.getenv("NODE_PASSWORD", "node_password_change_me")
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    'django.contri'
+    'b.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
