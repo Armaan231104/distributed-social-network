@@ -36,27 +36,9 @@ class Author(models.Model):
 
     @property
     def is_local(self):
-        """Check if this author is from this node (not a remote author).
-        
-        Compares the author's host against all ALLOWED_HOSTS to handle
-        localhost, 127.0.0.1, and production domains correctly.
-        """
-        from django.conf import settings
-        
-        # Get all allowed hosts and normalize them
-        local_hosts = []
-        for host in settings.ALLOWED_HOSTS:
-            h = host.replace('https://', '').replace('http://', '').rstrip('/')
-            if ':' in h:
-                h = h.split(':')[0]
-            local_hosts.append(h)
-        
-        # Normalize this author's host
-        author_host = self.host.replace('https://', '').replace('http://', '').rstrip('/')
-        if ':' in author_host:
-            author_host = author_host.split(':')[0]
-        
-        return any(author_host == h for h in local_hosts)
+        """Check if this author is from this node (not a remote author)."""
+        from .utils import is_local_author
+        return is_local_author(self.id)
 
     def get_followers_count(self):
         return self.followers.count()

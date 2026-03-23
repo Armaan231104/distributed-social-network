@@ -19,46 +19,12 @@ from .serializers import (
     AuthorSerializer, AuthorListSerializer, 
     FollowRequestSerializer
 )
+from .utils import get_host_url, is_local_author
+
 
 def build_local_author_id(user):
     host = get_host_url()
     return f"{host}/api/authors/{user.id}"
-
-def get_host_url():
-    """Get this node's base URL for constructing FQIDs."""
-    allowed_host = settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else 'localhost:8000'
-    # Always use http for local development, https for production
-    if 'localhost' in allowed_host or '127.0.0.1' in allowed_host:
-        return f'http://{allowed_host.rstrip("/")}'
-    return f'https://{allowed_host.rstrip("/")}'
-
-
-def is_local_author(author_id):
-    """
-    Check if an author ID belongs to this node (local) or a remote node.
-    
-    Compares the author ID against all known local hosts, not just the first one.
-    This handles localhost, 127.0.0.1, and production domains correctly.
-    """
-    from django.conf import settings
-    
-    # Get all allowed hosts and normalize them (remove protocol and port)
-    local_hosts = []
-    for host in settings.ALLOWED_HOSTS:
-        # Remove protocol
-        h = host.replace('https://', '').replace('http://', '').rstrip('/')
-        # Remove port if present
-        if ':' in h:
-            h = h.split(':')[0]
-        local_hosts.append(h)
-    
-    # Extract host from author_id
-    author_host = author_id.replace('https://', '').replace('http://', '').rstrip('/')
-    if ':' in author_host:
-        author_host = author_host.split(':')[0]
-    
-    # Check if author_host matches any local host
-    return any(author_host == h or author_host.startswith(h + '/') for h in local_hosts)
 
 
 def get_or_create_author(author_data):

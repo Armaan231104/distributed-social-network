@@ -1,9 +1,8 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
-from django.conf import settings
 from .models import Author
-from .views import get_host_url
+from .utils import get_host_url
 
 
 @receiver(post_save, sender=User)
@@ -14,7 +13,6 @@ def create_author(sender, instance, created, **kwargs):
     Staff/admin users are approved automatically.
     """
     if created:
-        # Use the centralized get_host_url function for consistency
         host_url = get_host_url() + '/api/'
 
         author_id = f'{host_url}authors/{instance.id}/'
