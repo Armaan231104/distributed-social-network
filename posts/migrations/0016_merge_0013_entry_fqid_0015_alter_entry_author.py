@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('posts', '0013_entry_fqid'),
+        ('posts', '0014_entry_fqid'), 
         ('posts', '0015_alter_entry_author'),
     ]
 
