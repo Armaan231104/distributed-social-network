@@ -18,8 +18,7 @@ from .serializers import (
     AuthorSerializer, AuthorListSerializer, 
     FollowRequestSerializer
 )
-from .utils import get_host_url
-
+from .utils import get_host_url, is_local_author
 
 def build_local_author_id(user):
     host = get_host_url()
@@ -31,6 +30,10 @@ def get_or_create_author(author_data):
     author_id = author_data.get('id')
     if not author_id:
         return None
+
+    # Enforce trailing slash for consistency
+    if not author_id.endswith('/'):
+        author_id += '/'
     
     existing = Author.objects.filter(id=author_id).first()
     if existing:
@@ -489,9 +492,14 @@ class InboxView(APIView):
         if data.get('type') == 'follow':
             actor_data = data.get('actor', {})
             object_data = data.get('object', {})
-            
+
             object_id = object_data.get('id', '')
-            if str(author_id) not in object_id and author.id not in object_id:
+
+            # normalize fqid
+            if not object_id.endswith('/'):
+                object_id += '/'
+
+            if object_id != author_id:
                 return Response({'error': 'Not the intended recipient'}, status=status.HTTP_400_BAD_REQUEST)
 
             actor = get_or_create_author(actor_data)
@@ -661,23 +669,20 @@ def author_profile(request, author_id):
 @login_required
 def follow_author(request, author_id):
     author_id = unquote(author_id)
-    print("DEBUG follow author_id:", author_id)
     
     try:
         current_author = request.user.author
     except Author.DoesNotExist:
         return redirect('authors-list')
     
-    try:
-        target_author = Author.objects.get(id=author_id)
-    except Author.DoesNotExist:
-        print("DEBUG target author not found")
-        return redirect('authors-list')
-    
-    print("DEBUG current_author:", current_author)
-    print("DEBUG target_author:", target_author)
-    print("DEBUG same author?", current_author == target_author)
-    print("DEBUG already following?", current_author.is_following(target_author))
+    # Check if they are local or remote, and create if remote
+    if is_local_author(author_id):
+        try:
+            target_author = get_author_by_id(author_id)
+        except Author.DoesNotExist:
+            return redirect('authors-list')
+    else:
+        target_author, _ = get_or_create_remote_author(author_id)
     
     if current_author == target_author:
         return redirect('author-profile', author_id=author_id)
@@ -686,7 +691,6 @@ def follow_author(request, author_id):
         return redirect('author-profile', author_id=author_id)
     
     request_result, state = create_follow_request(current_author, target_author)
-    print("DEBUG create_follow_request state:", state)
     
     if state in ('pending', 'accepted'):
         return redirect('author-profile', author_id=author_id)

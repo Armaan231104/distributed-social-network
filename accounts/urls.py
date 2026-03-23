@@ -1,30 +1,51 @@
-from django.urls import path, re_path
+from django.urls import path
 from . import views
+import posts.views
 
 apiurlpatterns = [
-    # API endpoints
-    path('authors/', views.AuthorListView.as_view(), name='author-list'),
-    path('authors/<str:author_id>/', views.AuthorDetailView.as_view(), name='author-detail'),
-    path('authors/<str:author_id>/following/', views.FollowingListView.as_view(), name='author-following'),
-    path('authors/<str:author_id>/following/<path:foreign_id>/', views.FollowView.as_view(), name='author-follow'),
-    path('authors/<str:author_id>/followers/', views.FollowersListView.as_view(), name='author-followers'),
-    path('authors/<str:author_id>/followers/<path:foreign_id>/', views.AcceptFollowView.as_view(), name='author-followers-manage'),
-    path('authors/<str:author_id>/follow_requests/', views.FollowRequestListView.as_view(), name='author-follow-requests'),
-    path('authors/<str:author_id>/inbox/', views.InboxView.as_view(), name='author-inbox'),
+    # API endpoints (Prefixed with api/ and using <path:> for FQIDs)
+    path('api/authors/', views.AuthorListView.as_view(), name='author-list'),
+    path('api/authors/<path:author_id>/', views.AuthorDetailView.as_view(), name='author-detail'),
+    path('api/authors/<path:author_id>/following/', views.FollowingListView.as_view(), name='author-following'),
+    path('api/authors/<path:author_id>/following/<path:foreign_id>/', views.FollowView.as_view(), name='author-follow'),
+    path('api/authors/<path:author_id>/followers/', views.FollowersListView.as_view(), name='author-followers'),
+    path('api/authors/<path:author_id>/followers/<path:foreign_id>/', views.AcceptFollowView.as_view(), name='author-followers-manage'),
+    path('api/authors/<path:author_id>/friends/', views.FriendsListView.as_view(), name='author-friends-api'),
+    path('api/authors/<path:author_id>/follow_requests/', views.FollowRequestListView.as_view(), name='author-follow-requests'),
+    path('api/authors/<path:author_id>/inbox/', views.InboxView.as_view(), name='author-inbox'),
 ]
 
 uiurlpatterns = [
-    # UI endpoints
-    path('authors/all/', views.authors_list, name='authors-list'),
+    # UI endpoints (No api/ prefix)
+    path('authors/all/', views.authors_list, name='authors-list-ui'),
     path('authors/<path:author_id>/profile/', views.author_profile, name='author-profile'),
+    path('authors/<path:author_id>/followers_ui/', views.author_followers, name='author-followers-ui'),
+    path('authors/<path:author_id>/following_ui/', views.author_following, name='author-following-ui'),
+    path('authors/<path:author_id>/friends_ui/', views.author_friends, name='author-friends-ui'),
+    
     path('follow/<path:author_id>/', views.follow_author, name='follow-author'),
     path('unfollow/<path:author_id>/', views.unfollow_author, name='unfollow-author'),
-    path('follow-requests/', views.follow_requests, name='follow-requests'),
+    path('cancel-request/<path:author_id>/', views.cancel_follow_request, name='cancel-follow-request'),
+    
+    path('follow-requests/', views.follow_requests, name='follow-requests-ui'),
     path('follow-requests/<int:request_id>/accept/', views.accept_follow_request, name='accept-follow-request'),
     path('follow-requests/<int:request_id>/reject/', views.reject_follow_request, name='reject-follow-request'),
+    
     path('me/', views.my_profile, name='my-profile'),
     path('me/edit/', views.edit_profile, name='edit-my-profile'),
-    path('authors/<path:author_id>/edit/', views.edit_profile, name='edit-profile')
+    path('authors/<path:author_id>/edit/', views.edit_profile, name='edit-profile'),
+    
+    path('login/', views.login_view, name='login'),    
+    path('logout/', views.logout_view, name='logout'),    
+    path('signup/', views.signup_view, name='signup'),
+    
+    path('pending-approval/', views.pending_approval, name='pending-approval'),
+    path('node-admin/pending-authors/', views.pending_authors_admin, name='pending-authors-admin'),
+    path('node-admin/pending-authors/<path:author_id>/approve/', views.approve_author, name='approve-author'),
+    path('node-admin/pending-authors/<path:author_id>/reject/', views.reject_author, name='reject-author'),
+    
+    path('', posts.views.stream, name='home'),
 ]
 
+# Combine them for Django to read
 urlpatterns = apiurlpatterns + uiurlpatterns
