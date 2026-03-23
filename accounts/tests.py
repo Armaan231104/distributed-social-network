@@ -165,7 +165,9 @@ class FollowingAPITest(TestCase):
     
     def test_list_following_empty(self):
         """Verifies following list returns empty array when not following anyone."""
-        response = self.client.get(f'/api/authors/{self.user1.id}/following/')
+        self.client.login(username='author1', password='testpass123')
+        author_fqid = self.author1.id.rstrip('/')
+        response = self.client.get(f'/api/authors/{author_fqid}/following/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data['type'], 'following')
@@ -173,7 +175,9 @@ class FollowingAPITest(TestCase):
     def test_list_following_with_follows(self):
         """Verifies following list returns correct authors when following."""
         Follow.objects.create(follower=self.author1, followee=self.author2)
-        response = self.client.get(f'/api/authors/{self.user1.id}/following/')
+        self.client.login(username='author1', password='testpass123')
+        author_fqid = self.author1.id.rstrip('/')
+        response = self.client.get(f'/api/authors/{author_fqid}/following/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(len(data['following']), 1)
@@ -192,7 +196,9 @@ class FollowersAPITest(TestCase):
     
     def test_list_followers_empty(self):
         """Verifies followers list returns empty array when no followers."""
-        response = self.client.get(f'/api/authors/{self.user1.id}/followers/')
+        self.client.login(username='author1', password='testpass123')
+        author_fqid = self.author1.id.rstrip('/')
+        response = self.client.get(f'/api/authors/{author_fqid}/followers/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data['type'], 'followers')
@@ -200,7 +206,9 @@ class FollowersAPITest(TestCase):
     def test_list_followers_with_followers(self):
         """Verifies followers list returns correct authors when followers exist."""
         Follow.objects.create(follower=self.author2, followee=self.author1)
-        response = self.client.get(f'/api/authors/{self.user1.id}/followers/')
+        self.client.login(username='author1', password='testpass123')
+        author_fqid = self.author1.id.rstrip('/')
+        response = self.client.get(f'/api/authors/{author_fqid}/followers/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(len(data['followers']), 1)
@@ -219,7 +227,9 @@ class FriendsAPITest(TestCase):
     
     def test_list_friends_empty(self):
         """Verifies friends list returns empty array when no friends."""
-        response = self.client.get(f'/api/authors/{self.user1.id}/friends/')
+        self.client.login(username='author1', password='testpass123')
+        author_fqid = self.author1.id.rstrip('/')
+        response = self.client.get(f'/api/authors/{author_fqid}/friends/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data['type'], 'friends')
@@ -229,7 +239,9 @@ class FriendsAPITest(TestCase):
         """Verifies friends list returns correct authors when mutual follows exist."""
         Follow.objects.create(follower=self.author1, followee=self.author2)
         Follow.objects.create(follower=self.author2, followee=self.author1)
-        response = self.client.get(f'/api/authors/{self.user1.id}/friends/')
+        self.client.login(username='author1', password='testpass123')
+        author_fqid = self.author1.id.rstrip('/')
+        response = self.client.get(f'/api/authors/{author_fqid}/friends/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(len(data['friends']), 1)
@@ -237,7 +249,9 @@ class FriendsAPITest(TestCase):
     def test_list_friends_not_mutual(self):
         """Verifies one-way follow does not create friend."""
         Follow.objects.create(follower=self.author1, followee=self.author2)
-        response = self.client.get(f'/api/authors/{self.user1.id}/friends/')
+        self.client.login(username='author1', password='testpass123')
+        author_fqid = self.author1.id.rstrip('/')
+        response = self.client.get(f'/api/authors/{author_fqid}/friends/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(len(data['friends']), 0)
@@ -251,8 +265,11 @@ class FriendsAPITest(TestCase):
             Follow.objects.create(follower=self.author1, followee=author)
             Follow.objects.create(follower=author, followee=self.author1)
         
+        self.client.login(username='author1', password='testpass123')
+        author_fqid = self.author1.id.rstrip('/')
+        
         # Page 1, size 2
-        response = self.client.get(f'/api/authors/{self.user1.id}/friends/?page=1&size=2')
+        response = self.client.get(f'/api/authors/{author_fqid}/friends/?page=1&size=2')
         data = response.json()
         self.assertEqual(data['count'], 5)
         self.assertEqual(len(data['friends']), 2)
@@ -260,7 +277,7 @@ class FriendsAPITest(TestCase):
         self.assertEqual(data['size'], 2)
         
         # Page 3, size 2
-        response = self.client.get(f'/api/authors/{self.user1.id}/friends/?page=3&size=2')
+        response = self.client.get(f'/api/authors/{author_fqid}/friends/?page=3&size=2')
         data = response.json()
         self.assertEqual(len(data['friends']), 1)
 
@@ -520,7 +537,7 @@ class InboxFollowRequestTest(TestCase):
         credentials = base64.b64encode(b'remote_user:remote_pass').decode()
         
         response = self.client.post(
-            f'/api/authors/{self.user1.id}/inbox/',
+            f'/api/authors/{self.author1.id.rstrip("/")}/inbox/',
             data=json.dumps(follow_data),
             content_type='application/json',
             HTTP_AUTHORIZATION=f'Basic {credentials}'

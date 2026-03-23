@@ -244,8 +244,10 @@ class FollowingListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, author_id):
+        if not author_id.endswith('/'):
+            author_id += '/'
         try:
-            author = Author.objects.get(user_id=author_id)
+            author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
         
@@ -276,8 +278,10 @@ class FollowersListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, author_id):
+        if not author_id.endswith('/'):
+            author_id += '/'
         try:
-            author = Author.objects.get(user_id=author_id)
+            author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
         
@@ -309,8 +313,10 @@ class FriendsListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, author_id):
+        if not author_id.endswith('/'):
+            author_id += '/'
         try:
-            author = Author.objects.get(user_id=author_id)
+            author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
         
@@ -482,8 +488,10 @@ class InboxView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, author_id):
+        if not author_id.endswith('/'):
+            author_id += '/'
         try:
-            author = Author.objects.get(user_id=author_id)
+            author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -495,11 +503,8 @@ class InboxView(APIView):
 
             object_id = object_data.get('id', '')
 
-            # normalize fqid
-            if not object_id.endswith('/'):
-                object_id += '/'
-
-            if object_id != author_id:
+            # Compare the exact FQIDs directly
+            if object_id != author.id:
                 return Response({'error': 'Not the intended recipient'}, status=status.HTTP_400_BAD_REQUEST)
 
             actor = get_or_create_author(actor_data)
@@ -719,7 +724,6 @@ def unfollow_author(request, author_id):
     
     return redirect('author-profile', author_id=author_id)
 
-@approved_author_required
 @login_required
 def cancel_follow_request(request, author_id):
     """Cancel a pending follow request (withdraw request)."""
@@ -733,9 +737,11 @@ def cancel_follow_request(request, author_id):
     try:
         target_author = Author.objects.get(id=author_id)
     except Author.DoesNotExist:
-        return redirect('authors-list')
+        try:
+            target_author = Author.objects.get(id__endswith=f'{author_id}/')
+        except Author.DoesNotExist:
+            return redirect('authors-list')
     
-    # Only delete the FollowRequest, not the Follow (if exists)
     FollowRequest.objects.filter(
         actor=current_author,
         object=target_author,
