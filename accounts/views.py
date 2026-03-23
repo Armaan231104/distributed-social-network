@@ -575,6 +575,39 @@ class InboxView(APIView):
             # If inbox router catches it, we accept it generically.
             return Response({'status': 'comment received'}, status=status.HTTP_201_CREATED)
 
+        elif data.get("type") == "entry":
+            author_data = data.get("author", {})
+            author = get_or_create_author(author_data)
+
+            if not author:
+                return Response({'error': 'Invalid author'}, status=400)
+
+            content_type = data.get("contentType")
+            content = data.get("content", "")
+
+            image_file = None
+
+            # 🧠 HANDLE IMAGE
+            if content_type and "base64" in content_type:
+                import base64
+                from django.core.files.base import ContentFile
+
+                image_file = ContentFile(
+                    base64.b64decode(content),
+                    name="remote_image.png"
+                )
+
+            entry = Entry.objects.create(
+                author=author.user if author.user else None,
+                title=data.get("title", ""),
+                content="" if image_file else content,
+                content_type=content_type,
+                visibility=data.get("visibility", "PUBLIC"),
+                image=image_file
+            )
+
+            return Response({'status': 'entry received'}, status=201)
+
         return Response({'error': 'Unknown inbox item type'}, status=status.HTTP_400_BAD_REQUEST)
 
 

@@ -7,6 +7,7 @@ urlpatterns = [
     path("api/entries/mine/", views.my_entries),
     path("api/entries/<uuid:entry_id>/", views.entry_detail_api),
     path("api/entries/stream/", views.stream_api, name="stream_api"),
+    path("api/authors/<path:author_id>/entries/<uuid:entry_id>/image/", views.entry_image),
 
     path('stream/', views.stream, name='stream'),
     path('entry/<uuid:entry_id>/', views.entry_detail, name='entry_detail'),
