@@ -31,7 +31,7 @@ uiurlpatterns = [
     
     path('me/', views.my_profile, name='my-profile'),
     path('me/edit/', views.edit_profile, name='edit-my-profile'),
-    path('authors/<path:author_id>/edit/', views.edit_profile, name='edit-profile'),
+    path('authors/<path:author_id>/edit/', views.edit_profile, name='edit-profile'), #This is important. DO NOT REMOVE
     
     path('login/', views.login_view, name='login'),    
     path('logout/', views.logout_view, name='logout'),    
