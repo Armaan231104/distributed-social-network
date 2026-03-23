@@ -1,6 +1,5 @@
 import requests
 from urllib.parse import unquote
-from django.conf import settings
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -19,7 +18,7 @@ from .serializers import (
     AuthorSerializer, AuthorListSerializer, 
     FollowRequestSerializer
 )
-from .utils import get_host_url, is_local_author
+from .utils import get_host_url
 
 
 def build_local_author_id(user):
@@ -59,16 +58,17 @@ def get_current_author(request):
 
 def get_author_by_id(author_id):
     """
-    Look up author by user_id (local) or FQID (remote).
-    
-    Local authors use serial user_id.
-    Remote authors authors use FQID URL.
-    NOTE: if it starts with 'http', it's a remote FQID.
+    Look up author by FQID. 
+    If a local integer/UUID slips through from the UI, format it into a proper FQID first.
     """
-    is_remote = str(author_id).startswith('http')
-    if is_remote:
-        return Author.objects.get(id=str(author_id))
-    return Author.objects.get(user_id=author_id)
+    author_id_str = str(author_id)
+    
+    # If it's a raw local ID, build the FQID
+    if not author_id_str.startswith('http'):
+        host_url = get_host_url()
+        author_id_str = f"{host_url}/api/authors/{author_id_str}/"
+    
+    return Author.objects.get(id=author_id_str)
 
 
 def get_or_create_remote_author(foreign_id):
@@ -88,18 +88,19 @@ def get_or_create_remote_author(foreign_id):
 
 def send_follow_to_remote(actor, target):
     """
-    Send a follow request to a remote author's inbox on their node when following a remote author.
-    Uses stored node credentials for HTTP Basic Auth if available.
+    Send a follow request to a remote author's inbox on their node.
+    Fails loudly if node credentials are missing instead of sending a 401 Unauthorized request.
     """
     from nodes.models import RemoteNode
     
-    # Use the robust is_local_author check instead of simple startswith
-    if is_local_author(target.id):
+    # Use the property you already have in your model
+    if target.is_local:
         return
     
     try:
-        remote_id = target.id.split('/')[-1]
+        remote_id = target.id.rstrip('/').split('/')[-1]
         inbox_url = f"{target.host.rstrip('/')}/api/authors/{remote_id}/inbox/"
+        
         follow_data = {
             'type': 'follow',
             'summary': f'{actor.displayName} wants to follow {target.displayName}',
@@ -115,12 +116,19 @@ def send_follow_to_remote(actor, target):
         
         if node:
             # Use stored node credentials
-            requests.post(inbox_url, json=follow_data, timeout=10, auth=(node.username, node.password))
+            response = requests.post(
+                inbox_url, 
+                json=follow_data, 
+                timeout=10, 
+                auth=(node.username, node.password)
+            )
+            response.raise_for_status()  # Optional: logs an error if the remote node rejects it
         else:
-            # No stored credentials - try without auth (may fail if remote requires it)
-            requests.post(inbox_url, json=follow_data, timeout=10)
-    except Exception:
-        pass
+            # log failed follow request instead of retrying since we don't have credentials and auth is required
+            print(f"Error: Cannot send follow request. No active credentials configured for {target.host}")
+            
+    except Exception as e:
+        print(f"Failed to send follow request to remote node: {e}")
 
 
 def create_follow_request(actor, target):

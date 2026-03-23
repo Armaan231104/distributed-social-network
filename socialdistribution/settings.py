@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
-from pathlib import Path
 from dotenv import load_dotenv
 import dj_database_url
 
@@ -33,6 +32,8 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") + [
 
 CSRF_TRUSTED_ORIGINS = ['https://cmput404-crimson-swcarson-55711a031595.herokuapp.com']
 
+# Default to localhost for development, override in production
+NODE_BASE_URL = os.environ.get('NODE_BASE_URL', 'http://127.0.0.1:8000')
 NODE_USERNAME = os.getenv("NODE_USERNAME", "admin")
 NODE_PASSWORD = os.getenv("NODE_PASSWORD", "node_password_change_me")
 

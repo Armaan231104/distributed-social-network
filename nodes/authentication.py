@@ -74,11 +74,13 @@ def authenticate_remote_node(auth_header):
     try:
         encoded_credentials = auth_header[6:]
         decoded = base64.b64decode(encoded_credentials).decode('utf-8')
+        # Split only on first colon - password may contain colons
         username, password = decoded.split(':', 1)
     except Exception:
         return None
-
+    
     # First, check against stored remote nodes
+    # Must match both username AND a node that we know about
     node = RemoteNode.objects.filter(
         username=username,
         is_active=True
@@ -88,7 +90,7 @@ def authenticate_remote_node(auth_header):
         user = RemoteNodeUser(node.id, node.url, node.username)
         return (user, {'type': 'remote_node', 'node': node})
 
-    # Second, check against this node's own credentials
+    # Second, check against this node's own credentials (from settings)
     local_username, local_password = get_node_credentials()
     if username == local_username and password == local_password:
         user = LocalNodeUser()
