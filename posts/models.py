@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 import uuid
 from datetime import timedelta
+from accounts.models import Author
 
 # The following class edited by Open AI, Chat GPT 5.2, "please adjust this class to properly handle image, plaintext, and commonmark input", 2026-02-26 
 class Entry(models.Model):
@@ -32,12 +33,16 @@ class Entry(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    fqid = models.URLField(max_length=500, null=True, blank=True, unique=True)
     github_event_id = models.CharField(
         max_length=255,
         null=True,
         blank=True
     )
-    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
+    # local user, null if remote entry
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts', null=True, blank=True)
+    # remote author
+    remote_author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name='remote_posts', null=True, blank=True)
     title = models.CharField(max_length=200)
     content = models.TextField(blank=True)
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default="PUBLIC", db_index=True)
@@ -78,6 +83,16 @@ class Entry(models.Model):
     @property
     def is_edited(self):
         return (self.updated_at - self.published_at) > timedelta(seconds=1)
+    
+    @property
+    def get_author(self):
+        """Returns the Author object regardless of whether local or remote."""
+        if self.remote_author:
+            return self.remote_author
+        try:
+            return self.author.author
+        except Exception:
+            return None
     
 class HostedImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
