@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 import uuid
 from datetime import timedelta
+from accounts.utils import get_host_url
 
 # The following class edited by Open AI, Chat GPT 5.2, "please adjust this class to properly handle image, plaintext, and commonmark input", 2026-02-26 
 class Entry(models.Model):
@@ -42,6 +43,7 @@ class Entry(models.Model):
     content = models.TextField(blank=True)
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default="PUBLIC", db_index=True)
     published_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    fqid = models.URLField(max_length=500, unique=True, null=True, blank=True)
 
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -74,6 +76,23 @@ class Entry(models.Model):
         """
         self.visibility = "DELETED"
         self.save()
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        if not self.fqid:
+            host = get_host_url()
+
+            if hasattr(self.author, "author"):
+                author_obj = self.author.author
+                author_id = author_obj.id
+            else:
+                return
+
+            author_id = author_obj.id.rstrip("/")  # remove trailing /
+
+            self.fqid = f"{author_id}/entries/{self.id}"
+            super().save(update_fields=["fqid"])
 
     @property
     def is_edited(self):
