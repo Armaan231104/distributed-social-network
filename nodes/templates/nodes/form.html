@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}{{ title }} - SocialDistribution{% endblock %}
+{% block title %}{{ title }}{% endblock %}
 
 {% block content %}
 <div class="edit-wrapper">
     <div class="edit-container login-container">
         <div class="edit-header">
-            <h1>{{ title }}</h1>
+            <h1><i class="fa-solid fa-server"></i> {{ title }}</h1>
             <p>Connect to a remote node by entering their URL and credentials.</p>
         </div>
 
@@ -27,34 +27,43 @@
             {% csrf_token %}
 
             <div class="form-group">
+                <label for="{{ form.url.id_for_label }}">Node URL</label>
                 {{ form.url }}
+                {% if form.url.help_text %}
+                    <small class="help-text">{{ form.url.help_text }}</small>
+                {% endif %}
             </div>
 
             <div class="form-group">
+                <label for="{{ form.username.id_for_label }}">Username</label>
                 {{ form.username }}
             </div>
 
             <div class="form-group">
+                <label for="{{ form.password.id_for_label }}">Password</label>
                 {{ form.password }}
+                {% if form.password.help_text %}
+                    <small class="help-text">{{ form.password.help_text }}</small>
+                {% endif %}
             </div>
 
             <div class="form-group checkbox-group">
-                <input type="checkbox" name="is_active" id="id_is_active" 
-                       {% if form.is_active.value %}checked{% endif %}>
-                <label for="id_is_active">Allow this node to connect</label>
+                {{ form.is_active }}
+                <label for="{{ form.is_active.id_for_label }}">Allow this node to connect</label>
             </div>
 
             <div class="form-actions">
-                <a href="{% url 'nodes-list' %}" class="btn btn-secondary">Cancel</a>
                 <button type="submit" class="btn btn-primary">
                     <i class="fa-solid fa-check"></i> {{ action }}
                 </button>
+                <a href="{% url 'nodes-list' %}" class="btn btn-secondary">Cancel</a>
             </div>
         </form>
     </div>
 </div>
 
 <style>
+/* Center the card vertically and horizontally */
 .edit-wrapper {
     display: flex;
     justify-content: center;
@@ -62,6 +71,7 @@
     padding: 20px;
 }
 
+/* Glass-style card */
 .login-container {
     width: 100%;
     max-width: 500px;
@@ -74,12 +84,14 @@
     text-align: center;
 }
 
+/* Header */
 .edit-header h1 {
     font-size: 28px;
     margin-bottom: 8px;
     font-weight: 600;
-    background: linear-gradient(90deg, #ff1a62, #ffa023);
+    background: linear-gradient(90deg,#ff1a62,#ffa023);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -89,95 +101,57 @@
     margin-bottom: 30px;
 }
 
+/* Form inputs */
 .edit-form .form-group {
     margin-bottom: 20px;
-    text-align: left;
 }
 
-.edit-form .form-input,
-.edit-form input {
-    width: 100%;
+/* Ensure checkbox is aligned properly */
+.edit-form .checkbox-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+.edit-form .checkbox-group input {
+    width: auto;
+    margin: 0;
+}
+
+.edit-form input, .edit-form select, .edit-form textarea {
+    width: 95%;
     max-width: 460px;
     padding: 16px 18px;
     border-radius: 16px;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0,0,0,0.08);
+    background: rgba(255,255,255,0.85);
     font-size: 15px;
     transition: 0.25s ease;
     display: block;
     margin: 0 auto;
-    box-sizing: border-box;
 }
 
-.edit-form .form-input:focus,
-.edit-form input:focus {
+.edit-form input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    display: inline-block;
+}
+
+.edit-form input:focus, .edit-form select:focus, .edit-form textarea:focus {
     border-color: #ff1a62;
     background: #fff;
-    box-shadow: 0 0 0 4px rgba(255, 26, 98, 0.12);
+    box-shadow: 0 0 0 4px rgba(255,26,98,0.12);
     outline: none;
 }
 
-.checkbox-group {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    justify-content: center;
-    margin: 25px 0;
-}
-
-.checkbox-group input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
-    cursor: pointer;
-    accent-color: #ff1a62;
-}
-
-.checkbox-group label {
-    font-size: 15px;
-    color: #555;
-    cursor: pointer;
-}
-
+/* Button aligned right */
 .form-actions {
     display: flex;
-    justify-content: center;
-    gap: 15px;
-    margin-top: 20px;
+    justify-content: flex-end;
+    gap: 10px;
 }
 
-.btn-primary {
-    padding: 14px 26px;
-    border-radius: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    text-decoration: none;
-    background: linear-gradient(45deg, #ff1a62, #ffa023);
-    color: white;
-    border: none;
-    transition: 0.25s ease;
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 18px 45px rgba(244, 23, 23, 0.35);
-}
-
-.btn-secondary {
-    padding: 14px 26px;
-    border-radius: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    text-decoration: none;
-    background: rgba(0, 0, 0, 0.06);
-    color: #333;
-    border: none;
-    transition: 0.25s ease;
-}
-
-.btn-secondary:hover {
-    background: rgba(0, 0, 0, 0.1);
-}
-
+/* Error message */
 .error-message {
     background: rgba(255, 26, 98, 0.1);
     color: #ff1a62;
@@ -185,18 +159,16 @@
     border-radius: 16px;
     margin-bottom: 20px;
     font-weight: 500;
-    text-align: left;
-}
-
-.error-message p {
-    margin: 4px 0;
+    text-align: center;
 }
 
 @media (max-width: 500px) {
     .login-container {
         padding: 30px;
     }
+    .edit-form input, .edit-form select, .edit-form textarea {
+        width: 95%;
+    }
 }
 </style>
-
 {% endblock %}
