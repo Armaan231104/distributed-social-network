@@ -1,184 +1,201 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}{{ title }}{% endblock %}
+{% block title %}{{ title }} - SocialDistribution{% endblock %}
 
 {% block content %}
-
-<div class="form-wrapper">
-    <h1>{{ title }}</h1>
-
-    <form method="POST" class="node-form">
-        {% csrf_token %}
-        
-        <div class="form-group">
-            <label for="id_url">Node URL</label>
-            <input type="url" name="url" id="id_url" class="form-input" 
-                   placeholder="https://other-node.herokuapp.com" required
-                   value="{{ form.url.value|default:'' }}">
-            {% if form.url.help_text %}
-            <small class="help-text">{{ form.url.help_text }}</small>
-            {% endif %}
-            {% if form.url.errors %}
-            <div class="form-error">{{ form.url.errors }}</div>
-            {% endif %}
+<div class="edit-wrapper">
+    <div class="edit-container login-container">
+        <div class="edit-header">
+            <h1>{{ title }}</h1>
+            <p>Connect to a remote node by entering their URL and credentials.</p>
         </div>
 
-        <div class="form-group">
-            <label for="id_username">Username</label>
-            <input type="text" name="username" id="id_username" class="form-input" 
-                   placeholder="Username" required
-                   value="{{ form.username.value|default:'' }}">
-            {% if form.username.help_text %}
-            <small class="help-text">{{ form.username.help_text }}</small>
-            {% endif %}
-            {% if form.username.errors %}
-            <div class="form-error">{{ form.username.errors }}</div>
-            {% endif %}
+        {% if form.errors %}
+        <div class="error-message">
+            {% for field in form %}
+                {% for error in field.errors %}
+                    <p>{{ error }}</p>
+                {% endfor %}
+            {% endfor %}
+            {% for error in form.non_field_errors %}
+                <p>{{ error }}</p>
+            {% endfor %}
         </div>
+        {% endif %}
 
-        <div class="form-group">
-            <label for="id_password">Password</label>
-            <input type="password" name="password" id="id_password" class="form-input" 
-                   placeholder="Password" required>
-            {% if form.password.help_text %}
-            <small class="help-text">{{ form.password.help_text }}</small>
-            {% endif %}
-            {% if form.password.errors %}
-            <div class="form-error">{{ form.password.errors }}</div>
-            {% endif %}
-        </div>
+        <form method="POST" class="edit-form">
+            {% csrf_token %}
 
-        <div class="form-group checkbox-group">
-            <input type="checkbox" name="is_active" id="id_is_active" 
-                   {% if form.is_active.value %}checked{% endif %}>
-            <label for="id_is_active">Active</label>
-            {% if form.is_active.help_text %}
-            <small class="help-text">{{ form.is_active.help_text }}</small>
-            {% endif %}
-        </div>
+            <div class="form-group">
+                {{ form.url }}
+            </div>
 
-        <div class="form-actions">
-            <a href="{% url 'nodes-list' %}" class="btn btn-secondary">Cancel</a>
-            <button type="submit" class="btn btn-primary">
-                <i class="fa-solid fa-check"></i> {{ action }}
-            </button>
-        </div>
-    </form>
+            <div class="form-group">
+                {{ form.username }}
+            </div>
+
+            <div class="form-group">
+                {{ form.password }}
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" name="is_active" id="id_is_active" 
+                       {% if form.is_active.value %}checked{% endif %}>
+                <label for="id_is_active">Allow this node to connect</label>
+            </div>
+
+            <div class="form-actions">
+                <a href="{% url 'nodes-list' %}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-check"></i> {{ action }}
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <style>
-.form-wrapper {
-    max-width: 600px;
-    margin: 0 auto;
-    padding: 30px;
+.edit-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
 }
 
-h1 {
-    margin-bottom: 30px;
+.login-container {
+    width: 100%;
+    max-width: 500px;
+    padding: 40px;
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 20px 50px rgba(244, 23, 23, 0.15);
+    border: 1px solid rgba(255, 26, 98, 0.15);
     text-align: center;
 }
 
-.node-form {
-    background: var(--card-bg, #fff);
-    padding: 30px;
-    border-radius: 14px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-group label {
-    display: block;
+.edit-header h1 {
+    font-size: 28px;
     margin-bottom: 8px;
     font-weight: 600;
-    color: #333;
+    background: linear-gradient(90deg, #ff1a62, #ffa023);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
-.form-input {
+.edit-header p {
+    font-size: 15px;
+    color: #555;
+    margin-bottom: 30px;
+}
+
+.edit-form .form-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.edit-form .form-input,
+.edit-form input {
     width: 100%;
-    padding: 12px 15px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    font-size: 1em;
-    transition: border-color 0.2s;
+    max-width: 460px;
+    padding: 16px 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 15px;
+    transition: 0.25s ease;
+    display: block;
+    margin: 0 auto;
     box-sizing: border-box;
 }
 
-.form-input:focus {
+.edit-form .form-input:focus,
+.edit-form input:focus {
+    border-color: #ff1a62;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(255, 26, 98, 0.12);
     outline: none;
-    border-color: #667eea;
 }
 
 .checkbox-group {
     display: flex;
     align-items: center;
-    gap: 10px;
-}
-
-.checkbox-group label {
-    margin-bottom: 0;
-    font-weight: normal;
+    gap: 12px;
+    justify-content: center;
+    margin: 25px 0;
 }
 
 .checkbox-group input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     cursor: pointer;
+    accent-color: #ff1a62;
 }
 
-.help-text {
-    display: block;
-    margin-top: 5px;
-    color: #666;
-    font-size: 0.85em;
-}
-
-.form-error {
-    color: #dc3545;
-    margin-top: 5px;
-    font-size: 0.9em;
+.checkbox-group label {
+    font-size: 15px;
+    color: #555;
+    cursor: pointer;
 }
 
 .form-actions {
     display: flex;
-    justify-content: flex-end;
+    justify-content: center;
     gap: 15px;
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 1px solid #eee;
-}
-
-.btn {
-    padding: 12px 24px;
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
-    font-size: 1em;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.2s;
+    margin-top: 20px;
 }
 
 .btn-primary {
-    background: #667eea;
+    padding: 14px 26px;
+    border-radius: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    background: linear-gradient(45deg, #ff1a62, #ffa023);
     color: white;
+    border: none;
+    transition: 0.25s ease;
 }
 
 .btn-primary:hover {
-    background: #5568d3;
+    transform: translateY(-2px);
+    box-shadow: 0 18px 45px rgba(244, 23, 23, 0.35);
 }
 
 .btn-secondary {
-    background: #e2e6ea;
+    padding: 14px 26px;
+    border-radius: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    background: rgba(0, 0, 0, 0.06);
     color: #333;
+    border: none;
+    transition: 0.25s ease;
 }
 
 .btn-secondary:hover {
-    background: #dbe0e5;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.error-message {
+    background: rgba(255, 26, 98, 0.1);
+    color: #ff1a62;
+    padding: 14px 16px;
+    border-radius: 16px;
+    margin-bottom: 20px;
+    font-weight: 500;
+    text-align: left;
+}
+
+.error-message p {
+    margin: 4px 0;
+}
+
+@media (max-width: 500px) {
+    .login-container {
+        padding: 30px;
+    }
 }
 </style>
 

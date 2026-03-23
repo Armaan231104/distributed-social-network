@@ -14,7 +14,7 @@ class RemoteNodeForm(forms.ModelForm):
             'placeholder': 'Password',
             'class': 'form-input'
         }),
-        help_text="Username and password from the remote node's README",
+        help_text="Password for HTTP Basic Authentication to the remote node",
         label="Password"
     )
 
@@ -23,7 +23,7 @@ class RemoteNodeForm(forms.ModelForm):
         fields = ['url', 'username', 'password', 'is_active']
         widgets = {
             'url': forms.URLInput(attrs={
-                'placeholder': 'https://other-node.herokuapp.com',
+                'placeholder': 'https://node.herokuapp.com',
                 'class': 'form-input'
             }),
             'username': forms.TextInput(attrs={

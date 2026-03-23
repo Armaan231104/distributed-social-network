@@ -4,7 +4,7 @@
 
 {% block content %}
 
-<div class="nodes-wrapper">
+<div class="authors-wrapper">
     <h1>
         Connected Nodes
         <br><br>
@@ -21,14 +21,17 @@
 
     {% if nodes %}
         {% for node in nodes %}
-        <div class="node-card">
-            <div class="node-main">
-                <div class="node-icon">
-                    <i class="fa-solid fa-network-wired"></i>
+        <div class="profile-hero author-card">
+            <div class="profile-main" style="flex: 1;">
+                <div class="profile-avatar-wrapper">
+                    <div class="profile-avatar-placeholder" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <i class="fa-solid fa-network-wired" style="font-size: 24px;"></i>
+                    </div>
                 </div>
-                <div class="node-info">
-                    <h2 class="node-url">{{ node.url }}</h2>
-                    <p class="node-username">
+
+                <div class="profile-info">
+                    <h2 class="author-name">{{ node.url }}</h2>
+                    <p class="profile-links">
                         <i class="fa-regular fa-user"></i>
                         {{ node.username }}
                     </p>
@@ -41,24 +44,27 @@
                     </div>
                 </div>
             </div>
-            <div class="node-actions">
-                <a href="{% url 'edit-node' node.id %}" class="btn btn-secondary">
-                    <i class="fa-solid fa-pen"></i> Edit
-                </a>
-                <form method="POST" action="{% url 'toggle-node' node.id %}" style="display: inline;">
-                    {% csrf_token %}
-                    <button type="submit" class="btn {% if node.is_active %}btn-warning{% else %}btn-success{% endif %}">
-                        <i class="fa-solid fa-power-off"></i>
-                        {% if node.is_active %}Disable{% else %}Enable{% endif %}
-                    </button>
-                </form>
-                <form method="POST" action="{% url 'delete-node' node.id %}" style="display: inline;" 
-                      onsubmit="return confirm('Remove Node\n\nAre you sure you want to stop sharing with {{ node.url }}? This cannot be undone.');">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-danger">
-                        <i class="fa-regular fa-trash-can"></i> Remove
-                    </button>
-                </form>
+
+            <div class="profile-description-side">
+                <div class="node-actions">
+                    <a href="{% url 'edit-node' node.id %}" class="btn btn-secondary">
+                        <i class="fa-solid fa-pen"></i> Edit
+                    </a>
+                    <form method="POST" action="{% url 'toggle-node' node.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn {% if node.is_active %}btn-warning{% else %}btn-success{% endif %}">
+                            <i class="fa-solid fa-power-off"></i>
+                            {% if node.is_active %}Disable{% else %}Enable{% endif %}
+                        </button>
+                    </form>
+                    <form method="POST" action="{% url 'delete-node' node.id %}" style="display: inline;" 
+                          onsubmit="return confirm('Remove Node\n\nAre you sure you want to stop sharing with {{ node.url }}? This cannot be undone.');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fa-regular fa-trash-can"></i> Remove
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
         <br><br>
@@ -72,59 +78,9 @@
     {% endif %}
 </div>
 
-<link rel="stylesheet" href="{% static 'css/nodes.css' %}">
 <style>
-.nodes-wrapper {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
 .add-node-wrapper {
     margin-bottom: 30px;
-}
-
-.node-card {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: var(--card-bg, #fff);
-    border-radius: 14px;
-    padding: 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    flex-wrap: wrap;
-    gap: 15px;
-}
-
-.node-main {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    flex: 1;
-    min-width: 250px;
-}
-
-.node-icon {
-    width: 60px;
-    height: 60px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 24px;
-}
-
-.node-info h2 {
-    margin: 0 0 8px 0;
-    font-size: 1.3em;
-    word-break: break-all;
-}
-
-.node-username {
-    margin: 0 0 8px 0;
-    color: #666;
 }
 
 .node-status {
@@ -135,16 +91,17 @@
     border-radius: 20px;
     font-size: 0.85em;
     font-weight: 600;
+    margin-top: 8px;
 }
 
 .node-status.active {
-    background: #d4edda;
-    color: #155724;
+    background: rgba(40, 167, 69, 0.15);
+    color: #28a745;
 }
 
 .node-status.inactive {
-    background: #f8d7da;
-    color: #721c24;
+    background: rgba(220, 53, 69, 0.15);
+    color: #dc3545;
 }
 
 .node-actions {
@@ -155,93 +112,22 @@
 
 .empty-state {
     text-align: center;
-    padding: 60px 20px;
+    padding: 80px 20px;
     color: #666;
 }
 
 .empty-state i {
-    font-size: 48px;
+    font-size: 64px;
     margin-bottom: 20px;
-    opacity: 0.5;
+    opacity: 0.3;
+    background: linear-gradient(90deg, #ff1a62, #ffa023);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
-.btn {
-    padding: 8px 16px;
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
-    font-size: 0.9em;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    transition: all 0.2s;
-}
-
-.btn-primary {
-    background: #667eea;
-    color: white;
-}
-
-.btn-primary:hover {
-    background: #5568d3;
-}
-
-.btn-secondary {
-    background: #e2e6ea;
-    color: #333;
-}
-
-.btn-secondary:hover {
-    background: #dbe0e5;
-}
-
-.btn-success {
-    background: #28a745;
-    color: white;
-}
-
-.btn-success:hover {
-    background: #218838;
-}
-
-.btn-warning {
-    background: #ffc107;
-    color: #333;
-}
-
-.btn-warning:hover {
-    background: #e0a800;
-}
-
-.btn-danger {
-    background: #dc3545;
-    color: white;
-}
-
-.btn-danger:hover {
-    background: #c82333;
-}
-
-h1 {
-    margin-bottom: 20px;
-}
-
-h1 .btn {
-    font-size: 0.6em;
-    padding: 6px 12px;
-}
-
-@media (max-width: 600px) {
-    .node-card {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    
-    .node-actions {
-        width: 100%;
-        justify-content: flex-start;
-    }
+.empty-state p {
+    margin: 8px 0;
+    font-size: 16px;
 }
 </style>
 
