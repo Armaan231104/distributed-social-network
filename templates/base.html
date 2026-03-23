@@ -53,6 +53,11 @@
                     <span>Deleted</span>
                 </a>
 
+                <a href="{% url 'nodes-list' %}" id="nodes">
+                    <i class="fa-solid fa-network-wired"></i>
+                    <span>Nodes</span>
+                </a>
+
                 {% endif %}
 
                 <form method="POST" action="{% url 'logout' %}" style="display: contents;" id="logout">

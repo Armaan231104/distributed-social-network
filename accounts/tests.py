@@ -129,6 +129,8 @@ class AuthorAPITest(TestCase):
         self.client = Client()
         self.user1 = User.objects.create_user(username='author1', password='testpass123')
         self.author1 = self.user1.author
+        # Login for local access
+        self.client.login(username='author1', password='testpass123')
     
     def test_list_authors(self):
         """Verifies GET /api/authors/ returns authors list with correct type."""
@@ -484,9 +486,19 @@ class InboxFollowRequestTest(TestCase):
         self.client = Client()
         self.user1 = User.objects.create_user(username='author1', password='testpass123')
         self.author1 = self.user1.author
+        
+        # Create a remote node for authentication
+        from nodes.models import RemoteNode
+        self.remote_node = RemoteNode.objects.create(
+            url='http://remote-node.com',
+            username='remote_user',
+            password='remote_pass',
+            is_active=True
+        )
     
     def test_receive_remote_follow_request(self):
         """Verifies remote follow requests are created via inbox endpoint."""
+        import base64
         follow_data = {
             'type': 'follow',
             'summary': 'Remote Author wants to follow Author One',
@@ -504,10 +516,14 @@ class InboxFollowRequestTest(TestCase):
             }
         }
         
+        # Authenticate with the remote node credentials
+        credentials = base64.b64encode(b'remote_user:remote_pass').decode()
+        
         response = self.client.post(
             f'/api/authors/{self.user1.id}/inbox/',
             data=json.dumps(follow_data),
-            content_type='application/json'
+            content_type='application/json',
+            HTTP_AUTHORIZATION=f'Basic {credentials}'
         )
         self.assertEqual(response.status_code, 201)
         self.assertTrue(

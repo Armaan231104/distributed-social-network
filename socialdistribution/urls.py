@@ -28,7 +28,8 @@ urlpatterns = [
     path("", include("accounts.ui_urls")),
     path("interactions/", include("interactions.urls")),
     # path("", include("core.urls")),
-    path("posts/", include("posts.urls"))
+    path("posts/", include("posts.urls")),
+    path("nodes/", include("nodes.urls")),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

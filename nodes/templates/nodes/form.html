@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+
+<div class="form-wrapper">
+    <h1>{{ title }}</h1>
+
+    <form method="POST" class="node-form">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label for="id_url">Node URL</label>
+            <input type="url" name="url" id="id_url" class="form-input" 
+                   placeholder="https://other-node.herokuapp.com" required
+                   value="{{ form.url.value|default:'' }}">
+            {% if form.url.help_text %}
+            <small class="help-text">{{ form.url.help_text }}</small>
+            {% endif %}
+            {% if form.url.errors %}
+            <div class="form-error">{{ form.url.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="id_username">Username</label>
+            <input type="text" name="username" id="id_username" class="form-input" 
+                   placeholder="Username" required
+                   value="{{ form.username.value|default:'' }}">
+            {% if form.username.help_text %}
+            <small class="help-text">{{ form.username.help_text }}</small>
+            {% endif %}
+            {% if form.username.errors %}
+            <div class="form-error">{{ form.username.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="id_password">Password</label>
+            <input type="password" name="password" id="id_password" class="form-input" 
+                   placeholder="Password" required>
+            {% if form.password.help_text %}
+            <small class="help-text">{{ form.password.help_text }}</small>
+            {% endif %}
+            {% if form.password.errors %}
+            <div class="form-error">{{ form.password.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group checkbox-group">
+            <input type="checkbox" name="is_active" id="id_is_active" 
+                   {% if form.is_active.value %}checked{% endif %}>
+            <label for="id_is_active">Active</label>
+            {% if form.is_active.help_text %}
+            <small class="help-text">{{ form.is_active.help_text }}</small>
+            {% endif %}
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'nodes-list' %}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fa-solid fa-check"></i> {{ action }}
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+.form-wrapper {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 30px;
+}
+
+h1 {
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.node-form {
+    background: var(--card-bg, #fff);
+    padding: 30px;
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+}
+
+.form-input {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1em;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.checkbox-group label {
+    margin-bottom: 0;
+    font-weight: normal;
+}
+
+.checkbox-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.help-text {
+    display: block;
+    margin-top: 5px;
+    color: #666;
+    font-size: 0.85em;
+}
+
+.form-error {
+    color: #dc3545;
+    margin-top: 5px;
+    font-size: 0.9em;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+.btn {
+    padding: 12px 24px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 1em;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #5568d3;
+}
+
+.btn-secondary {
+    background: #e2e6ea;
+    color: #333;
+}
+
+.btn-secondary:hover {
+    background: #dbe0e5;
+}
+</style>
+
+{% endblock %}

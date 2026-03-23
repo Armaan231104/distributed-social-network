@@ -1,0 +1,248 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Connected Nodes{% endblock %}
+
+{% block content %}
+
+<div class="nodes-wrapper">
+    <h1>
+        Connected Nodes
+        <br><br>
+        <a href="{% url 'home' %}" onclick="event.preventDefault(); history.back();" class="btn btn-secondary">
+            <i class="fa-solid fa-hand-point-left"></i> Back
+        </a>
+    </h1>
+
+    <div class="add-node-wrapper">
+        <a href="{% url 'add-node' %}" class="btn btn-primary">
+            <i class="fa-solid fa-plus"></i> Add Node
+        </a>
+    </div>
+
+    {% if nodes %}
+        {% for node in nodes %}
+        <div class="node-card">
+            <div class="node-main">
+                <div class="node-icon">
+                    <i class="fa-solid fa-network-wired"></i>
+                </div>
+                <div class="node-info">
+                    <h2 class="node-url">{{ node.url }}</h2>
+                    <p class="node-username">
+                        <i class="fa-regular fa-user"></i>
+                        {{ node.username }}
+                    </p>
+                    <div class="node-status {% if node.is_active %}active{% else %}inactive{% endif %}">
+                        {% if node.is_active %}
+                            <i class="fa-solid fa-circle-check"></i> Active
+                        {% else %}
+                            <i class="fa-solid fa-circle-xmark"></i> Disabled
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="node-actions">
+                <a href="{% url 'edit-node' node.id %}" class="btn btn-secondary">
+                    <i class="fa-solid fa-pen"></i> Edit
+                </a>
+                <form method="POST" action="{% url 'toggle-node' node.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn {% if node.is_active %}btn-warning{% else %}btn-success{% endif %}">
+                        <i class="fa-solid fa-power-off"></i>
+                        {% if node.is_active %}Disable{% else %}Enable{% endif %}
+                    </button>
+                </form>
+                <form method="POST" action="{% url 'delete-node' node.id %}" style="display: inline;" 
+                      onsubmit="return confirm('Remove Node\n\nAre you sure you want to stop sharing with {{ node.url }}? This cannot be undone.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fa-regular fa-trash-can"></i> Remove
+                    </button>
+                </form>
+            </div>
+        </div>
+        <br><br>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <i class="fa-solid fa-network-wired"></i>
+            <p>No connected nodes yet.</p>
+            <p>Add a node to start sharing with other servers.</p>
+        </div>
+    {% endif %}
+</div>
+
+<link rel="stylesheet" href="{% static 'css/nodes.css' %}">
+<style>
+.nodes-wrapper {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.add-node-wrapper {
+    margin-bottom: 30px;
+}
+
+.node-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--card-bg, #fff);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.node-main {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
+    min-width: 250px;
+}
+
+.node-icon {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+}
+
+.node-info h2 {
+    margin: 0 0 8px 0;
+    font-size: 1.3em;
+    word-break: break-all;
+}
+
+.node-username {
+    margin: 0 0 8px 0;
+    color: #666;
+}
+
+.node-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+}
+
+.node-status.active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.node-status.inactive {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.node-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666;
+}
+
+.empty-state i {
+    font-size: 48px;
+    margin-bottom: 20px;
+    opacity: 0.5;
+}
+
+.btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9em;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #5568d3;
+}
+
+.btn-secondary {
+    background: #e2e6ea;
+    color: #333;
+}
+
+.btn-secondary:hover {
+    background: #dbe0e5;
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #218838;
+}
+
+.btn-warning {
+    background: #ffc107;
+    color: #333;
+}
+
+.btn-warning:hover {
+    background: #e0a800;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}
+
+h1 {
+    margin-bottom: 20px;
+}
+
+h1 .btn {
+    font-size: 0.6em;
+    padding: 6px 12px;
+}
+
+@media (max-width: 600px) {
+    .node-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .node-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+</style>
+
+{% endblock %}

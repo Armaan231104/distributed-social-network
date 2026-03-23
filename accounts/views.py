@@ -4,11 +4,13 @@ from django.conf import settings
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny, BasePermission
+from rest_framework.permissions import IsAuthenticated, BasePermission
+from rest_framework.authentication import SessionAuthentication
 from django.contrib.admin.views.decorators import staff_member_required
+from nodes.authentication import RemoteNodeAuthentication
 from .models import Author, FollowRequest, Follow
 from django.contrib.auth.models import User
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import login
 from django.contrib.auth.forms import AuthenticationForm
 from posts.models import Entry
 from .forms import SignUpForm
@@ -25,9 +27,38 @@ def build_local_author_id(user):
 def get_host_url():
     """Get this node's base URL for constructing FQIDs."""
     allowed_host = settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else 'localhost:8000'
-    if 'localhost' in allowed_host:
-        return f'http://{allowed_host}'
-    return f'https://{allowed_host}'
+    # Always use http for local development, https for production
+    if 'localhost' in allowed_host or '127.0.0.1' in allowed_host:
+        return f'http://{allowed_host.rstrip("/")}'
+    return f'https://{allowed_host.rstrip("/")}'
+
+
+def is_local_author(author_id):
+    """
+    Check if an author ID belongs to this node (local) or a remote node.
+    
+    Compares the author ID against all known local hosts, not just the first one.
+    This handles localhost, 127.0.0.1, and production domains correctly.
+    """
+    from django.conf import settings
+    
+    # Get all allowed hosts and normalize them (remove protocol and port)
+    local_hosts = []
+    for host in settings.ALLOWED_HOSTS:
+        # Remove protocol
+        h = host.replace('https://', '').replace('http://', '').rstrip('/')
+        # Remove port if present
+        if ':' in h:
+            h = h.split(':')[0]
+        local_hosts.append(h)
+    
+    # Extract host from author_id
+    author_host = author_id.replace('https://', '').replace('http://', '').rstrip('/')
+    if ':' in author_host:
+        author_host = author_host.split(':')[0]
+    
+    # Check if author_host matches any local host
+    return any(author_host == h or author_host.startswith(h + '/') for h in local_hosts)
 
 
 def get_or_create_author(author_data):
@@ -92,13 +123,15 @@ def get_or_create_remote_author(foreign_id):
 def send_follow_to_remote(actor, target):
     """
     Send a follow request to a remote author's inbox on their node when following a remote author.
+    Uses stored node credentials for HTTP Basic Auth if available.
     """
-    is_remote = not target.id.startswith(get_host_url())
-    if not is_remote:
+    from nodes.models import RemoteNode
+    
+    # Use the robust is_local_author check instead of simple startswith
+    if is_local_author(target.id):
         return
     
     try:
-        # extract the remote node's url
         remote_id = target.id.split('/')[-1]
         inbox_url = f"{target.host.rstrip('/')}/api/authors/{remote_id}/inbox/"
         follow_data = {
@@ -107,7 +140,19 @@ def send_follow_to_remote(actor, target):
             'actor': AuthorSerializer(actor).data,
             'object': AuthorSerializer(target).data
         }
-        requests.post(inbox_url, json=follow_data, timeout=10)
+        
+        # Try to get credentials from stored nodes
+        node = RemoteNode.objects.filter(
+            url__startswith=target.host.rstrip('/'),
+            is_active=True
+        ).first()
+        
+        if node:
+            # Use stored node credentials
+            requests.post(inbox_url, json=follow_data, timeout=10, auth=(node.username, node.password))
+        else:
+            # No stored credentials - try without auth (may fail if remote requires it)
+            requests.post(inbox_url, json=follow_data, timeout=10)
     except Exception:
         pass
 
@@ -182,7 +227,8 @@ def approved_author_required(view_func):
 
 class AuthorListView(APIView):
     """List authors on this node."""
-    permission_classes = [AllowAny]
+    authentication_classes = [RemoteNodeAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
@@ -202,7 +248,8 @@ class AuthorListView(APIView):
     
 class AuthorDetailView(APIView):
     """Get details for a specific author."""
-    permission_classes = [AllowAny]
+    authentication_classes = [RemoteNodeAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, author_id):
         try:
@@ -216,7 +263,8 @@ class AuthorDetailView(APIView):
 
 class FollowingListView(APIView):
     """Get list of authors this author is following."""
-    permission_classes = [AllowAny]
+    authentication_classes = [RemoteNodeAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, author_id):
         try:
@@ -247,7 +295,8 @@ class FollowingListView(APIView):
 
 class FollowersListView(APIView):
     """Get list of authors who follow this author."""
-    permission_classes = [AllowAny]
+    authentication_classes = [RemoteNodeAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, author_id):
         try:
@@ -279,7 +328,8 @@ class FollowersListView(APIView):
 
 class FriendsListView(APIView):
     """Get list of friends (mutual follows) for an author."""
-    permission_classes = [AllowAny]
+    authentication_classes = [RemoteNodeAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, author_id):
         try:
@@ -451,7 +501,8 @@ class InboxView(APIView):
     When a remote author wants to follow you, their node contacts this endpoint
     to create a follow request in your inbox.
     """
-    permission_classes = [AllowAny]
+    authentication_classes = [RemoteNodeAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, author_id):
         try:
@@ -788,7 +839,6 @@ def my_profile(request):
 
 from .forms import AuthorUpdateForm
 
-from django.shortcuts import get_object_or_404
 
 @approved_author_required
 @login_required

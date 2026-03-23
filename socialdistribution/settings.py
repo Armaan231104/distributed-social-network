@@ -33,6 +33,9 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") + [
 
 CSRF_TRUSTED_ORIGINS = ['https://cmput404-crimson-swcarson-55711a031595.herokuapp.com']
 
+NODE_USERNAME = os.getenv("NODE_USERNAME", "admin")
+NODE_PASSWORD = os.getenv("NODE_PASSWORD", "node_password_change_me")
+
 # Application definition
 
 INSTALLED_APPS = [
