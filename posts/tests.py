@@ -1,11 +1,13 @@
 import json
+from unittest.mock import patch
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from accounts.models import Follow
+from accounts.models import Author, Follow
 from posts.models import Entry
+from nodes.models import RemoteNode
 
 
 class PostsApiTests(TestCase):
@@ -656,3 +658,180 @@ class NodeAdminDeletedEntriesTest(TestCase):
             reverse('entry_detail', kwargs={'entry_id': self.deleted_entry.id})
         )
         self.assertEqual(response.status_code, 302)
+
+# REMOTE TESTS
+class InboxEntryTests(TestCase):
+    """
+    Tests for the inbox endpoint handling incoming remote entries.
+    Covers create, update, and delete (via visibility=DELETED) from remote nodes.
+    """
+
+    def setUp(self):
+        self.client = Client()
+
+        # local author who will receive inbox items
+        self.local_user = User.objects.create_user(username='local', password='pass12345')
+        self.local_author = self.local_user.author
+
+        # remote node credentials
+        self.node = RemoteNode.objects.create(
+            url='http://remotenode.com/api/',
+            username='remoteuser',
+            password='remotepass',
+            is_active=True,
+        )
+
+        # remote author (no local user)
+        self.remote_author = Author.objects.create(
+            id='http://remotenode.com/api/authors/999',
+            host='http://remotenode.com/api/',
+            displayName='Remote User',
+            user=None,
+            is_approved=True,
+        )
+
+        from urllib.parse import urlparse
+        author_path = urlparse(self.local_author.id).path
+        self.inbox_url = f'{author_path}inbox/'
+
+        self.entry_payload = {
+            'type': 'entry',
+            'id': 'http://remotenode.com/api/authors/999/entries/123',
+            'title': 'Remote Entry',
+            'content': 'Hello from remote node',
+            'contentType': 'text/plain',
+            'visibility': 'PUBLIC',
+            'published': '2026-01-01T00:00:00+00:00',
+            'author': {
+                'type': 'author',
+                'id': 'http://remotenode.com/api/authors/999',
+                'host': 'http://remotenode.com/api/',
+                'displayName': 'Remote User',
+                'github': None,
+                'profileImage': None,
+                'web': None,
+            }
+        }
+
+    def post_to_inbox(self, payload, username='remoteuser', password='remotepass'):
+        return self.client.post(
+            self.inbox_url,
+            data=json.dumps(payload),
+            content_type='application/json',
+            HTTP_AUTHORIZATION='Basic ' + __import__('base64').b64encode(
+                f'{username}:{password}'.encode()
+            ).decode()
+        )
+
+    '''
+    Tests: inbox creates a new entry when receiving a remote entry object
+    Pass Condition: Entry is created in the database with correct fqid
+    '''
+    def test_inbox_creates_remote_entry(self):
+        resp = self.post_to_inbox(self.entry_payload)
+        self.assertEqual(resp.status_code, 201)
+        self.assertTrue(Entry.objects.filter(fqid=self.entry_payload['id']).exists())
+
+    '''
+    Tests: inbox updates an existing entry when receiving the same entry id again
+    Pass Condition: Entry is updated with new content, not duplicated
+    '''
+    def test_inbox_updates_existing_remote_entry(self):
+        self.post_to_inbox(self.entry_payload)
+
+        updated_payload = {**self.entry_payload, 'title': 'Updated Title', 'content': 'Updated content'}
+        resp = self.post_to_inbox(updated_payload)
+        self.assertEqual(resp.status_code, 200)
+
+        self.assertEqual(Entry.objects.filter(fqid=self.entry_payload['id']).count(), 1)
+        entry = Entry.objects.get(fqid=self.entry_payload['id'])
+        self.assertEqual(entry.title, 'Updated Title')
+        self.assertEqual(entry.content, 'Updated content')
+
+    '''
+    Tests: inbox soft deletes an entry when receiving visibility=DELETED
+    Pass Condition: Entry visibility is set to DELETED in the database
+    '''
+    def test_inbox_soft_deletes_remote_entry(self):
+        self.post_to_inbox(self.entry_payload)
+
+        deleted_payload = {**self.entry_payload, 'visibility': 'DELETED'}
+        resp = self.post_to_inbox(deleted_payload)
+        self.assertEqual(resp.status_code, 200)
+
+        entry = Entry.objects.get(fqid=self.entry_payload['id'])
+        self.assertEqual(entry.visibility, 'DELETED')
+
+    '''
+    Tests: inbox returns 400 when entry payload is missing the id field
+    Pass Condition: Response status is 400 Bad Request
+    '''
+    def test_inbox_rejects_entry_missing_id(self):
+        payload = {**self.entry_payload}
+        del payload['id']
+        resp = self.post_to_inbox(payload)
+        self.assertEqual(resp.status_code, 400)
+
+    '''
+    Tests: inbox creates a remote author if one does not already exist
+    Pass Condition: Author is created in the database with the correct id
+    '''
+    def test_inbox_creates_remote_author_if_not_exists(self):
+        payload = {**self.entry_payload}
+        payload['id'] = 'http://remotenode.com/api/authors/999/entries/456'
+        payload['author'] = {
+            'type': 'author',
+            'id': 'http://remotenode.com/api/authors/888',
+            'host': 'http://remotenode.com/api/',
+            'displayName': 'Brand New Remote User',
+            'github': None,
+            'profileImage': None,
+            'web': None,
+        }
+        resp = self.post_to_inbox(payload)
+        self.assertEqual(resp.status_code, 201)
+        self.assertTrue(Author.objects.filter(id='http://remotenode.com/api/authors/888').exists())
+
+    '''
+    Tests: fanout sends entry to remote followers' inboxes on post creation
+    Pass Condition: requests.post is called once per remote follower
+    '''
+    def test_fanout_sends_to_remote_followers_on_create(self):
+        Follow.objects.create(follower=self.remote_author, followee=self.local_author)
+
+        with patch('posts.views.requests.post') as mock_post:
+            self.client.login(username='local', password='pass12345')
+            self.client.post(
+                '/posts/api/entries/',
+                data=json.dumps({
+                    'title': 'New Entry',
+                    'content': 'hello',
+                    'contentType': 'text/plain',
+                    'visibility': 'PUBLIC',
+                }),
+                content_type='application/json',
+            )
+            self.assertTrue(mock_post.called)
+
+    '''
+    Tests: fanout does not send to local followers, only remote ones
+    Pass Condition: requests.post is not called when all followers are local
+    '''
+    def test_fanout_does_not_send_to_local_followers(self):
+        local_follower_user = User.objects.create_user(username='localfollower', password='pass12345')
+        local_follower_author = local_follower_user.author
+        Follow.objects.create(follower=local_follower_author, followee=self.local_author)
+
+        with patch('posts.views.requests.post') as mock_post:
+            self.client.login(username='local', password='pass12345')
+            self.client.post(
+                '/posts/api/entries/',
+                data=json.dumps({
+                    'title': 'Local Only Entry',
+                    'content': 'hello',
+                    'contentType': 'text/plain',
+                    'visibility': 'PUBLIC',
+                }),
+                content_type='application/json',
+            )
+            self.assertFalse(mock_post.called)

@@ -479,6 +479,7 @@ class FollowRequestListView(APIView):
             'count': total
         })
 
+# ---------- INBOX ---------- #
 
 class InboxView(APIView):
     """
@@ -499,6 +500,7 @@ class InboxView(APIView):
 
         data = request.data
         
+        # POST FOLLOW
         if data.get('type') == 'follow':
             actor_data = data.get('actor', {})
             object_data = data.get('object', {})
@@ -530,6 +532,32 @@ class InboxView(APIView):
                 follow_request.save()
 
             return Response({'status': 'follow request received'}, status=status.HTTP_201_CREATED)
+        
+        # POST ENTRY (ALSO UPDATE AND DELETE)
+        elif data.get('type') == 'entry':
+            entry_id = data.get('id')
+            remote_author_data = data.get('author', {})
+            
+            if not entry_id:
+                return Response({'error': 'Missing entry id'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # get or create the remote author
+            remote_author = get_or_create_author(remote_author_data)
+            if not remote_author:
+                return Response({'error': 'Invalid author'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # create, update, or soft delete based on visibility
+            entry, created = Entry.objects.update_or_create(
+                fqid=entry_id,
+                defaults={
+                    'remote_author': remote_author,
+                    'title': data.get('title', ''),
+                    'content': data.get('content', ''),
+                    'content_type': data.get('contentType', 'text/plain'),
+                    'visibility': data.get('visibility', 'PUBLIC'),
+                }
+            )
+            return Response({'status': 'entry received'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
         return Response({'error': 'Unknown inbox item type'}, status=status.HTTP_400_BAD_REQUEST)
 
