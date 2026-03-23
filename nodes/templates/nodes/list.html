@@ -6,129 +6,141 @@
 
 <div class="authors-wrapper">
     <h1>
-        Connected Nodes
+        <i class="fa-solid fa-network-wired"></i> Connected Nodes
         <br><br>
-        <a href="{% url 'home' %}" onclick="event.preventDefault(); history.back();" class="btn btn-secondary">
-            <i class="fa-solid fa-hand-point-left"></i> Back
-        </a>
-    </h1>
-
-    <div class="add-node-wrapper">
         <a href="{% url 'add-node' %}" class="btn btn-primary">
             <i class="fa-solid fa-plus"></i> Add Node
         </a>
-    </div>
+    </h1>
 
     {% if nodes %}
         {% for node in nodes %}
-        <div class="profile-hero author-card">
-            <div class="profile-main" style="flex: 1;">
-                <div class="profile-avatar-wrapper">
-                    <div class="profile-avatar-placeholder" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                        <i class="fa-solid fa-network-wired" style="font-size: 24px;"></i>
+            <div class="profile-hero author-card {% if not node.is_active %}inactive-node{% endif %}">
+                
+                <div class="profile-main">
+                    
+                    <div class="node-icon-wrapper profile-avatar-wrapper" style="width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; background: #fff;">
+                        <i class="fa-solid fa-server" style="font-size: 40px; color: #ff1a62;"></i>
+                    </div>
+
+                    <div class="profile-info">
+                        <h2 class="author-name" style="word-break: break-all; font-size: 24px;">{{ node.url }}</h2>
+                        
+                        <p class="profile-links">
+                            <i class="fa-regular fa-user"></i>
+                            <span style="font-weight: 500; font-size: 16px;">{{ node.username }}</span>
+                        </p>
+                        
+                        <p class="profile-links">
+                            {% if node.is_active %}
+                                <i class="fa-solid fa-circle-check" style="color: #28a745;"></i>
+                                <span style="font-weight: 600; color: #28a745;">Active</span>
+                            {% else %}
+                                <i class="fa-solid fa-circle-xmark" style="color: #dc3545;"></i>
+                                <span style="font-weight: 600; color: #dc3545;">Disabled</span>
+                            {% endif %}
+                        </p>
+                        
+                        <div class="profile-actions" style="margin-top: 15px;">
+                            <a href="{% url 'edit-node' node.id %}" class="btn btn-secondary" title="Edit">
+                                <i class="fa-solid fa-pen"></i> Edit
+                            </a>
+                            <form method="POST" action="{% url 'toggle-node' node.id %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn {% if node.is_active %}btn-disable{% else %}btn-enable{% endif %}" title="{% if node.is_active %}Disable{% else %}Enable{% endif %}">
+                                    <i class="fa-solid fa-power-off"></i> {% if node.is_active %}Disable{% else %}Enable{% endif %}
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
 
-                <div class="profile-info">
-                    <h2 class="author-name">{{ node.url }}</h2>
-                    <p class="profile-links">
-                        <i class="fa-regular fa-user"></i>
-                        {{ node.username }}
-                    </p>
-                    <div class="node-status {% if node.is_active %}active{% else %}inactive{% endif %}">
-                        {% if node.is_active %}
-                            <i class="fa-solid fa-circle-check"></i> Active
-                        {% else %}
-                            <i class="fa-solid fa-circle-xmark"></i> Disabled
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <div class="profile-description-side">
-                <div class="node-actions">
-                    <a href="{% url 'edit-node' node.id %}" class="btn btn-secondary">
-                        <i class="fa-solid fa-pen"></i> Edit
-                    </a>
-                    <form method="POST" action="{% url 'toggle-node' node.id %}" style="display: inline;">
+                <div class="profile-description-side" style="justify-content: flex-end;">
+                    <form method="POST" action="{% url 'delete-node' node.id %}" class="inline-form"
+                          onsubmit="return confirm('Remove Node\n\nAre you sure you want to stop sharing with {{ node.url }}?\n\nThis cannot be undone.');" style="text-align: right;">
                         {% csrf_token %}
-                        <button type="submit" class="btn {% if node.is_active %}btn-warning{% else %}btn-success{% endif %}">
-                            <i class="fa-solid fa-power-off"></i>
-                            {% if node.is_active %}Disable{% else %}Enable{% endif %}
-                        </button>
-                    </form>
-                    <form method="POST" action="{% url 'delete-node' node.id %}" style="display: inline;" 
-                          onsubmit="return confirm('Remove Node\n\nAre you sure you want to stop sharing with {{ node.url }}? This cannot be undone.');">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-danger">
-                            <i class="fa-regular fa-trash-can"></i> Remove
+                        <button type="submit" class="btn btn-danger-custom" title="Remove">
+                            <i class="fa-regular fa-trash-can"></i> Remove Node
                         </button>
                     </form>
                 </div>
             </div>
-        </div>
-        <br><br>
+            <br><br>
         {% endfor %}
     {% else %}
         <div class="empty-state">
-            <i class="fa-solid fa-network-wired"></i>
-            <p>No connected nodes yet.</p>
-            <p>Add a node to start sharing with other servers.</p>
+            <i class="fa-solid fa-network-wired" style="font-size: 64px; color: #ccc; margin-bottom: 20px;"></i><br>
+            No connected nodes found.<br><br>
+            Add a node to start sharing with other servers.
         </div>
     {% endif %}
+
 </div>
 
+<link rel="stylesheet" href="{% static 'css/accounts/profile.css' %}">
 <style>
-.add-node-wrapper {
-    margin-bottom: 30px;
+/* Wrapper spacing */
+.authors-wrapper {
+    max-width: 1100px;
+    margin: 0 auto;
 }
 
-.node-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.85em;
-    font-weight: 600;
-    margin-top: 8px;
-}
-
-.node-status.active {
-    background: rgba(40, 167, 69, 0.15);
-    color: #28a745;
-}
-
-.node-status.inactive {
-    background: rgba(220, 53, 69, 0.15);
-    color: #dc3545;
-}
-
-.node-actions {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
+/* Empty state styling */
 .empty-state {
     text-align: center;
-    padding: 80px 20px;
+    font-size: 18px;
     color: #666;
+    padding: 80px 20px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.95);
+    border: 1px solid rgba(255,26,98,0.15);
 }
 
-.empty-state i {
-    font-size: 64px;
-    margin-bottom: 20px;
-    opacity: 0.3;
-    background: linear-gradient(90deg, #ff1a62, #ffa023);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+.profile-hero {
+    animation: none!important;
+    transition: transform 1s cubic-bezier(0.25, 1, 0.5, 1);
+    justify-content: space-between;
 }
 
-.empty-state p {
-    margin: 8px 0;
-    font-size: 16px;
+.profile-hero:hover {
+    transform: translateY(-4px) rotate(0.2deg) scale(1.01);
 }
+
+.inactive-node {
+    opacity: 0.7;
+    filter: grayscale(40%);
+}
+
+.btn-enable {
+    background: linear-gradient(45deg, #28a745, #218838);
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 16px;
+}
+.btn-disable {
+    background: #fff;
+    color: #ff9100;
+    border: 2px solid #ff9100;
+    padding: 12px 30px;
+    border-radius: 16px;
+}
+.btn-danger-custom {
+    background: linear-gradient(45deg, #dc3545, #c82333);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 16px;
+    cursor: pointer;
+}
+
+@media (max-width: 900px) {
+    .profile-main { flex: 0 0 90%; }
+    .profile-description-side { flex: 0 0 90%; text-align: left !important; justify-content: flex-start !important; margin-top: 20px; border-left: none; padding-left: 0; }
+    .profile-description-side form { text-align: left !important; }
+}
+
+.profile-main { flex: 0 0 65%; }
+.profile-description-side { flex: 0 0 30%; }
 </style>
-
 {% endblock %}
