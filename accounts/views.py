@@ -947,17 +947,10 @@ def edit_profile(request, author_id=None):
             user=request.user   # needed for is_approved
         )
         if form.is_valid():
-            try:
-                saved = form.save()
-                print("SAVED:", saved.profileImage.name)
-                print("URL:", saved.profileImage.url)
-            except Exception as e:
-                print("SAVE ERROR:", e)
-                import traceback
-                traceback.print_exc()
+            form.save()
             return redirect('author-profile', author_id=author.id)
-        else:
-            print("FORM ERRORS:", form.errors)
+    else:
+        form = AuthorUpdateForm(instance=author, user=request.user)
 
     return render(request, "accounts/edit_profile.html", {
         "form": form,

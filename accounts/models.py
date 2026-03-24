@@ -23,13 +23,14 @@ class Author(models.Model):
     class Meta:
         ordering = ['-created_at']
 
-    def profile_static_path(instance, filename):
-        return os.path.join('static/profile_images/', filename)
-
-    profileImage = models.ImageField(upload_to=profile_static_path,
-        blank=True,
-        null=True,)
+    def profile_upload_path(instance, filename):
+        return f"profile_images/{filename}"
     
+    profileImage = models.ImageField(
+        upload_to=profile_upload_path,
+        blank=True,
+        null=True,
+    )
     def __str__(self):
         return self.displayName
 
