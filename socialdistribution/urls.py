@@ -29,6 +29,7 @@ urlpatterns = [
     path("posts/", include("posts.urls")),
     path("nodes/", include("nodes.urls")),
 ]
+
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
