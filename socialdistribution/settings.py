@@ -59,7 +59,7 @@ INSTALLED_APPS = [
     'interactions',
     'nodes',
     'cloudinary',
-    'cloudinary_storage',
+    'django_cloudinary_storage',
 ]
 
 MIDDLEWARE = [
@@ -167,12 +167,8 @@ REST_FRAMEWORK = {
 }
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-# Default to local storage
-DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
 
-# Local static files always via WhiteNoise
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-USE_CLOUDINARY = os.getenv("USE_CLOUDINARY", "False") == "True"
-# Use Cloudinary only if the flag is True
-if USE_CLOUDINARY:
-    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+if not DEBUG:
+    # Keep WhiteNoise for static files
+    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    DEFAULT_FILE_STORAGE = "django_cloudinary_storage.storage.MediaCloudinaryStorage"
