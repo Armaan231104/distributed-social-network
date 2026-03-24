@@ -46,6 +46,8 @@ NODE_PASSWORD = os.getenv("NODE_PASSWORD", "node_password_change_me")
 # Application definition
 
 INSTALLED_APPS = [
+    'cloudinary_storage',  # must be BEFORE staticfiles
+    'cloudinary',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -58,10 +60,7 @@ INSTALLED_APPS = [
     'accounts',
     'interactions',
     'nodes',
-    'cloudinary',
-    'cloudinary_storage',
 ]
-
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -167,17 +166,13 @@ REST_FRAMEWORK = {
 }
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-
 if not DEBUG:
-    # Keep WhiteNoise for static files
     STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-
-if os.environ.get("USE_CLOUDINARY") == "True":
-    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-
     CLOUDINARY_STORAGE = {
-        'CLOUD_NAME': os.environ['CLOUDINARY_CLOUD_NAME'],
-        'API_KEY': os.environ['CLOUDINARY_API_KEY'],
-        'API_SECRET': os.environ['CLOUDINARY_API_SECRET'],
+        'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME'),
+        'API_KEY': os.environ.get('CLOUDINARY_API_KEY'),
+        'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET'),
     }
+
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'

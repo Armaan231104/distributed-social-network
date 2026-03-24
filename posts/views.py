@@ -105,7 +105,6 @@ def stream(request):
 
     return render(request, 'posts/stream.html', {'posts': posts})
 
-
 def serialize_entry_for_stream(request, entry):
     """
     Converts an entry into JSON format for the stream API.
