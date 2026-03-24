@@ -949,6 +949,8 @@ def edit_profile(request, author_id=None):
         if form.is_valid():
             form.save()
             return redirect('author-profile', author_id=author.id)
+        else:
+            print("FORM ERRORS:", form.errors)  # ← add this line
     else:
         form = AuthorUpdateForm(instance=author, user=request.user)
 

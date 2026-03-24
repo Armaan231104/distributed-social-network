@@ -15,7 +15,6 @@ class Author(models.Model):
     displayName = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     github = models.URLField(max_length=255, blank=True, null=True)
-
     web = models.URLField(max_length=255, blank=True, null=True)
     is_approved = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
