@@ -59,7 +59,7 @@ INSTALLED_APPS = [
     'interactions',
     'nodes',
     'cloudinary',
-    'django_cloudinary_storage',
+    'cloudinary_storage',
 ]
 
 MIDDLEWARE = [
@@ -171,4 +171,13 @@ MEDIA_ROOT = BASE_DIR / 'media'
 if not DEBUG:
     # Keep WhiteNoise for static files
     STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-    DEFAULT_FILE_STORAGE = "django_cloudinary_storage.storage.MediaCloudinaryStorage"
+
+
+if os.environ.get("USE_CLOUDINARY") == "True":
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+    CLOUDINARY_STORAGE = {
+        'CLOUD_NAME': os.environ['CLOUDINARY_CLOUD_NAME'],
+        'API_KEY': os.environ['CLOUDINARY_API_KEY'],
+        'API_SECRET': os.environ['CLOUDINARY_API_SECRET'],
+    }
