@@ -72,7 +72,6 @@ def edit_node(request, node_id):
         'action': 'Save',
     })
 
-
 @staff_member_required
 @require_POST
 def delete_node(request, node_id):

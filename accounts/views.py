@@ -947,7 +947,15 @@ def edit_profile(request, author_id=None):
             user=request.user   # needed for is_approved
         )
         if form.is_valid():
-            form.save()
+            print("FILES:", request.FILES)
+            try:
+                saved = form.save()
+                print("SAVED profileImage:", saved.profileImage)
+                print("SAVED profileImage URL:", saved.profileImage.url if saved.profileImage else "none")
+            except Exception as e:
+                print("SAVE ERROR:", e)
+                import traceback
+                traceback.print_exc()
             return redirect('author-profile', author_id=author.id)
     else:
         form = AuthorUpdateForm(instance=author, user=request.user)
