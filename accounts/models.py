@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 import os
+from django.conf import settings
+from cloudinary_storage.storage import MediaCloudinaryStorage
 
 class Author(models.Model):
     """
@@ -26,10 +28,15 @@ class Author(models.Model):
     def profile_static_path(instance, filename):
         return os.path.join('profile_images/', filename)
 
+    if not settings.DEBUG:
+        image_storage = MediaCloudinaryStorage()
+    else:
+        image_storage = None
     profileImage = models.ImageField(
         upload_to=profile_static_path,
         blank=True,
         null=True,
+        storage=image_storage
     )
     def __str__(self):
         return self.displayName
