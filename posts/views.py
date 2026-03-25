@@ -245,8 +245,6 @@ def create_entry(request):
 
         from nodes.utils import send_entry_to_remote
 
-        send_entry_to_remote(entry)
-
         return JsonResponse({"id": entry.fqid}, status=201)
 
     try:
@@ -276,8 +274,6 @@ def create_entry(request):
     from nodes.utils import send_entry_to_remote
 
     fanout_entry_to_remote_followers(entry, request.user)
-
-    send_entry_to_remote(entry)
 
     return JsonResponse({"id": entry.fqid}, status=201)
 
@@ -562,7 +558,7 @@ def send_entry_to_inbox(entry, author, inbox_url, node):
     """Send a spec-compliant entry object to a remote inbox."""
     payload = {
         "type": "entry",
-        "id": str(entry.id),
+        "id": entry.fqid,
         "title": entry.title,
         "content": entry.content,
         "contentType": entry.content_type,
@@ -595,20 +591,22 @@ def fanout_entry_to_remote_followers(entry, user):
     except Author.DoesNotExist:
         return
 
-    # get all followers who are remote (no local user account)
-    remote_followers = Follow.objects.filter(
-        followee=author,
-        follower__user__isnull=True  # remote authors have no local user
+    all_followers = Follow.objects.filter(
+        followee=author
     ).select_related('follower')
+
+    remote_followers = [
+        f for f in all_followers if f.follower.user is None
+    ]
 
     for follow in remote_followers:
         remote_author = follow.follower
 
-        # find which node this remote author belongs to
         node = RemoteNode.objects.filter(
             is_active=True,
             url__contains=remote_author.host
         ).first()
+
         if not node:
             continue
 
