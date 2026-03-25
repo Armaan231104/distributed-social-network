@@ -199,7 +199,7 @@
                         {% endif %}
                     </div>
 
-                    <a class="post-author-name author-link" href="{% url 'author-profile' post.author.author.id %}">
+                    <a class="post-author-name author-link" href="{% url 'author-profile' post.author.id %}">
                         {{ post.author.author.displayName|default:post.author.username }}
                     </a>
                 </div>
@@ -221,7 +221,7 @@
             -->
             {% if post.content_type == "image" and post.image %}
                 <figure class="stream-post-media">
-                    <img src="{{ post.image.url }}" alt="{{ post.title }}" class="post-content-image">
+                    <img src="/api/authors/{{ post.author.id|urlencode }}/entries/{{ post.id }}/image" class="post-content-image">
 
                 </figure>
                     {% if post.content %}

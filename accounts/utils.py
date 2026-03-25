@@ -21,36 +21,40 @@ def normalize_fqid(author_id):
     Handles:
     - IDs without trailing slash: "http://host/api/authors/1" -> "http://host/api/authors/1/"
     - Raw local IDs: "1" -> "http://host/api/authors/1/"
-    - Already normalized IDs: "http://host/api/authors/1/" -> "http://host/api/authors/1/"
-    
-    Returns the normalized FQID string.
+    - Localhost switching: "http://127.0.0.1:8000/api/authors/1/" -> "https://deployed-host.com/api/authors/1/"
     """
     if not author_id:
         return None
     
     author_id_str = str(author_id)
+    host_url = get_host_url().rstrip('/')
     
-    # Ensure trailing slash
+    # Replace localhost with deployed host if we are running on prod directly.
+    if "127.0.0.1:8000" in author_id_str or "localhost:8000" in author_id_str:
+        author_id_str = author_id_str.replace("http://127.0.0.1:8000", host_url)
+        author_id_str = author_id_str.replace("http://localhost:8000", host_url)
+
+    # older versions used a raw id so this helps with compatibility
+    if not author_id_str.startswith('http'):
+        clean_id = author_id_str.strip('/')
+        author_id_str = f"{host_url}/api/authors/{clean_id}"
+
     if not author_id_str.endswith('/'):
         author_id_str += '/'
-    
-    # If it's a raw local ID (no http), build the FQID
-    if not author_id_str.startswith('http'):
-        host_url = get_host_url()
-        author_id_str = f"{host_url}/api/authors/{author_id_str}"
-    
+
     return author_id_str
 
 
-# utils.py - make more flexible
 def is_local_author(author_id):
+    """
+    Check if an author ID belongs to this node.
+    """
     if not author_id:
         return False
     
-    host_url = get_host_url()
-    # Match with OR without port
-    local_hosts = [
-        host_url.rstrip(':8000'),  # http://127.0.0.1
-        host_url,                  # http://127.0.0.1:8000
-    ]
-    return any(author_id.startswith(h) for h in local_hosts)
+    # normalize the host url in case of trailing slashes
+    host_url = get_host_url().rstrip('/')
+    author_id_str = str(author_id)
+    
+    # add a '/' to the end of the author_id_str to prevent substring hijacking
+    return author_id_str.startswith(f"{host_url}/")

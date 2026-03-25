@@ -4,6 +4,8 @@ import uuid
 from datetime import timedelta
 from accounts.utils import get_host_url
 from accounts.models import Author
+from django.conf import settings
+from cloudinary_storage.storage import MediaCloudinaryStorage
 
 # The following class edited by Open AI, Chat GPT 5.2, "please adjust this class to properly handle image, plaintext, and commonmark input", 2026-02-26 
 class Entry(models.Model):
@@ -20,6 +22,12 @@ class Entry(models.Model):
 
     Soft deletion keeps the entry in the database but changes its visibility to DELETED.
     """
+
+    if not settings.DEBUG:
+        image_storage = MediaCloudinaryStorage()
+    else:
+        image_storage = None  # uses default local storage
+
     VISIBILITY_CHOICES = [
         ("PUBLIC", "Public"),
         ("UNLISTED", "Unlisted"),
@@ -48,7 +56,6 @@ class Entry(models.Model):
     content = models.TextField(blank=True)
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default="PUBLIC", db_index=True)
     published_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    fqid = models.URLField(max_length=500, unique=True, null=True, blank=True)
 
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -58,7 +65,7 @@ class Entry(models.Model):
         default = "text/plain"
     )
     
-    image = models.ImageField(upload_to="entries/", blank=True, null=True)
+    image = models.ImageField(upload_to="entries/", blank=True, null=True, storage=image_storage)
 
     class Meta:
         """
@@ -116,8 +123,15 @@ class Entry(models.Model):
 class HostedImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="hosted_images")
-    image = models.ImageField(upload_to="hosted_images/")
+
+    if not settings.DEBUG:
+        image_storage = MediaCloudinaryStorage()
+    else:
+        image_storage = None
     uploaded_at = models.DateTimeField(auto_now_add=True)
+
+
+    image = models.ImageField(upload_to="hosted_images/",storage=image_storage)
 
     def __str__(self):
         return f"{self.author.username} - {self.id}"

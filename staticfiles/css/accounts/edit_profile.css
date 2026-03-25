@@ -1,0 +1,196 @@
+/* ============================= */
+/* EDIT PROFILE GLASS CARD        */
+/* ============================= */
+.edit-wrapper {
+    padding: 20px;
+}
+.edit-container {
+    max-width: 620px;
+    margin: 0 auto;
+    padding: 45px;
+    border-radius: 22px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 20px 50px rgba(244,23,23,0.15);
+    border: 1px solid rgba(255,26,98,0.15);
+    position: relative;
+    animation: float 6s ease-in-out infinite alternate;
+}
+
+/* ============================= */
+/* HEADER                        */
+/* ============================= */
+.edit-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    background: linear-gradient(90deg, #ff1a62, #ffa023);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.edit-header p {
+    font-size: 15px;
+    color: #555;
+}
+
+/* ============================= */
+/* FORM LAYOUT                   */
+/* ============================= */
+.edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.edit-form input,
+.edit-form textarea,
+.edit-form select {
+    width: 100%;
+    padding: 16px 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(0,0,0,0.08);
+    background: rgba(255,255,255,0.85);
+    font-size: 15px;
+    transition: all 0.3s ease;
+    box-sizing: border-box;
+}
+
+.edit-form input:focus,
+.edit-form textarea:focus,
+.edit-form select:focus {
+    border-color: #ff1a62;
+    background: #fff;
+    box-shadow: 0 0 0 6px rgba(255,26,98,0.12);
+    outline: none;
+}
+
+.edit-form textarea {
+    min-height: 150px;
+    resize: vertical;
+}
+
+/* ============================= */
+/* PROFILE IMAGE LIKE MODAL      */
+/* ============================= */
+.image-upload-row {
+    display: flex;
+    gap: 12px;
+}
+
+.image-upload-box {
+    flex: 0 0 60%;
+    height: 180px;
+    border-radius: 16px;
+    border: 2px dashed rgba(255,26,98,0.25);
+    background: #fafafa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+    transition: all 0.3s ease;
+    background-size: cover;
+    background-position: center;
+}
+
+.image-upload-box:hover {
+    border-color: #ff1a62;
+    box-shadow: 0 12px 30px rgba(244,23,23,0.2);
+}
+
+.upload-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #666;
+    font-size: 14px;
+    text-align: center;
+    pointer-events: none;
+}
+
+/* hide placeholder text/icon when image is loaded */
+.image-upload-box.has-image .upload-content {
+    display: none;
+}
+
+.image-upload-box input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.remove-image-btn {
+    flex: 0 0 40%;
+    border-radius: 16px;
+    border: 2px solid #ff1a62;
+    color: #ff1a62;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 28px;
+    transition: all 0.3s ease;
+    background: transparent;
+}
+.remove-image-btn:hover {
+    background: linear-gradient(45deg, #ff1a62, #ffa023);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(255,26,98,0.25);
+}
+
+/* ============================= */
+/* FORM ACTION BUTTONS           */
+/* ============================= */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+textarea {
+    height: 150px;
+    min-height: 150px;
+    resize: vertical;
+}
+
+/* ============================= */
+/* RESPONSIVE                    */
+/* ============================= */
+@media (max-width: 700px) {
+    .image-upload-row {
+        flex-direction: column;
+    }
+    .image-upload-box,
+    .remove-image-btn {
+        flex: 1 1 100%;
+    }
+    .form-actions {
+        flex-direction: column;
+    }
+    .form-actions .btn {
+        width: 100%;
+    }
+}
+.edit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+}

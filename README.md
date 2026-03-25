@@ -200,6 +200,31 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") + [
 ]
 ```
 
+### 7. Set required environment variables for node-to-node communication
+
+Run these commands to configure your node for distributed operation:
+
+```bash
+# Your node's public URL (the first entry in ALLOWED_HOSTS)
+heroku config:set ALLOWED_HOSTS=your-app-name.herokuapp.com -a your-app-name
+
+# Your public URL for constructing FQIDs  
+heroku config:set NODE_BASE_URL=https://your-app-name.herokuapp.com -a your-app-name
+
+# Username for OTHER nodes to authenticate TO you
+heroku config:set NODE_USERNAME=admin -a your-app-name
+
+# Password for OTHER nodes to authenticate TO you  
+heroku config:set NODE_PASSWORD=your-secure-password -a your-app-name
+```
+
+You can also set these variables in the Heroku dashboard.
+
+**NOTE:** Share the following variables with other nodes so they can connect to you:
+- Your `NODE_USERNAME`
+- Your `NODE_PASSWORD`
+- Your public URL (e.g., `https://your-app-name.herokuapp.com`)
+
 ### 7. Deploy
 Since our main branch is called `staging`, push it like this:
 ```bash

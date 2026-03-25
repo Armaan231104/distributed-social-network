@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
+from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST, require_http_methods
 from django.db.models import Q
@@ -7,9 +8,38 @@ from django.contrib.auth.models import User
 from .models import Entry, HostedImage
 from accounts.models import Author, Follow
 from nodes.models import RemoteNode
+from nodes.models import RemoteNode
 from interactions.views import user_can_access_entry
 from nodes.utils import send_entry_to_remote
+from nodes.utils import send_entry_to_remote
 import json
+from functools import wraps
+import requests
+
+def get_entry_by_id(entry_id):
+    if str(entry_id).startswith("http"):
+        return get_object_or_404(Entry, fqid=entry_id)
+    return get_object_or_404(Entry, id=entry_id)
+
+def approved_author_required(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect("login")
+
+        if request.user.is_staff:
+            return view_func(request, *args, **kwargs)
+
+        try:
+            author = request.user.author
+        except Author.DoesNotExist:
+            return redirect("login")
+
+        if not author.is_approved:
+            return redirect("pending-approval")
+
+        return view_func(request, *args, **kwargs)
+    return wrapper
 from functools import wraps
 import requests
 
@@ -88,6 +118,7 @@ def get_stream_entries_for_user(user):
     ).order_by('-published_at').distinct()
 
 @approved_author_required
+@approved_author_required
 def stream(request):
     """
     Renders the main timeline page.
@@ -100,11 +131,19 @@ def stream(request):
         • UNLISTED entries from authors they follow
         • FRIENDS entries from mutual followers
     """
-
+    import os
+    import cloudinary
+    import socialdistribution.settings as settings
+    print("=== Cloudinary Config Check ===")
+    print("CLOUDINARY_CLOUD_NAME :", os.environ.get('CLOUDINARY_CLOUD_NAME'))
+    print("CLOUDINARY_API_KEY    :", os.environ.get('CLOUDINARY_API_KEY'))
+    print("CLOUDINARY_API_SECRET :", os.environ.get('CLOUDINARY_API_SECRET'))
+    print("DEBUG                 :", settings.DEBUG)
+    print("DEFAULT_FILE_STORAGE  :", getattr(settings, 'DEFAULT_FILE_STORAGE', 'NOT SET'))
+    print(cloudinary.config().__dict__)
     posts = get_stream_entries_for_user(request.user)
 
     return render(request, 'posts/stream.html', {'posts': posts})
-
 
 def serialize_entry_for_stream(request, entry):
     """
@@ -134,6 +173,7 @@ def serialize_entry_for_stream(request, entry):
         }
 
     return {
+        "id": entry.fqid,
         "id": entry.fqid,
         "title": entry.title,
         "content": entry.content,
@@ -179,6 +219,7 @@ def entry_detail(request, entry_id):
     """
 
     entry = get_entry_by_id(entry_id)
+    entry = get_entry_by_id(entry_id)
 
     if not user_can_access_entry(request.user, entry):
         return JsonResponse({'error': 'Forbidden'}, status=403)
@@ -192,6 +233,17 @@ def entry_detail(request, entry_id):
         'author_path': author_path,
     })
 
+def entry_image(request, author_id, entry_id):
+    entry = get_entry_by_id(entry_id)
+
+    if not entry.image:
+        return JsonResponse({"error": "Not an image"}, status=404)
+
+    from interactions.views import user_can_access_entry
+    if not user_can_access_entry(request.user, entry):
+        return JsonResponse({"error": "Forbidden"}, status=403)
+
+    return HttpResponse(entry.image.read(), content_type="image/png")
 def entry_image(request, author_id, entry_id):
     entry = get_entry_by_id(entry_id)
 
@@ -297,7 +349,27 @@ def entry_detail_api(request, entry_id):
         if entry.visibility == "DELETED":
             if not request.user.is_authenticated or not request.user.is_staff:
                 return JsonResponse({"error": "Not found"}, status=404)
+    entry = get_entry_by_id(entry_id)
+    
+    # GET - Read entry
+    if request.method == "GET":
+        if entry.visibility == "DELETED":
+            if not request.user.is_authenticated or not request.user.is_staff:
+                return JsonResponse({"error": "Not found"}, status=404)
 
+        if entry.visibility in ["PUBLIC", "UNLISTED"]:
+            pass
+        elif entry.visibility == "FRIENDS":
+            if not request.user.is_authenticated:
+                return JsonResponse({"error": "Forbidden"}, status=403)
+            if request.user != entry.author:
+                try:
+                    viewer_author = request.user.author
+                    entry_author = entry.author.author
+                except Author.DoesNotExist:
+                    return JsonResponse({"error": "Forbidden"}, status=403)
+                if not viewer_author.is_friend(entry_author):
+                    return JsonResponse({"error": "Forbidden"}, status=403)
         if entry.visibility in ["PUBLIC", "UNLISTED"]:
             pass
         elif entry.visibility == "FRIENDS":
@@ -318,7 +390,66 @@ def entry_detail_api(request, entry_id):
                 image_url = request.build_absolute_uri(entry.image.url)
             except ValueError:
                 image_url = None
+        image_url = None
+        if entry.image:
+            try:
+                image_url = request.build_absolute_uri(entry.image.url)
+            except ValueError:
+                image_url = None
 
+        return JsonResponse({
+            "id": entry.fqid,
+            "title": entry.title,
+            "content": entry.content,
+            "contentType": entry.content_type,
+            "visibility": entry.visibility,
+            "published": entry.published_at.isoformat(),
+            "image": image_url,
+        })
+    
+    # PATCH - Partial update (only author)
+    if request.method == "PATCH":
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Authentication required"}, status=401)
+        
+        if entry.author != request.user:
+            return HttpResponseForbidden()
+        
+        if entry.visibility == "DELETED":
+            return JsonResponse({"error": "Entry not found"}, status=404)
+        
+        try:
+            data = json.loads(request.body.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        if "content" in data:
+            entry.content = data["content"].strip()
+        
+        if "title" in data:
+            entry.title = data["title"]
+        
+        entry.save()
+
+        return JsonResponse({
+            "id": entry.fqid,
+            "message": "Updated successfully",
+            "content": entry.content
+        }, status=200)
+    
+    # DELETE - Soft delete (only author)
+    if request.method == "DELETE":
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Authentication required"}, status=401)
+        
+        if entry.author != request.user:
+            return HttpResponseForbidden()
+        
+        entry.soft_delete()
+
+        fanout_entry_to_remote_followers(entry, request.user)
+        
+        return JsonResponse({"deleted": True})
         return JsonResponse({
             "id": entry.fqid,
             "title": entry.title,
@@ -425,6 +556,7 @@ def my_entries(request):
 
         return {
             "id": e.fqid,
+            "id": e.fqid,
             "title": e.title,
             "content": e.content,
             "contentType": getattr(e, "content_type", "text/plain"),
@@ -447,6 +579,7 @@ def edit_entry(request, entry_id):
     Deleted entries cannot be edited.
     """
 
+    entry = get_entry_by_id(entry_id)
     entry = get_entry_by_id(entry_id)
 
     if entry.author != request.user:
@@ -505,8 +638,11 @@ def edit_entry(request, entry_id):
 
     fanout_entry_to_remote_followers(entry, request.user)
 
+    fanout_entry_to_remote_followers(entry, request.user)
+
     return JsonResponse({"updated": True}, status=200)
 
+@approved_author_required
 @approved_author_required
 @login_required
 @require_POST
@@ -518,11 +654,14 @@ def delete_entry_ui(request, entry_id):
     """
 
     entry = get_entry_by_id(entry_id)
+    entry = get_entry_by_id(entry_id)
 
     if entry.author != request.user:
         return HttpResponseForbidden("You cannot delete this entry.")
 
     entry.soft_delete()
+
+    fanout_entry_to_remote_followers(entry, request.user)
 
     fanout_entry_to_remote_followers(entry, request.user)
 

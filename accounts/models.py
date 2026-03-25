@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 import os
+from django.conf import settings
+from cloudinary_storage.storage import MediaCloudinaryStorage
 
 class Author(models.Model):
     """
@@ -15,7 +17,6 @@ class Author(models.Model):
     displayName = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     github = models.URLField(max_length=255, blank=True, null=True)
-
     web = models.URLField(max_length=255, blank=True, null=True)
     is_approved = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -25,12 +26,18 @@ class Author(models.Model):
         ordering = ['-created_at']
 
     def profile_static_path(instance, filename):
-        return os.path.join('static/profile_images/', filename)
+        return os.path.join('profile_images/', filename)
 
-    profileImage = models.ImageField(upload_to=profile_static_path,
+    if not settings.DEBUG:
+        image_storage = MediaCloudinaryStorage()
+    else:
+        image_storage = None
+    profileImage = models.ImageField(
+        upload_to=profile_static_path,
         blank=True,
-        null=True,)
-    
+        null=True,
+        storage=image_storage
+    )
     def __str__(self):
         return self.displayName
 

@@ -4,7 +4,10 @@ This document describes the API endpoints for the posts system which handles ent
 
 Entries support multiple visibility levels and content types. Access control is enforced according to visibility rules and user authentication status.
 
-All Entry identifiers are UUIDs.
+Entries are identified using both a UUID (`id`) and a Fully Qualified ID (`fqid`).
+
+- The UUID is used locally within the node
+- The FQID is used for communication between nodes
 
 ---
 
@@ -51,6 +54,45 @@ Deleted entries remain in the database but are hidden from normal users.
 
 ---
 
+## Entry Identifiers (FQID)
+
+Entries use two identifiers:
+
+- `id` → UUID (local database identifier)
+- `fqid` → Fully Qualified ID (global identifier)
+
+### FQID Format
+
+http://<host>/api/authors/<author_id>/entries/<entry_id>
+
+
+### Example
+
+
+http://127.0.0.1:8000/api/authors/1/entries/550e8400-e29b-41d4-a716-446655440000
+...
+
+
+### Purpose
+
+The UUID (`id`) is used internally by the node.
+
+The FQID (`fqid`) is used for:
+
+- communication between nodes
+- inbox delivery
+- remote storage of entries
+
+### Behavior
+
+- Local entries generate an FQID on save
+- Remote entries use the FQID provided by the sending node
+- Inbox operations always match entries using FQID
+
+This ensures entries remain globally unique across nodes.
+
+---
+
 # Visibility Levels
 
 ## PUBLIC
@@ -92,6 +134,70 @@ Deleted entries remain in the database but are hidden from normal users.
 | image | Image upload |
 
 Invalid content types return **400 Bad Request**.
+
+---
+
+## Image Posts
+
+The system supports image-based entries in addition to text and markdown.
+
+### Creating Image Posts
+
+Image posts must be submitted using:
+
+
+multipart/form-data
+
+
+Required fields:
+
+- `title`
+- `contentType = "image"`
+- `image` (file upload)
+- optional `content` (caption)
+
+### Example Request
+
+Form data:
+
+
+title = "My Image"
+content = "Caption"
+contentType = "image"
+image = <file>
+
+### Remote Image Support
+
+In addition to file uploads, images may also be received from remote nodes via the inbox as base64-encoded content.
+
+These images are:
+
+- decoded into files
+- stored locally
+- attached to entries automatically
+
+### Behavior
+
+- The uploaded file is stored on the server
+- The entry is created with:
+  - `content_type = "image"`
+  - associated image file
+- The text content is used as a caption
+
+### Validation Rules
+
+- Missing image file → `400 Bad Request`
+- Invalid contentType → `400 Bad Request`
+
+### Storage
+
+Images are stored under:
+
+
+/media/entries/
+
+
+and linked to the entry record.
 
 ---
 
