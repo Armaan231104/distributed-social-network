@@ -165,13 +165,7 @@ REST_FRAMEWORK = {
 }
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-import cloudinary
 
-cloudinary.config(
-    cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
-    api_key=os.environ.get('CLOUDINARY_API_KEY'),
-    api_secret=os.environ.get('CLOUDINARY_API_SECRET'),
-)
 CLOUDINARY_STORAGE = {
     'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME'),
     'API_KEY': os.environ.get('CLOUDINARY_API_KEY'),
