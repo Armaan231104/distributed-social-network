@@ -4,5 +4,4 @@ __pycache__/
 .env
 *.sqlite3
 todo.md
-.DS_Storestaticfiles/
-staticfiles/
+.DS_Store
