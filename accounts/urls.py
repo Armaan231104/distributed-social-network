@@ -17,6 +17,7 @@ apiurlpatterns = [
 
 uiurlpatterns = [
     path('authors/all/', views.authors_list, name='authors-list'),
+    path('follow-remote/', views.follow_remote_author, name='follow-remote'),
     path('authors/<path:author_id>/profile/', views.author_profile, name='author-profile'),
     path('authors/<path:author_id>/followers/', views.author_followers, name='author-followers'),
     path('authors/<path:author_id>/following/', views.author_following, name='author-following'),

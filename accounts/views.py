@@ -1,5 +1,6 @@
 import requests
 from urllib.parse import unquote
+from django.contrib import messages
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -637,6 +638,72 @@ def authors_list(request):
         'authors': authors,
         'current_user_author': current_user_author,
     })
+
+
+@login_required
+def follow_remote_author(request):
+    """Follow a remote author by their FQID."""
+    if request.method != 'POST':
+        return redirect('authors-list')
+    
+    try:
+        current_author = request.user.author
+    except Author.DoesNotExist:
+        messages.error(request, 'You must have an approved author profile to follow others.')
+        return redirect('authors-list')
+    
+    remote_fqid = request.POST.get('remote_author_fqid', '').strip()
+    
+    if not remote_fqid:
+        messages.error(request, 'Please enter an author URL.')
+        return redirect('authors-list')
+    
+    # Validate it's a proper FQID format
+    if not remote_fqid.startswith('http'):
+        messages.error(request, 'Please enter a valid author URL (e.g., https://other-node.com/api/authors/123/).')
+        return redirect('authors-list')
+    
+    # Check if it's a local author
+    if is_local_author(remote_fqid):
+        messages.error(request, 'To follow local authors, use the Follow button on their profile.')
+        return redirect('authors-list')
+    
+    try:
+        # Get or create the remote author
+        remote_author, created = get_or_create_remote_author(remote_fqid)
+        
+        # Check if already following
+        if current_author.is_following(remote_author):
+            messages.info(request, f'You are already following {remote_author.displayName}.')
+            return redirect('authors-list')
+        
+        # Check if there's already a pending request
+        existing_request = FollowRequest.objects.filter(
+            actor=current_author,
+            object=remote_author,
+            status=FollowRequest.Status.PENDING
+        ).first()
+        
+        if existing_request:
+            messages.info(request, f'You already have a pending follow request to {remote_author.displayName}.')
+            return redirect('authors-list')
+        
+        # Create the follow request
+        follow_request, state = create_follow_request(current_author, remote_author)
+        
+        if state in ('pending', 'accepted'):
+            messages.success(request, f'Follow request sent to {remote_author.displayName}! They will need to approve your request before you can see their posts.')
+        else:
+            # Try to send to remote
+            send_follow_to_remote(current_author, remote_author)
+            messages.success(request, f'Follow request sent to {remote_author.displayName}!')
+        
+        return redirect('authors-list')
+        
+    except Exception as e:
+        messages.error(request, f'Could not follow author: {str(e)}')
+        return redirect('authors-list')
+
 
 @approved_author_required
 def author_followers(request, author_id):
