@@ -132,6 +132,7 @@ def stream(request):
         • FRIENDS entries from mutual followers
     """
     import os
+    import cloudinary
     import socialdistribution.settings as settings
     print("=== Cloudinary Config Check ===")
     print("CLOUDINARY_CLOUD_NAME :", os.environ.get('CLOUDINARY_CLOUD_NAME'))
@@ -139,6 +140,7 @@ def stream(request):
     print("CLOUDINARY_API_SECRET :", bool(os.environ.get('CLOUDINARY_API_SECRET')))
     print("DEBUG                 :", settings.DEBUG)
     print("DEFAULT_FILE_STORAGE  :", getattr(settings, 'DEFAULT_FILE_STORAGE', 'NOT SET'))
+    print(cloudinary.config().__dict__)
     posts = get_stream_entries_for_user(request.user)
 
     return render(request, 'posts/stream.html', {'posts': posts})
