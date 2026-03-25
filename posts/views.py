@@ -131,8 +131,10 @@ def stream(request):
         • UNLISTED entries from authors they follow
         • FRIENDS entries from mutual followers
     """
-
-    posts = get_stream_entries_for_user(request.user)
+    import os
+    print("CLOUD_NAME:", os.environ.get('CLOUDINARY_CLOUD_NAME'))
+    print("API_KEY:", bool(os.environ.get('CLOUDINARY_API_KEY')))
+    print("API_SECRET:", bool(os.environ.get('CLOUDINARY_API_SECRET')))
 
     return render(request, 'posts/stream.html', {'posts': posts})
 
