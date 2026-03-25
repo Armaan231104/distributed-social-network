@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from posts.models import Entry
 from accounts.models import Author
+from accounts.utils import get_host_url
 import uuid
 
 
@@ -15,6 +16,16 @@ class Comment(models.Model):
     author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name='comments')
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+    fqid = models.URLField(max_length=500, unique=True, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        if not self.fqid:
+            host = get_host_url()
+            author_id = self.author.id
+            self.fqid = f"{host}/api/authors/{author_id}/commented/{self.id}"
+            super().save(update_fields=["fqid"])
 
     class Meta:
         ordering = ['created_at']
@@ -38,6 +49,16 @@ class Like(models.Model):
     entry = models.ForeignKey(Entry, on_delete=models.CASCADE, related_name='likes', null=True, blank=True)
     comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='likes', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    fqid = models.URLField(max_length=500, unique=True, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        if not self.fqid:
+            host = get_host_url()
+            author_id = self.author.id
+            self.fqid = f"{host}/api/authors/{author_id}/liked/{self.id}"
+            super().save(update_fields=["fqid"])
 
     class Meta:
         constraints = [

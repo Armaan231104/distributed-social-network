@@ -515,6 +515,116 @@ For each valid `PushEvent`:
   "visibility": "PUBLIC"
 }
 ```
+---
+
+## Inbox: Receiving Remote Entries (Including Images)
+
+The inbox endpoint also handles entries sent from remote nodes.  
+This allows nodes to share posts, including image posts, across the distributed network.
+
+---
+
+### Endpoint
+
+POST /api/authors/{author_id}/inbox/
+
+---
+
+### Supported Object Type
+
+"type": "entry"
+
+---
+
+### Example Request (Text Entry)
+
+    {
+      "type": "entry",
+      "id": "http://remote-node.com/api/authors/999/entries/123",
+      "title": "Remote Post",
+      "content": "Hello world",
+      "contentType": "text/plain",
+      "visibility": "PUBLIC",
+      "author": {
+        "type": "author",
+        "id": "http://remote-node.com/api/authors/999",
+        "host": "http://remote-node.com/api/",
+        "displayName": "Remote Author"
+      }
+    }
+
+---
+
+### Example Request (Image Entry - Base64)
+
+    {
+      "type": "entry",
+      "id": "http://remote-node.com/api/authors/999/entries/124",
+      "title": "Image Post",
+      "contentType": "image/png;base64",
+      "content": "<base64-encoded-image>",
+      "visibility": "PUBLIC",
+      "author": {
+        "type": "author",
+        "id": "http://remote-node.com/api/authors/999",
+        "host": "http://remote-node.com/api/",
+        "displayName": "Remote Author"
+      }
+    }
+
+---
+
+### Behavior
+
+- The inbox accepts entry objects from remote nodes
+- The entry is identified using its FQID (`id`)
+- If the entry does not exist, it is created
+- If the entry already exists, it is updated (no duplication)
+- If visibility is set to "DELETED", the entry is soft deleted
+
+---
+
+### Image Handling
+
+When `contentType` contains "base64":
+
+- The `content` field is treated as a base64-encoded image
+- The image is decoded into a file
+- The file is stored locally
+- The entry is created with:
+  - empty text content
+  - an attached image file
+
+---
+
+### Remote Author Handling
+
+If the incoming author does not exist:
+
+- A new remote author is created
+- The author is stored using their FQID
+- No local user is associated with this author
+
+---
+
+### Entry Synchronization
+
+The inbox ensures consistency across nodes:
+
+- Create → new entry stored using FQID  
+- Update → existing entry updated without duplication  
+- Delete → entry visibility set to "DELETED"  
+
+---
+
+### Fan-out Behavior
+
+When a local entry is created:
+
+- The system sends the entry to all remote followers
+- Each remote node receives the entry through its inbox
+
+Local followers do NOT trigger remote requests.
 
 ---
 

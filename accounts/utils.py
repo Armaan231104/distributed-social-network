@@ -37,15 +37,23 @@ def normalize_fqid(author_id):
     # If it's a raw local ID (no http), build the FQID
     if not author_id_str.startswith('http'):
         host_url = get_host_url()
+        # Replace localhost with deployed host
+        if "127.0.0.1" in author_id_str:
+            author_id_str = author_id_str.replace("http://127.0.0.1:8000", host_url)
         author_id_str = f"{host_url}/api/authors/{author_id_str}"
     
     return author_id_str
 
 
+# utils.py - make more flexible
 def is_local_author(author_id):
-    """Check if an author ID belongs to this node."""
     if not author_id:
         return False
     
     host_url = get_host_url()
-    return author_id.startswith(host_url)
+    # Match with OR without port
+    local_hosts = [
+        host_url.rstrip(':8000'),  # http://127.0.0.1
+        host_url,                  # http://127.0.0.1:8000
+    ]
+    return any(author_id.startswith(h) for h in local_hosts)
