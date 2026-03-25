@@ -95,7 +95,9 @@ def send_follow_to_remote(actor, target):
         return
     
     try:
-        inbox_url = f"{target.id.rstrip('/')}/inbox/"
+        remote_author_id = target.id.rstrip('/').split('/')[-1]
+        target_host = target.host.rstrip('/')
+        inbox_url = f"{target_host}/api/authors/{remote_author_id}/inbox/"
         
         follow_data = {
             'type': 'follow',
@@ -105,7 +107,6 @@ def send_follow_to_remote(actor, target):
         }
         
         # Try to get credentials from stored nodes
-        target_host = target.host.rstrip('/')
         node = next((n for n in RemoteNode.objects.filter(is_active=True) if target_host.startswith(n.url.rstrip('/'))), None)
         
         if node:
@@ -361,6 +362,11 @@ class FollowView(APIView):
             return Response({'error': 'Already following'}, status=status.HTTP_400_BAD_REQUEST)
 
         request_result, state = create_follow_request(current_author, foreign_author)
+        
+        # For remote authors, create Follow object immediately so stream can fetch posts
+        # Per spec: "A's node can assume that A is following B, even before author B accepts"
+        if not foreign_author.user:
+            Follow.objects.get_or_create(follower=current_author, followee=foreign_author)
         
         if state == 'pending':
             return Response({'error': 'Follow request already pending'}, status=status.HTTP_400_BAD_REQUEST)
@@ -668,6 +674,11 @@ def follow_remote_author(request):
         
         # Create the follow request
         follow_request, state = create_follow_request(current_author, remote_author)
+        
+        # For remote authors, create Follow object immediately so stream can fetch posts
+        # Per spec: "A's node can assume that A is following B, even before author B accepts"
+        if not remote_author.user:
+            Follow.objects.get_or_create(follower=current_author, followee=remote_author)
         
         if state in ('pending', 'accepted'):
             messages.success(request, f'Follow request sent to {remote_author.displayName}! They will need to approve your request before you can see their posts.')
