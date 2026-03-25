@@ -63,15 +63,13 @@
 </div>
 
 <style>
-/* Center the card vertically and horizontally */
 .edit-wrapper {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 20px;
+    padding: 40px 20px;
 }
 
-/* Glass-style card */
 .login-container {
     width: 100%;
     max-width: 500px;
@@ -79,17 +77,21 @@
     border-radius: 22px;
     background: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     box-shadow: 0 20px 50px rgba(244, 23, 23, 0.15);
     border: 1px solid rgba(255, 26, 98, 0.15);
-    text-align: center;
 }
 
-/* Header */
+.edit-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
 .edit-header h1 {
     font-size: 28px;
-    margin-bottom: 8px;
+    margin: 0 0 8px;
     font-weight: 600;
-    background: linear-gradient(90deg,#ff1a62,#ffa023);
+    background: linear-gradient(90deg, #ff1a62, #ffa023);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -98,60 +100,93 @@
 .edit-header p {
     font-size: 15px;
     color: #555;
-    margin-bottom: 30px;
+    margin: 0;
 }
 
-/* Form inputs */
 .edit-form .form-group {
     margin-bottom: 20px;
 }
 
-/* Ensure checkbox is aligned properly */
+.edit-form label {
+    display: block;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 6px;
+}
+
+.edit-form input,
+.edit-form select,
+.edit-form textarea {
+    width: 100%;
+    padding: 16px 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.85);
+    font-size: 15px;
+    transition: 0.25s ease;
+    box-sizing: border-box;
+}
+
+.edit-form input:focus,
+.edit-form select:focus,
+.edit-form textarea:focus {
+    border-color: #ff1a62;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(255, 26, 98, 0.12);
+    outline: none;
+}
+
 .edit-form .checkbox-group {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
 }
-.edit-form .checkbox-group input {
-    width: auto;
-    margin: 0;
-}
 
-.edit-form input, .edit-form select, .edit-form textarea {
-    width: 95%;
-    max-width: 460px;
-    padding: 16px 18px;
-    border-radius: 16px;
-    border: 1px solid rgba(0,0,0,0.08);
-    background: rgba(255,255,255,0.85);
-    font-size: 15px;
-    transition: 0.25s ease;
-    display: block;
-    margin: 0 auto;
-}
-
-.edit-form input[type="checkbox"] {
+.edit-form .checkbox-group input[type="checkbox"] {
     width: 20px;
     height: 20px;
-    display: inline-block;
+    padding: 0;
+    accent-color: #ff1a62;
+    cursor: pointer;
 }
 
-.edit-form input:focus, .edit-form select:focus, .edit-form textarea:focus {
-    border-color: #ff1a62;
-    background: #fff;
-    box-shadow: 0 0 0 4px rgba(255,26,98,0.12);
-    outline: none;
+.edit-form .checkbox-group label {
+    margin: 0;
+    font-size: 14px;
+    color: #333;
 }
 
-/* Button aligned right */
+.help-text {
+    display: block;
+    font-size: 12px;
+    color: #888;
+    margin-top: 6px;
+    text-align: left;
+}
+
 .form-actions {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
+    margin-top: 10px;
 }
 
-/* Error message */
+.btn {
+    padding: 14px 26px;
+    border-radius: 16px;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    text-decoration: none;
+    border: none;
+    transition: 0.25s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
 .error-message {
     background: rgba(255, 26, 98, 0.1);
     color: #ff1a62;
@@ -162,12 +197,13 @@
     text-align: center;
 }
 
+.error-message p {
+    margin: 4px 0;
+}
+
 @media (max-width: 500px) {
     .login-container {
         padding: 30px;
-    }
-    .edit-form input, .edit-form select, .edit-form textarea {
-        width: 95%;
     }
 }
 </style>

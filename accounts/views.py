@@ -8,11 +8,13 @@ from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.authentication import SessionAuthentication
 from django.contrib.admin.views.decorators import staff_member_required
 from nodes.authentication import RemoteNodeAuthentication
-from .models import Author, FollowRequest, Follow
 from django.contrib.auth.models import User
 from django.contrib.auth import login
 from django.contrib.auth.forms import AuthenticationForm
+
+from .models import Author, FollowRequest, Follow
 from posts.models import Entry
+from interactions.models import Like, Comment
 from .forms import SignUpForm
 from functools import wraps
 from .serializers import (
@@ -533,7 +535,7 @@ class InboxView(APIView):
 
             return Response({'status': 'follow request received'}, status=status.HTTP_201_CREATED)
         
-        # POST ENTRY (ALSO UPDATE AND DELETE)
+        # POST ENTRY (ALSO UPDATE AND SOFT DELETE)
         elif data.get('type') == 'entry':
             entry_id = data.get('id')
             remote_author_data = data.get('author', {})
@@ -546,6 +548,20 @@ class InboxView(APIView):
             if not remote_author:
                 return Response({'error': 'Invalid author'}, status=status.HTTP_400_BAD_REQUEST)
             
+            content_type = data.get('contentType', 'text/plain')
+            content = data.get('content', '')
+            image_file = None
+            
+            # HANDLE IMAGE
+            if content_type and "base64" in content_type:
+                import base64
+                from django.core.files.base import ContentFile
+
+                image_file = ContentFile(
+                    base64.b64decode(content),
+                    name="remote_image.png"
+                )
+            
             # create, update, or soft delete based on visibility
             entry, created = Entry.objects.update_or_create(
                 fqid=entry_id,
@@ -555,12 +571,12 @@ class InboxView(APIView):
                     'content': data.get('content', ''),
                     'content_type': data.get('contentType', 'text/plain'),
                     'visibility': data.get('visibility', 'PUBLIC'),
+                    'image': image_file 
                 }
             )
             return Response({'status': 'entry received'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
         elif data.get('type') in ['like', 'Like']:
-            from interactions.models import Like
             actor = get_or_create_author(data.get('author', {}))
             obj_url = str(data.get('object', ''))
             if actor and obj_url:
@@ -570,48 +586,11 @@ class InboxView(APIView):
             return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
             
         elif data.get('type') in ['comment', 'Comment']:
-            from interactions.models import Comment
             actor = get_or_create_author(data.get('author', {}))
             content = data.get('comment', 'remote comment')
             # Spec states comments are often sent directly to POST /api/authors/{id}/posts/{id}/comments
             # If inbox router catches it, we accept it generically.
             return Response({'status': 'comment received'}, status=status.HTTP_201_CREATED)
-
-        elif data.get("type") == "entry":
-            author_data = data.get("author", {})
-            author = get_or_create_author(author_data)
-
-            if not author:
-                return Response({'error': 'Invalid author'}, status=400)
-
-            content_type = data.get("contentType")
-            content = data.get("content", "")
-
-            image_file = None
-
-            # 🧠 HANDLE IMAGE
-            if content_type and "base64" in content_type:
-                import base64
-                from django.core.files.base import ContentFile
-
-                image_file = ContentFile(
-                    base64.b64decode(content),
-                    name="remote_image.png"
-                )
-
-            entry = Entry.objects.create(
-                author=author.user if author.user else None,
-                title=data.get("title", ""),
-                content="" if image_file else content,
-                content_type=content_type,
-                visibility=data.get("visibility", "PUBLIC"),
-                image=image_file
-            )
-
-            return Response({'status': 'entry received'}, status=201)
-
-        return Response({'error': 'Unknown inbox item type'}, status=status.HTTP_400_BAD_REQUEST)
-
 
 # UI views
 from django.shortcuts import render, get_object_or_404, redirect
