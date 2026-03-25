@@ -164,6 +164,10 @@ REST_FRAMEWORK = {
     ],
 }
 MEDIA_URL = '/media/'
+# if not DEBUG:
+#     MEDIA_URL = f'https://res.cloudinary.com/{os.environ["CLOUDINARY_CLOUD_NAME"]}/image/upload/'
+# else:
+#     MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 CLOUDINARY_STORAGE = {
     'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME'),
