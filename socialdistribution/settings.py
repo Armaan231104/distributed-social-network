@@ -9,6 +9,9 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
+import cloudinary 
+import cloudinary.uploader 
+import cloudinary.api
 
 from pathlib import Path
 import os
@@ -167,9 +170,9 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME'),
-    'API_KEY': os.environ.get('CLOUDINARY_API_KEY'),
-    'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET'),
+    'CLOUD_NAME': 'daytyu3kd',
+    'API_KEY': '358211538488375',
+    'API_SECRET': 'kbRg9cJil47FXkZlnVVHzbhF6Sg',
 }
 
 if not DEBUG:
