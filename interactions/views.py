@@ -90,16 +90,16 @@ def toggle_like(request, object_type, object_id):
         liked = True
 
     if target_author and not target_author.is_local:
-        send_like_to_remote_inbox(liking_author, target_author, object_url, summary)
+        send_like_to_remote_inbox(liking_author, target_author, object_url)
 
     return JsonResponse({'liked': liked, 'like_count': obj.likes.count()})
 
 
-def send_like_to_remote_inbox(sender, recipient, object_url, summary):
+def send_like_to_remote_inbox(sender, recipient, object_url):
     """
     Sends a standard 'Like' object to the recipient's inbox.
     """
-    target_host = recipient.host.rstip('/')
+    target_host = recipient.host.rstrip('/')
     # Recipient ID is already the full URL (e.g., http://node/api/authors/uuid)
     inbox_url = recipient.id.rstrip('/') + '/inbox/'
 
@@ -113,7 +113,6 @@ def send_like_to_remote_inbox(sender, recipient, object_url, summary):
     
     payload = {
         "type": "Like",
-        "summary": summary,
         "author": {
             "type": "author",
             "id": sender.id,
@@ -146,12 +145,60 @@ def add_comment(request, entry_id):
     if request.method == 'POST':
         content = request.POST.get('content')
         if content:
-            Comment.objects.create(
+            comment = Comment.objects.create(
                 entry=entry,
                 author=request.user.author,
                 content=content,
             )
+
+            if comment.fqid:
+                send_comment_to_remote_inbox(comment, entry)
+
     return redirect('entry_detail', entry_id=entry_id)
+
+def send_comment_to_remote_inbox(comment, entry):
+    """Send a comment to the remote entry author's inbox."""
+    # get the remote author of the entry
+    remote_author = entry.remote_author
+    if not remote_author or remote_author.is_local:
+        return
+
+    # find the node for this remote author
+    node = RemoteNode.objects.filter(
+        is_active=True,
+        url__contains=remote_author.host
+    ).first()
+    if not node:
+        return
+
+    payload = {
+        'type': 'comment',
+        'id': comment.fqid,
+        'author': {
+            'type': 'author',
+            'id': comment.author.id,
+            'displayName': comment.author.displayName,
+            'host': comment.author.host,
+            'github': comment.author.github or None,
+            'profileImage': comment.author.profileImage.url if comment.author.profileImage else None,
+            'web': comment.author.web or None,
+        },
+        'comment': comment.content,
+        'contentType': getattr(comment, 'contentType', 'text/plain'),
+        'published': comment.created_at.isoformat(),
+        'entry': entry.fqid or str(entry.id),
+    }
+
+    inbox_url = f"{remote_author.id.rstrip('/')}/inbox/"
+    try:
+        requests.post(
+            inbox_url,
+            json=payload,
+            auth=(node.username, node.password),
+            timeout=5
+        )
+    except requests.RequestException:
+        pass
 
 
 # ── API views — comments ──
@@ -211,6 +258,9 @@ class AuthorCommentedView(View):
             content=content,
             contentType=data.get('contentType', 'text/plain')
         )
+
+        send_comment_to_remote_inbox(comment, entry)
+
         return JsonResponse(CommentSerializer(comment).data, status=201)
 
 

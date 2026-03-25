@@ -1,5 +1,6 @@
 import requests
 from urllib.parse import unquote
+from django.contrib import messages
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -7,11 +8,13 @@ from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.authentication import SessionAuthentication
 from django.contrib.admin.views.decorators import staff_member_required
 from nodes.authentication import RemoteNodeAuthentication
-from .models import Author, FollowRequest, Follow
 from django.contrib.auth.models import User
 from django.contrib.auth import login
 from django.contrib.auth.forms import AuthenticationForm
+
+from .models import Author, FollowRequest, Follow
 from posts.models import Entry
+from interactions.models import Like, Comment
 from .forms import SignUpForm
 from functools import wraps
 from .serializers import (
@@ -532,7 +535,7 @@ class InboxView(APIView):
 
             return Response({'status': 'follow request received'}, status=status.HTTP_201_CREATED)
         
-        # POST ENTRY (ALSO UPDATE AND DELETE)
+        # POST ENTRY (ALSO UPDATE AND SOFT DELETE)
         elif data.get('type') == 'entry':
             entry_id = data.get('id')
             remote_author_data = data.get('author', {})
@@ -545,6 +548,20 @@ class InboxView(APIView):
             if not remote_author:
                 return Response({'error': 'Invalid author'}, status=status.HTTP_400_BAD_REQUEST)
             
+            content_type = data.get('contentType', 'text/plain')
+            content = data.get('content', '')
+            image_file = None
+            
+            # HANDLE IMAGE
+            if content_type and "base64" in content_type:
+                import base64
+                from django.core.files.base import ContentFile
+
+                image_file = ContentFile(
+                    base64.b64decode(content),
+                    name="remote_image.png"
+                )
+            
             # create, update, or soft delete based on visibility
             entry, created = Entry.objects.update_or_create(
                 fqid=entry_id,
@@ -554,12 +571,12 @@ class InboxView(APIView):
                     'content': data.get('content', ''),
                     'content_type': data.get('contentType', 'text/plain'),
                     'visibility': data.get('visibility', 'PUBLIC'),
+                    'image': image_file 
                 }
             )
             return Response({'status': 'entry received'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
         elif data.get('type') in ['like', 'Like']:
-            from interactions.models import Like
             actor = get_or_create_author(data.get('author', {}))
             obj_url = str(data.get('object', ''))
             if actor and obj_url:
@@ -569,48 +586,11 @@ class InboxView(APIView):
             return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
             
         elif data.get('type') in ['comment', 'Comment']:
-            from interactions.models import Comment
             actor = get_or_create_author(data.get('author', {}))
             content = data.get('comment', 'remote comment')
             # Spec states comments are often sent directly to POST /api/authors/{id}/posts/{id}/comments
             # If inbox router catches it, we accept it generically.
             return Response({'status': 'comment received'}, status=status.HTTP_201_CREATED)
-
-        elif data.get("type") == "entry":
-            author_data = data.get("author", {})
-            author = get_or_create_author(author_data)
-
-            if not author:
-                return Response({'error': 'Invalid author'}, status=400)
-
-            content_type = data.get("contentType")
-            content = data.get("content", "")
-
-            image_file = None
-
-            # 🧠 HANDLE IMAGE
-            if content_type and "base64" in content_type:
-                import base64
-                from django.core.files.base import ContentFile
-
-                image_file = ContentFile(
-                    base64.b64decode(content),
-                    name="remote_image.png"
-                )
-
-            entry = Entry.objects.create(
-                author=author.user if author.user else None,
-                title=data.get("title", ""),
-                content="" if image_file else content,
-                content_type=content_type,
-                visibility=data.get("visibility", "PUBLIC"),
-                image=image_file
-            )
-
-            return Response({'status': 'entry received'}, status=201)
-
-        return Response({'error': 'Unknown inbox item type'}, status=status.HTTP_400_BAD_REQUEST)
-
 
 # UI views
 from django.shortcuts import render, get_object_or_404, redirect
@@ -637,6 +617,72 @@ def authors_list(request):
         'authors': authors,
         'current_user_author': current_user_author,
     })
+
+
+@login_required
+def follow_remote_author(request):
+    """Follow a remote author by their FQID."""
+    if request.method != 'POST':
+        return redirect('authors-list')
+    
+    try:
+        current_author = request.user.author
+    except Author.DoesNotExist:
+        messages.error(request, 'You must have an approved author profile to follow others.')
+        return redirect('authors-list')
+    
+    remote_fqid = request.POST.get('remote_author_fqid', '').strip()
+    
+    if not remote_fqid:
+        messages.error(request, 'Please enter an author URL.')
+        return redirect('authors-list')
+    
+    # Validate it's a proper FQID format
+    if not remote_fqid.startswith('http'):
+        messages.error(request, 'Please enter a valid author URL (e.g., https://other-node.com/api/authors/123/).')
+        return redirect('authors-list')
+    
+    # Check if it's a local author
+    if is_local_author(remote_fqid):
+        messages.error(request, 'To follow local authors, use the Follow button on their profile.')
+        return redirect('authors-list')
+    
+    try:
+        # Get or create the remote author
+        remote_author, created = get_or_create_remote_author(remote_fqid)
+        
+        # Check if already following
+        if current_author.is_following(remote_author):
+            messages.info(request, f'You are already following {remote_author.displayName}.')
+            return redirect('authors-list')
+        
+        # Check if there's already a pending request
+        existing_request = FollowRequest.objects.filter(
+            actor=current_author,
+            object=remote_author,
+            status=FollowRequest.Status.PENDING
+        ).first()
+        
+        if existing_request:
+            messages.info(request, f'You already have a pending follow request to {remote_author.displayName}.')
+            return redirect('authors-list')
+        
+        # Create the follow request
+        follow_request, state = create_follow_request(current_author, remote_author)
+        
+        if state in ('pending', 'accepted'):
+            messages.success(request, f'Follow request sent to {remote_author.displayName}! They will need to approve your request before you can see their posts.')
+        else:
+            # Try to send to remote
+            send_follow_to_remote(current_author, remote_author)
+            messages.success(request, f'Follow request sent to {remote_author.displayName}!')
+        
+        return redirect('authors-list')
+        
+    except Exception as e:
+        messages.error(request, f'Could not follow author: {str(e)}')
+        return redirect('authors-list')
+
 
 @approved_author_required
 def author_followers(request, author_id):

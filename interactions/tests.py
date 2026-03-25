@@ -5,10 +5,13 @@ from django.db import IntegrityError
 from django.apps import apps
 from django.db.models import JSONField
 from django.contrib.auth.models import User
-from interactions.models import Like, Comment
+from .models import Like, Comment
 from posts.models import Entry
 from accounts.models import Author
-import json
+from nodes.models import RemoteNode
+import json, requests
+
+from unittest.mock import patch
 
 
 # The following tests were written with assistance from 
@@ -501,6 +504,8 @@ class AuthorCommentedAPITest(InteractionTestBase):
     def test_get_commented_response_shape(self):
         """Response has correct wrapper shape."""
         response = self.client.get(f'/api/authors/{self.user2.id}/commented/')
+        if response.status_code != 200:
+            print(response.content)
         data = response.json()
         self.assertEqual(data['type'], 'comments')
         self.assertEqual(data['count'], 1)
@@ -773,3 +778,284 @@ class LikeDetailAPITest(InteractionTestBase):
             f'/api/authors/{self.user1.id}/liked/00000000-0000-0000-0000-000000000000/'
         )
         self.assertEqual(response.status_code, 404)
+
+# ----------- REMOTE TESTS ----------- #
+
+class RemoteLikeEntryTest(InteractionTestBase):
+    def setUp(self):
+        super().setUp()
+        # 1. Define remote host and author
+        self.remote_host = "http://remote-node.com"
+        self.remote_author = Author.objects.create(
+            id=f"{self.remote_host}/api/authors/remote-uuid",
+            host=self.remote_host,
+            displayName="Remote Author",
+            is_approved=True
+        )
+        
+        # 2. Create a remote entry (linked via remote_author)
+        self.remote_entry = Entry.objects.create(
+            author=None, 
+            remote_author=self.remote_author,
+            title="Remote Post",
+            content="Hello from the other side",
+            visibility="PUBLIC",
+            fqid=f"{self.remote_host}/api/authors/remote-uuid/posts/post-uuid"
+        )
+
+        # 3. Create the RemoteNode config used for Auth
+        self.node = RemoteNode.objects.create(
+            url=self.remote_host,
+            username="node_user",
+            password="node_password",
+            is_active=True
+        )
+
+    @patch('interactions.views.requests.post')
+    def test_like_remote_entry_sends_to_inbox(self, mock_post):
+        """
+        Test that liking a remote entry triggers an API call with correct credentials.
+        """
+        mock_post.return_value.status_code = 201
+        self.client.login(username='sean', password='test123')
+        
+        response = self.client.post(f'/interactions/like/entry/{self.remote_entry.id}/')
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Verify remote call was made to the correct inbox URL
+        expected_inbox = f"{self.remote_author.id.rstrip('/')}/inbox/"
+        self.assertTrue(mock_post.called)
+        
+        # Check that RemoteNode credentials were used for Basic Auth
+        args, kwargs = mock_post.call_args
+        self.assertEqual(args[0], expected_inbox)
+        self.assertEqual(kwargs['auth'], ("node_user", "node_password"))
+        
+        # Verify the Like object exists locally
+        self.assertTrue(Like.objects.filter(author=self.author1, entry=self.remote_entry).exists())
+
+    @patch('interactions.views.requests.post')
+    def test_like_remote_entry_node_inactive(self, mock_post):
+        """
+        If the node is inactive, the view should skip the remote post.
+        """
+        self.node.disable() # Uses the disable() method from your model
+        
+        self.client.login(username='sean', password='test123')
+        response = self.client.post(f'/interactions/like/entry/{self.remote_entry.id}/')
+        
+        # Local like should still succeed
+        self.assertEqual(response.status_code, 200)
+        # Remote post should NOT be called because node is inactive
+        mock_post.assert_not_called()
+
+    @patch('interactions.views.requests.post')
+    def test_like_remote_entry_network_timeout(self, mock_post):
+        """
+        The UI should not crash if the remote node times out.
+        """
+        mock_post.side_effect = requests.exceptions.Timeout
+        
+        self.client.login(username='sean', password='test123')
+        response = self.client.post(f'/interactions/like/entry/{self.remote_entry.id}/')
+        
+        # We handle the exception silently in the view
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['liked'])
+
+
+class RemoteLikeCommentTest(InteractionTestBase):
+    def setUp(self):
+        super().setUp()
+        # 1. Setup Remote Host and Author
+        self.remote_host = "http://remote-node.com"
+        self.remote_author = Author.objects.create(
+            id=f"{self.remote_host}/api/authors/remote-uuid",
+            host=self.remote_host,
+            displayName="Remote Commenter",
+            is_approved=True
+        )
+        
+        # 2. Setup a Local Entry (so the comment has a parent)
+        self.local_entry = Entry.objects.create(
+            author=self.user1,
+            title="My Local Post",
+            visibility="PUBLIC"
+        )
+
+        # 3. Create a Comment by the Remote Author
+        self.remote_comment = Comment.objects.create(
+            entry=self.local_entry,
+            author=self.remote_author,
+            content="Great post!",
+            id="550e8400-e29b-41d4-a716-446655440000"
+        )
+
+        # 4. Create RemoteNode credentials for authentication
+        self.node = RemoteNode.objects.create(
+            url=self.remote_host,
+            username="node_admin",
+            password="node_password",
+            is_active=True
+        )
+
+    @patch('interactions.views.requests.post')
+    def test_like_remote_comment_sends_to_inbox(self, mock_post):
+        """
+        Test that liking a comment owned by a remote author sends a 
+        Like activity to that author's inbox.
+        """
+        mock_post.return_value.status_code = 201
+        self.client.login(username='sean', password='test123')
+        
+        # Act: Post to the toggle_like endpoint for a comment
+        response = self.client.post(f'/interactions/like/comment/{self.remote_comment.id}/')
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['liked'])
+
+        # Verify the Like object was stored locally
+        self.assertTrue(Like.objects.filter(author=self.author1, comment=self.remote_comment).exists())
+
+        # Verify the outgoing request
+        self.assertTrue(mock_post.called)
+        args, kwargs = mock_post.call_args
+        
+        # Target should be the remote author's inbox
+        expected_inbox = f"{self.remote_author.id.rstrip('/')}/inbox/"
+        self.assertEqual(args[0], expected_inbox)
+        
+        # Verify Auth credentials from RemoteNode
+        self.assertEqual(kwargs['auth'], ("node_admin", "node_password"))
+        
+        # Verify Payload 'object' matches the comment FQID format in views.py
+        payload = kwargs['json']
+        expected_object_url = f"{self.remote_author.id}/comments/{self.remote_comment.id}"
+        self.assertEqual(payload['type'], 'Like')
+        self.assertEqual(payload['object'], expected_object_url)
+
+    @patch('interactions.views.requests.post')
+    def test_unlike_remote_comment_does_not_resend_to_remote(self, mock_post):
+        """
+        Test that deleting a like (unliking) locally works. 
+        Note: Depending on your requirements, you might want an 'Undo' 
+        activity sent, but your current view only sends on 'created'.
+        """
+        # Pre-create a like
+        Like.objects.create(author=self.author1, comment=self.remote_comment)
+        
+        self.client.login(username='sean', password='test123')
+        response = self.client.post(f'/interactions/like/comment/{self.remote_comment.id}/')
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()['liked'])
+        
+        # Current logic in views.py only calls remote inbox if 'created' is True
+        mock_post.assert_not_called()
+
+
+class RemoteCommentDeliveryTest(InteractionTestBase):
+    def setUp(self):
+        super().setUp()
+        # 1. Setup the Remote Author (The owner of the post)
+        self.remote_host = "http://external-node.ca"
+        self.remote_author = Author.objects.create(
+            id=f"{self.remote_host}/api/authors/remote-uuid",
+            host=self.remote_host,
+            displayName="Remote Blogger",
+            is_approved=True
+        )
+
+        # 2. Setup the Remote Entry (The post being commented on)
+        self.remote_entry = Entry.objects.create(
+            author=None,
+            remote_author=self.remote_author,
+            title="Remote Post",
+            fqid=f"{self.remote_host}/api/authors/remote-uuid/entries/post-123",
+            visibility="PUBLIC"
+        )
+
+        # 3. Setup RemoteNode credentials for the host
+        self.node = RemoteNode.objects.create(
+            url=self.remote_host,
+            username="api_user",
+            password="api_password",
+            is_active=True
+        )
+
+    @patch('interactions.views.requests.post')
+    def test_add_comment_sends_to_remote_inbox(self, mock_post):
+        """
+        Test that adding a comment via the UI triggers send_comment_to_remote_inbox.
+        """
+        mock_post.return_value.status_code = 201
+        self.client.login(username='sean', password='test123')
+
+        # Act: Use the UI view to add a comment
+        comment_data = {'content': 'This is a test comment'}
+        response = self.client.post(
+            f'/interactions/add_comment/{self.remote_entry.id}/', 
+            data=comment_data
+        )
+
+        # UI view redirects back to entry_detail
+        self.assertEqual(response.status_code, 302)
+
+        # Verify Comment exists in DB
+        comment = Comment.objects.get(content='This is a test comment')
+        self.assertEqual(comment.author, self.author1)
+
+        # Verify Remote Delivery
+        self.assertTrue(mock_post.called)
+        args, kwargs = mock_post.call_args
+        
+        # Check target inbox URL
+        expected_inbox = f"{self.remote_author.id.rstrip('/')}/inbox/"
+        self.assertEqual(args[0], expected_inbox)
+
+        # Check Payload structure (matching your send_comment_to_remote_inbox logic)
+        payload = kwargs['json']
+        self.assertEqual(payload['type'], 'comment')
+        self.assertEqual(payload['comment'], 'This is a test comment')
+        self.assertEqual(payload['author']['id'], self.author1.id)
+        self.assertEqual(payload['entry'], self.remote_entry.fqid)
+
+        # Check Auth credentials
+        self.assertEqual(kwargs['auth'], ("api_user", "api_password"))
+
+    @patch('interactions.views.requests.post')
+    def test_add_comment_local_entry_no_remote_call(self, mock_post):
+        """
+        Ensure no remote call is made if the entry author is local.
+        """
+        local_entry = Entry.objects.create(
+            author=self.user1, # Self-commenting on own post
+            title="Local Post",
+            visibility="PUBLIC"
+        )
+
+        self.client.login(username='sean', password='test123')
+        self.client.post(
+            f'/interactions/add_comment/{local_entry.id}/', 
+            data={'content': 'Local comment'}
+        )
+
+        # Should not attempt a remote POST
+        mock_post.assert_not_called()
+
+    @patch('interactions.views.requests.post')
+    def test_add_comment_remote_node_inactive(self, mock_post):
+        """
+        Verify no remote delivery if the RemoteNode is disabled.
+        """
+        self.node.disable() # Using your RemoteNode.disable() method
+        
+        self.client.login(username='sean', password='test123')
+        self.client.post(
+            f'/interactions/add_comment/{self.remote_entry.id}/', 
+            data={'content': 'Ghost comment'}
+        )
+
+        # Node is inactive, so delivery should be skipped
+        mock_post.assert_not_called()

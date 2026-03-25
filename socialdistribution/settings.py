@@ -28,12 +28,13 @@ SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me")
 DEBUG = os.getenv("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") + [
-    "armaan-node-2f540b0851c6.herokuapp.com",
+    "crimson-hazel-f17dca3230bc.herokuapp.com",
+    "cmput404-crimson-swcarson-55711a031595.herokuapp.com",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://armaan-node-2f540b0851c6.herokuapp.com",
-    "https://crimson-hazel-f17dca3230bc.herokuapp.com",
+    'https://crimson-hazel-f17dca3230bc.herokuapp.com',
+    "https://cmput404-crimson-swcarson-55711a031595.herokuapp.com",
 ]
 
 # Default to localhost for development, override in production

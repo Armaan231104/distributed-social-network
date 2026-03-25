@@ -1,20 +1,90 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
-from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST, require_http_methods
 from django.db.models import Q
-from django.contrib.auth.models import User
 from .models import Entry, HostedImage
 from accounts.models import Author, Follow
 from nodes.models import RemoteNode
-from nodes.models import RemoteNode
 from interactions.views import user_can_access_entry
-from nodes.utils import send_entry_to_remote
-from nodes.utils import send_entry_to_remote
 import json
 from functools import wraps
 import requests
+
+
+def fetch_remote_author_posts(remote_author):
+    """
+    Fetch posts from a remote author and store them locally.
+    Returns a queryset of the fetched/stored entries.
+    """
+    if remote_author.user:
+        return Entry.objects.none()
+    
+    remote_author_id = remote_author.id.rstrip('/')
+    author_id_part = remote_author_id.split('/')[-1]
+    
+    remote_host = remote_author.host.rstrip('/')
+    posts_url = f"{remote_host}/api/authors/{author_id_part}/posts/"
+    
+    node = None
+    for n in RemoteNode.objects.filter(is_active=True):
+        if remote_host in n.url:
+            node = n
+            break
+    
+    if not node:
+        return Entry.objects.none()
+    
+    try:
+        response = requests.get(
+            posts_url,
+            auth=(node.username, node.password),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            return Entry.objects.none()
+        
+        data = response.json()
+        posts = data.get('src', [])
+        
+        stored_entries = []
+        for post in posts:
+            visibility = post.get('visibility', 'PUBLIC')
+            if visibility == 'DELETED':
+                continue
+            
+            fqid = post.get('id')
+            if not fqid:
+                continue
+            
+            entry, created = Entry.objects.get_or_create(
+                fqid=fqid,
+                defaults={
+                    'title': post.get('title', ''),
+                    'content': post.get('content', ''),
+                    'content_type': post.get('contentType', 'text/plain'),
+                    'visibility': visibility,
+                    'author': remote_author,
+                }
+            )
+            
+            if created or entry.published_at is None:
+                published = post.get('published')
+                if published:
+                    from django.utils.dateparse import parse_datetime
+                    dt = parse_datetime(published)
+                    if dt:
+                        entry.published_at = dt
+                        entry.save(update_fields=['published_at'])
+            
+            stored_entries.append(entry.id)
+        
+        return Entry.objects.filter(id__in=stored_entries)
+    
+    except Exception as e:
+        print(f"Error fetching remote posts from {remote_author.displayName}: {e}")
+        return Entry.objects.none()
 
 def get_entry_by_id(entry_id):
     if str(entry_id).startswith("http"):
@@ -40,8 +110,6 @@ def approved_author_required(view_func):
 
         return view_func(request, *args, **kwargs)
     return wrapper
-from functools import wraps
-import requests
 
 def get_entry_by_id(entry_id):
     if str(entry_id).startswith("http"):
@@ -77,7 +145,7 @@ def get_stream_entries_for_user(user):
     - Authenticated users see:
         • Their own entries (excluding DELETED)
         • All PUBLIC entries on the node
-        • UNLISTED entries from authors they follow
+        • UNLISTED entries from authors they follow (local and remote)
         • FRIENDS entries from mutual followers
     """
 
@@ -110,12 +178,26 @@ def get_stream_entries_for_user(user):
         if a.user and a.is_following(current_author)
     ]
 
-    return base_qs.filter(
+    local_entries = base_qs.filter(
         Q(author=user) |
         Q(visibility="PUBLIC") |
         Q(author__in=followed_users, visibility="UNLISTED") |
         Q(author__in=friend_users, visibility="FRIENDS")
-    ).order_by('-published_at').distinct()
+    )
+
+    remote_following = Follow.objects.filter(
+        follower=current_author,
+        followee__user__isnull=True
+    ).select_related('followee')
+
+    remote_entries = Entry.objects.none()
+    for follow in remote_following:
+        remote_author = follow.followee
+        posts = fetch_remote_author_posts(remote_author)
+        remote_entries = remote_entries | posts
+
+    all_entries = local_entries | remote_entries
+    return all_entries.order_by('-published_at').distinct()
 
 @approved_author_required
 @approved_author_required
