@@ -33,7 +33,7 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") + [
 
 CSRF_TRUSTED_ORIGINS = [
     'https://crimson-hazel-f17dca3230bc.herokuapp.com',
-    "cmput404-crimson-swcarson-55711a031595.herokuapp.com",
+    "https://cmput404-crimson-swcarson-55711a031595.herokuapp.com",
 ]
 
 # Default to localhost for development, override in production
