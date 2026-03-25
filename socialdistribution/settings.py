@@ -30,9 +30,11 @@ DEBUG = os.getenv("DEBUG", "False") == "True"
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") + [
     "crimson-hazel-f17dca3230bc.herokuapp.com",
     "cmput404-crimson-swcarson-55711a031595.herokuapp.com",
+    "https://crimson-aaron-aee261bd70fb.herokuapp.com"
 ]
 
 CSRF_TRUSTED_ORIGINS = [
+    "https://crimson-aaron-aee261bd70fb.herokuapp.com"
     'https://crimson-hazel-f17dca3230bc.herokuapp.com',
     "https://cmput404-crimson-swcarson-55711a031595.herokuapp.com",
 ]
