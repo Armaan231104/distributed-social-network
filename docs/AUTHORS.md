@@ -6,7 +6,7 @@ This document describes the API endpoints for the author system, which handles a
 
 The author system implements the follow functionality described in the project specification. Authors can follow other authors, and followers must be approved before they can see an author's posts.
 
-Every author has a unique identifier. Local authors use integer IDs (1, 2, 3...) while remote authors use Fully Qualified IDs (FQIDs) such as `http://remote-node.com/api/authors/abc123/`. API endpoints accept either format depending on whether the target author is local or remote.
+Every author has a unique identifier. Local authors may be referenced using integer IDs internally, but all API responses and external communication use Fully Qualified IDs (FQIDs). While remote authors use Fully Qualified IDs (FQIDs) such as `http://remote-node.com/api/authors/abc123/`. API endpoints accept either format depending on whether the target author is local or remote.
 
 ## Pagination
 
@@ -21,6 +21,64 @@ The following endpoints return paginated results:
 **Response:** `{ "type": "following", "following": [...], "page_number": 1, "size": 50, "count": 150 }`
 
 ---
+## Fully Qualified IDs (FQID)
+
+In this system, all authors are uniquely identified using Fully Qualified IDs (FQIDs).
+
+An FQID is a full URL that globally identifies an author across all nodes.
+
+### Format
+
+http://<host>/api/authors/<id>/
+
+### Examples
+
+
+http://127.0.0.1:8000/api/authors/1/
+
+http://remote-node.com/api/authors/abc123/
+
+
+### Why FQIDs are used
+
+Local numeric IDs are not globally unique across distributed nodes.  
+Using full URLs ensures:
+
+- No ID collisions between nodes
+- Authors can be uniquely identified across the network
+- Remote authors can be stored and referenced consistently
+
+### Internal Handling
+
+All incoming author IDs are normalized to FQID format using:
+
+- trailing slash enforcement
+- host resolution for local IDs
+
+For example:
+
+- `"1"` → `http://<host>/api/authors/1/`
+- `"http://host/api/authors/1"` → `http://host/api/authors/1/`
+
+### Local vs Remote Authors
+
+- Local authors have a Django `User`
+- Remote authors have:
+  - no local user
+  - an FQID pointing to another node
+
+### API Behavior
+
+All API responses return author IDs as FQIDs.
+
+Clients may send either:
+- local IDs (`1`)
+- or full FQIDs
+
+The server normalizes both formats internally.
+
+---
+
 **The following API documentation was generated from Google, Gemini "Generate markdown documentation for the API including request body/params and response body" 2026-02-24**
 **Only the endpoint documentation is AI generated in this document, however it reviewed for correctness.**
 ## API Endpoints

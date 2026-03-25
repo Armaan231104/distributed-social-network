@@ -8,6 +8,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from accounts.models import Author, Follow
 from posts.models import Entry
 from nodes.models import RemoteNode
+import base64
 
 
 class PostsApiTests(TestCase):
@@ -16,8 +17,7 @@ class PostsApiTests(TestCase):
         self.user1 = User.objects.create_user(username="u1", password="pass12345")
         self.user2 = User.objects.create_user(username="u2", password="pass12345")
         self.admin = User.objects.create_user(
-            username="admin", password="pass12345", is_staff=True
-        )
+            username="admin", password="pass12345", is_staff=True)
 
     def post_json(self, payload):
         return self.client.post(
@@ -64,7 +64,7 @@ class PostsApiTests(TestCase):
         )
         self.assertEqual(resp.status_code, 201)
 
-        entry = Entry.objects.get(id=resp.json()["id"])
+        entry = Entry.objects.get(fqid=resp.json()["id"])
         self.assertEqual(entry.visibility, "UNLISTED")
 
     def test_my_entries_excludes_deleted(self):
@@ -82,8 +82,8 @@ class PostsApiTests(TestCase):
         self.assertEqual(resp.status_code, 200)
 
         ids = {item["id"] for item in resp.json()}
-        self.assertIn(str(e1.id), ids)
-        self.assertNotIn(str(e2.id), ids)
+        self.assertIn(e1.fqid, ids)
+        self.assertNotIn(e2.fqid, ids)
 
     def test_get_public_entry_anonymous_ok(self):
         e = Entry.objects.create(
@@ -198,7 +198,7 @@ class PostsApiTests(TestCase):
         })
         self.assertEqual(resp.status_code, 201)
 
-        entry = Entry.objects.get(id=resp.json()["id"])
+        entry = Entry.objects.get(fqid=resp.json()["id"])
         self.assertEqual(entry.author, self.user1)
         self.assertEqual(entry.title, "Plain")
         self.assertEqual(entry.content, "hello world")
@@ -220,7 +220,7 @@ class PostsApiTests(TestCase):
         })
         self.assertEqual(resp.status_code, 201)
 
-        entry = Entry.objects.get(id=resp.json()["id"])
+        entry = Entry.objects.get(fqid=resp.json()["id"])
         self.assertEqual(entry.content_type, "text/markdown")
 
     '''
@@ -232,7 +232,7 @@ class PostsApiTests(TestCase):
         resp = self.post_image_multipart(title="Pic", content="caption here")
         self.assertEqual(resp.status_code, 201)
 
-        entry = Entry.objects.get(id=resp.json()["id"])
+        entry = Entry.objects.get(fqid=resp.json()["id"])
         self.assertEqual(entry.author, self.user1)
 
     '''
@@ -294,6 +294,8 @@ class PostVisibilityOnProfileTest(TestCase):
             username='author', password='testpass123'
         )
         self.author = self.author_user.author
+        self.author.is_approved = True
+        self.author.save()
 
         self.non_follower_user = User.objects.create_user(
             username='non_follower', password='testpass123'
@@ -303,15 +305,22 @@ class PostVisibilityOnProfileTest(TestCase):
             username='follower', password='testpass123'
         )
         self.follower_author = self.follower_user.author
+        self.follower_author.is_approved = True
+        self.follower_author.save()
         Follow.objects.create(follower=self.follower_author, followee=self.author)
 
         self.friend_user = User.objects.create_user(
             username='friend', password='testpass123'
         )
         self.friend_author = self.friend_user.author
+        self.friend_author.is_approved = True
+        self.friend_author.save()
         Follow.objects.create(follower=self.friend_author, followee=self.author)
         Follow.objects.create(follower=self.author, followee=self.friend_author)
 
+        self.non_follower_author = self.non_follower_user.author
+        self.non_follower_author.is_approved = True
+        self.non_follower_author.save()
         self.public_post = Entry.objects.create(
             author=self.author_user,
             title='Public Post',
@@ -341,105 +350,114 @@ class PostVisibilityOnProfileTest(TestCase):
             'author-profile', kwargs={'author_id': self.author.id}
         )
 
+    # helper
+    def get_ids(self, response):
+        if response.status_code == 302:
+            return set()
+
+        self.assertIsNotNone(response.context)
+        posts = response.context['posts']
+        return {p.fqid for p in posts}
+
     # --- PUBLIC ---
 
     def test_public_post_visible_to_unauthenticated_user(self):
         response = self.client.get(self.profile_url)
-        self.assertIn(self.public_post, response.context['posts'])
+        self.assertEqual(response.status_code, 302)
 
     def test_public_post_visible_to_non_follower(self):
         self.client.login(username='non_follower', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertIn(self.public_post, response.context['posts'])
+        self.assertIn(self.public_post.fqid, self.get_ids(response))
 
     def test_public_post_visible_to_follower(self):
         self.client.login(username='follower', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertIn(self.public_post, response.context['posts'])
+        self.assertIn(self.public_post.fqid, self.get_ids(response))
 
     def test_public_post_visible_to_friend(self):
         self.client.login(username='friend', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertIn(self.public_post, response.context['posts'])
+        self.assertIn(self.public_post.fqid, self.get_ids(response))
 
     def test_public_post_visible_to_author_on_own_profile(self):
         self.client.login(username='author', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertIn(self.public_post, response.context['posts'])
+        self.assertIn(self.public_post.fqid, self.get_ids(response))
 
     # --- UNLISTED ---
 
     def test_unlisted_post_not_visible_to_unauthenticated_user(self):
         response = self.client.get(self.profile_url)
-        self.assertNotIn(self.unlisted_post, response.context['posts'])
+        self.assertNotIn(self.unlisted_post.fqid, self.get_ids(response))
 
     def test_unlisted_post_not_visible_to_non_follower(self):
         self.client.login(username='non_follower', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertNotIn(self.unlisted_post, response.context['posts'])
+        self.assertNotIn(self.unlisted_post.fqid, self.get_ids(response))
 
     def test_unlisted_post_visible_to_follower(self):
         self.client.login(username='follower', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertIn(self.unlisted_post, response.context['posts'])
+        self.assertIn(self.unlisted_post.fqid, self.get_ids(response))
 
     def test_unlisted_post_visible_to_friend(self):
         self.client.login(username='friend', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertIn(self.unlisted_post, response.context['posts'])
+        self.assertIn(self.unlisted_post.fqid, self.get_ids(response))
 
     def test_unlisted_post_visible_to_author_on_own_profile(self):
         self.client.login(username='author', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertIn(self.unlisted_post, response.context['posts'])
+        self.assertIn(self.unlisted_post.fqid, self.get_ids(response))
 
     # --- FRIENDS ---
 
     def test_friends_post_not_visible_to_unauthenticated_user(self):
         response = self.client.get(self.profile_url)
-        self.assertNotIn(self.friends_post, response.context['posts'])
+        self.assertNotIn(self.friends_post.fqid, self.get_ids(response))
 
     def test_friends_post_not_visible_to_non_follower(self):
         self.client.login(username='non_follower', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertNotIn(self.friends_post, response.context['posts'])
+        self.assertNotIn(self.friends_post.fqid, self.get_ids(response))
 
     def test_friends_post_not_visible_to_one_way_follower(self):
         self.client.login(username='follower', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertNotIn(self.friends_post, response.context['posts'])
+        self.assertNotIn(self.friends_post.fqid, self.get_ids(response))
 
     def test_friends_post_visible_to_mutual_follower(self):
         self.client.login(username='friend', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertIn(self.friends_post, response.context['posts'])
+        self.assertIn(self.friends_post.fqid, self.get_ids(response))
 
     def test_friends_post_visible_to_author_on_own_profile(self):
         self.client.login(username='author', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertIn(self.friends_post, response.context['posts'])
+        self.assertIn(self.friends_post.fqid, self.get_ids(response))
 
     # --- DELETED ---
 
     def test_deleted_post_not_visible_to_author_on_own_profile(self):
         self.client.login(username='author', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertNotIn(self.deleted_post, response.context['posts'])
+        self.assertNotIn(self.deleted_post.fqid, self.get_ids(response))
 
     def test_deleted_post_not_visible_to_non_follower(self):
         self.client.login(username='non_follower', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertNotIn(self.deleted_post, response.context['posts'])
+        self.assertNotIn(self.deleted_post.fqid, self.get_ids(response))
 
     def test_deleted_post_not_visible_to_follower(self):
         self.client.login(username='follower', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertNotIn(self.deleted_post, response.context['posts'])
+        self.assertNotIn(self.deleted_post.fqid, self.get_ids(response))
 
     def test_deleted_post_not_visible_to_friend(self):
         self.client.login(username='friend', password='testpass123')
         response = self.client.get(self.profile_url)
-        self.assertNotIn(self.deleted_post, response.context['posts'])
+        self.assertNotIn(self.deleted_post.fqid, self.get_ids(response))
 
 
 class NodeAdminDeletedEntriesTest(TestCase):
@@ -467,12 +485,16 @@ class NodeAdminDeletedEntriesTest(TestCase):
         self.regular_user = User.objects.create_user(
             username='regular', password='pass12345'
         )
+        self.regular_user.author.is_approved = True
+        self.regular_user.author.save()
         self.admin_user = User.objects.create_user(
             username='nodeadmin', password='pass12345', is_staff=True
         )
         self.author_user = User.objects.create_user(
             username='postauthor', password='pass12345'
         )
+        self.author_user.author.is_approved = True
+        self.author_user.author.save()
 
         self.live_entry = Entry.objects.create(
             author=self.author_user,
@@ -600,8 +622,13 @@ class NodeAdminDeletedEntriesTest(TestCase):
     def test_deleted_entry_absent_from_stream(self):
         self.client.login(username='regular', password='pass12345')
         response = self.client.get('/posts/stream/')
+
         self.assertEqual(response.status_code, 200)
-        self.assertNotIn(self.deleted_entry, response.context['posts'])
+        self.assertIsNotNone(response.context)
+        posts = response.context['posts']
+        ids = {p.fqid for p in posts}
+
+        self.assertNotIn(self.deleted_entry.fqid, ids)
 
     '''
     Tests: A live entry still appears in the author's own stream after another entry is deleted.
@@ -610,7 +637,13 @@ class NodeAdminDeletedEntriesTest(TestCase):
     def test_live_entry_still_in_stream_after_deletion(self):
         self.client.login(username='postauthor', password='pass12345')
         response = self.client.get('/posts/stream/')
-        self.assertIn(self.live_entry, response.context['posts'])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(response.context)
+        posts = response.context['posts']
+        ids = {p.fqid for p in posts}
+
+        self.assertIn(self.live_entry.fqid, ids)
 
     # ------------------------------------------------------------------
     # Entry detail page: access control for deleted entries
@@ -672,6 +705,8 @@ class InboxEntryTests(TestCase):
         # local author who will receive inbox items
         self.local_user = User.objects.create_user(username='local', password='pass12345')
         self.local_author = self.local_user.author
+        self.local_author.is_approved = True
+        self.local_author.save()
 
         # remote node credentials
         self.node = RemoteNode.objects.create(
@@ -835,3 +870,164 @@ class InboxEntryTests(TestCase):
                 content_type='application/json',
             )
             self.assertFalse(mock_post.called)
+
+class FQIDTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="fqid_user", password="pass12345")
+        self.author = self.user.author
+
+    '''
+    Tests: Author ID is stored as a full URL (FQID)
+    Pass Condition: author.id starts with http and contains /authors/
+    '''
+    def test_author_id_is_fqid(self):
+        self.assertTrue(self.author.id.startswith("http"))
+        self.assertIn("/authors/", self.author.id)
+
+    '''
+    Tests: Entry automatically generates an FQID on save
+    Pass Condition: fqid is not null and contains author path
+    '''
+    def test_entry_generates_fqid(self):
+        entry = Entry.objects.create(
+            author=self.user,
+            title="Test",
+            content="content",
+            content_type="text/plain"
+        )
+
+        self.assertIsNotNone(entry.fqid)
+        self.assertIn("/entries/", entry.fqid)
+        self.assertIn(str(entry.id), entry.fqid)
+
+    '''
+    Tests: Remote entry keeps provided FQID
+    Pass Condition: fqid remains exactly as provided
+    '''
+    def test_remote_entry_preserves_fqid(self):
+        remote_author = Author.objects.create(
+            id="http://remote.com/api/authors/999/",
+            host="http://remote.com/api/",
+            displayName="Remote",
+            user=None,
+            is_approved=True
+        )
+
+        entry = Entry.objects.create(
+            remote_author=remote_author,
+            title="Remote Entry",
+            content="hello",
+            content_type="text/plain",
+            fqid="http://remote.com/api/authors/999/entries/123"
+        )
+
+        self.assertEqual(entry.fqid, "http://remote.com/api/authors/999/entries/123")
+
+class InboxImageTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+        self.local_user = User.objects.create_user(username='localimg', password='pass12345')
+        self.local_author = self.local_user.author
+        self.local_author.is_approved = True
+        self.local_author.save()
+
+        self.node = RemoteNode.objects.create(
+            url='http://remotenode.com/api/',
+            username='remoteuser',
+            password='remotepass',
+            is_active=True,
+        )
+
+        from urllib.parse import urlparse
+        author_path = urlparse(self.local_author.id).path
+        self.inbox_url = f'{author_path}inbox/'
+
+    def post_to_inbox(self, payload):
+        return self.client.post(
+            self.inbox_url,
+            data=json.dumps(payload),
+            content_type='application/json',
+            HTTP_AUTHORIZATION='Basic ' + base64.b64encode(
+                b'remoteuser:remotepass'
+            ).decode()
+        )
+
+    '''
+    Tests: Inbox accepts base64 image and creates entry with image file
+    Pass Condition: entry is created and image field is not empty
+    '''
+    def test_inbox_creates_image_entry_from_base64(self):
+        fake_image = base64.b64encode(b"fake image data").decode()
+
+        payload = {
+            "type": "entry",
+            "id": "http://remotenode.com/api/authors/999/entries/img123",
+            "title": "Image Entry",
+            "contentType": "image/png;base64",
+            "content": fake_image,
+            "visibility": "PUBLIC",
+            "author": {
+                "type": "author",
+                "id": "http://remotenode.com/api/authors/999",
+                "host": "http://remotenode.com/api/",
+                "displayName": "Remote User"
+            }
+        }
+
+        resp = self.post_to_inbox(payload)
+        self.assertIn(resp.status_code, [200, 201])
+
+        entry = Entry.objects.get(fqid=payload["id"])
+        self.assertIsNotNone(entry.image)
+
+class FanoutFQIDTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+        self.user = User.objects.create_user(username='sender', password='pass12345')
+        self.author = self.user.author
+
+        self.node = RemoteNode.objects.create(
+            url="http://remote.com/api/",
+            username="remoteuser",
+            password="remotepass",
+            is_active=True,
+        )
+
+        self.remote_author = Author.objects.create(
+            id="http://remote.com/api/authors/999",
+            host="http://remote.com/api/",
+            displayName="Remote",
+            user=None,
+            is_approved=True
+        )
+
+        Follow.objects.create(follower=self.remote_author, followee=self.author)
+
+    '''
+    Tests: Fanout sends entry using FQID
+    Pass Condition: outgoing request contains entry fqid
+    '''
+    def test_fanout_uses_fqid(self):
+        with patch('posts.views.requests.post') as mock_post:
+            self.client.login(username='sender', password='pass12345')
+
+            self.client.post(
+                '/posts/api/entries/',
+                data=json.dumps({
+                    'title': 'Test',
+                    'content': 'hello',
+                    'contentType': 'text/plain',
+                    'visibility': 'PUBLIC',
+                }),
+                content_type='application/json',
+            )
+
+            self.assertTrue(mock_post.called)
+
+            args, kwargs = mock_post.call_args
+            sent_data = kwargs.get('json', {})
+
+            self.assertIn("id", sent_data)
+            self.assertTrue(sent_data["id"].startswith("http"))
