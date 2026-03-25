@@ -5,10 +5,12 @@ from django.http import JsonResponse
 from django.views import View
 from django.conf import settings
 import json
+import requests
 
 from posts.models import Entry
 from accounts.models import Author
 from .models import Like, Comment
+from nodes.models import RemoteNode
 from .serializers import (
     LikeSerializer, CommentSerializer,
     serialize_likes, serialize_comments
@@ -56,17 +58,28 @@ def toggle_like(request, object_type, object_id):
     Checks if the object (comment or entry) has been liked by the user, then
     either adds or deletes a like depending on current status.
     """
-    author = request.user.author
+    liking_author = request.user.author
+
     if object_type == 'entry':
         obj = get_object_or_404(Entry, id=object_id)
         if not user_can_access_entry(request.user, obj):
             return JsonResponse({'error': 'Forbidden'}, status=403)
-        like, created = Like.objects.get_or_create(author=author, entry=obj, comment=None)
+        
+        target_author = obj.get_author
+        object_url = obj.fqid or f"{liking_author.host}api/authors/{target_author.id}/posts/{obj.id}"
+
+        like, created = Like.objects.get_or_create(author=liking_author, entry=obj, comment=None)
+
     elif object_type == 'comment':
         obj = get_object_or_404(Comment, id=object_id)
         if not user_can_access_entry(request.user, obj.entry):
             return JsonResponse({'error': 'Forbidden'}, status=403)
-        like, created = Like.objects.get_or_create(author=author, entry=None, comment=obj)
+        
+        target_author = obj.author
+        object_url = f"{target_author.id}/comments/{obj.id}"
+
+        like, created = Like.objects.get_or_create(author=liking_author, entry=None, comment=obj)
+
     else:
         return JsonResponse({'error': 'invalid type'}, status=400)
 
@@ -76,7 +89,50 @@ def toggle_like(request, object_type, object_id):
     else:
         liked = True
 
+    if target_author and not target_author.is_local:
+        send_like_to_remote_inbox(liking_author, target_author, object_url, summary)
+
     return JsonResponse({'liked': liked, 'like_count': obj.likes.count()})
+
+
+def send_like_to_remote_inbox(sender, recipient, object_url, summary):
+    """
+    Sends a standard 'Like' object to the recipient's inbox.
+    """
+    target_host = recipient.host.rstip('/')
+    # Recipient ID is already the full URL (e.g., http://node/api/authors/uuid)
+    inbox_url = recipient.id.rstrip('/') + '/inbox/'
+
+    try:
+        node_config = RemoteNode.objects.get(url__icontains=target_host, is_active=True)
+        auth_credentials = (node_config.username, node_config.password)
+    except RemoteNode.DoesNotExist:
+        # if no node is configured, the request will likely fail with 401/403
+        print(f"No credentials found for host: {target_host}")
+        return None
+    
+    payload = {
+        "type": "Like",
+        "summary": summary,
+        "author": {
+            "type": "author",
+            "id": sender.id,
+            "host": sender.host,
+            "displayName": sender.displayName,
+            "url": sender.id,
+            "github": sender.github,
+            "profileImage": sender.profileImage.url if sender.profileImage else None
+        },
+        "object": object_url
+    }
+
+    try:
+        # 5-second timeout to prevent Heroku worker hang-ups
+        response = requests.post(inbox_url, json=payload, auth=auth_credentials, timeout=5)
+        return response.status_code
+    except requests.exceptions.RequestException as e:
+        print(f"Remote conn failed: {e}")
+        return None
 
 
 @login_required

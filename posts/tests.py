@@ -781,7 +781,7 @@ class InboxEntryTests(TestCase):
         payload['id'] = 'http://remotenode.com/api/authors/999/entries/456'
         payload['author'] = {
             'type': 'author',
-            'id': 'http://remotenode.com/api/authors/888',
+            'id': 'http://remotenode.com/api/authors/888/',
             'host': 'http://remotenode.com/api/',
             'displayName': 'Brand New Remote User',
             'github': None,
@@ -790,7 +790,7 @@ class InboxEntryTests(TestCase):
         }
         resp = self.post_to_inbox(payload)
         self.assertEqual(resp.status_code, 201)
-        self.assertTrue(Author.objects.filter(id='http://remotenode.com/api/authors/888').exists())
+        self.assertTrue(Author.objects.filter(id='http://remotenode.com/api/authors/888/').exists())
 
     '''
     Tests: fanout sends entry to remote followers' inboxes on post creation

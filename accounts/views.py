@@ -43,7 +43,8 @@ def get_or_create_author(author_data):
         host=author_data.get('host', ''),
         displayName=author_data.get('displayName', 'Unknown'),
         github=author_data.get('github'),
-        profileImage=author_data.get('profileImage'),
+        # if string URL set to None, since we can't import images yet.  fix in future
+        profileImage=author_data.get('profileImage') if not isinstance(author_data.get('profileImage'), str) else None,
         web=author_data.get('web'),
         is_approved=True,
     )
