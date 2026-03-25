@@ -136,8 +136,8 @@ def stream(request):
     import socialdistribution.settings as settings
     print("=== Cloudinary Config Check ===")
     print("CLOUDINARY_CLOUD_NAME :", os.environ.get('CLOUDINARY_CLOUD_NAME'))
-    print("CLOUDINARY_API_KEY    :", bool(os.environ.get('CLOUDINARY_API_KEY')))
-    print("CLOUDINARY_API_SECRET :", bool(os.environ.get('CLOUDINARY_API_SECRET')))
+    print("CLOUDINARY_API_KEY    :", os.environ.get('CLOUDINARY_API_KEY'))
+    print("CLOUDINARY_API_SECRET :", os.environ.get('CLOUDINARY_API_SECRET'))
     print("DEBUG                 :", settings.DEBUG)
     print("DEFAULT_FILE_STORAGE  :", getattr(settings, 'DEFAULT_FILE_STORAGE', 'NOT SET'))
     print(cloudinary.config().__dict__)
