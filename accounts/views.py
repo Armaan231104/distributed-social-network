@@ -103,10 +103,8 @@ def send_follow_to_remote(actor, target):
         }
         
         # Try to get credentials from stored nodes
-        node = RemoteNode.objects.filter(
-            url__startswith=target.host.rstrip('/'),
-            is_active=True
-        ).first()
+        target_host = target.host.rstrip('/')
+        node = next((n for n in RemoteNode.objects.filter(is_active=True) if target_host.startswith(n.url.rstrip('/'))), None)
         
         if node:
             # Use stored node credentials
@@ -559,6 +557,57 @@ class InboxView(APIView):
                 }
             )
             return Response({'status': 'entry received'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+        elif data.get('type') in ['like', 'Like']:
+            from interactions.models import Like
+            actor = get_or_create_author(data.get('author', {}))
+            obj_url = str(data.get('object', ''))
+            if actor and obj_url:
+                entry = Entry.objects.filter(id=obj_url.rstrip('/').split('/')[-1]).first() or Entry.objects.filter(fqid=obj_url).first()
+                if entry:
+                    Like.objects.get_or_create(author=actor, entry=entry)
+            return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
+            
+        elif data.get('type') in ['comment', 'Comment']:
+            from interactions.models import Comment
+            actor = get_or_create_author(data.get('author', {}))
+            content = data.get('comment', 'remote comment')
+            # Spec states comments are often sent directly to POST /api/authors/{id}/posts/{id}/comments
+            # If inbox router catches it, we accept it generically.
+            return Response({'status': 'comment received'}, status=status.HTTP_201_CREATED)
+
+        elif data.get("type") == "entry":
+            author_data = data.get("author", {})
+            author = get_or_create_author(author_data)
+
+            if not author:
+                return Response({'error': 'Invalid author'}, status=400)
+
+            content_type = data.get("contentType")
+            content = data.get("content", "")
+
+            image_file = None
+
+            # 🧠 HANDLE IMAGE
+            if content_type and "base64" in content_type:
+                import base64
+                from django.core.files.base import ContentFile
+
+                image_file = ContentFile(
+                    base64.b64decode(content),
+                    name="remote_image.png"
+                )
+
+            entry = Entry.objects.create(
+                author=author.user if author.user else None,
+                title=data.get("title", ""),
+                content="" if image_file else content,
+                content_type=content_type,
+                visibility=data.get("visibility", "PUBLIC"),
+                image=image_file
+            )
+
+            return Response({'status': 'entry received'}, status=201)
 
         return Response({'error': 'Unknown inbox item type'}, status=status.HTTP_400_BAD_REQUEST)
 

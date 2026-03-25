@@ -1,5 +1,5 @@
-from django.urls import path
-from . import views
+from django.urls import path, re_path
+import accounts.views as views
 import posts.views
 
 apiurlpatterns = [
@@ -11,7 +11,8 @@ apiurlpatterns = [
     path('api/authors/<path:author_id>/followers/<path:foreign_id>/', views.AcceptFollowView.as_view(), name='author-followers-manage-api'),
     path('api/authors/<path:author_id>/friends/', views.FriendsListView.as_view(), name='author-friends-api'),
     path('api/authors/<path:author_id>/follow_requests/', views.FollowRequestListView.as_view(), name='author-follow-requests'),
-    path('api/authors/<path:author_id>/', views.AuthorDetailView.as_view(), name='author-detail'),
+    # ugly but helps to avoid regex matching things it is not supposed to
+    re_path(r'^api/authors/(?P<author_id>(?:https?://[^/]+.*/api/authors/[^/]+/?|[^/]+))/$', views.AuthorDetailView.as_view(), name='author-detail'),
 ]
 
 uiurlpatterns = [
@@ -31,7 +32,7 @@ uiurlpatterns = [
     
     path('me/', views.my_profile, name='my-profile'),
     path('me/edit/', views.edit_profile, name='edit-my-profile'),
-    path('authors/<path:author_id>/edit/', views.edit_profile, name='edit-profile'),
+    path('authors/<path:author_id>/edit/', views.edit_profile, name='edit-profile'), #This is important. DO NOT REMOVE
     
     path('login/', views.login_view, name='login'),    
     path('logout/', views.logout_view, name='logout'),    

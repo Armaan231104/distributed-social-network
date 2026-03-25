@@ -221,6 +221,27 @@ heroku open -a your-app-name
 
 ---
 
+### Create a new superuser
+After deploying your Heroku app and new database, you need to create a superuser (node admin)
+
+```bash
+heroku run python manage.py createsuperuser --app your-app-name
+```
+
+Alternative method if that doesn't work
+
+```
+heroku run bash -a your-app-name
+```
+
+```heroku
+python manage.py createsuperuser
+```
+
+Enter a username and password, and use this to sign into the site.
+
+---
+
 ### Ongoing deploys
 Every time you want to redeploy after making changes:
 ```bash

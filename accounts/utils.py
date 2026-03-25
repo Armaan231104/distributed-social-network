@@ -42,10 +42,15 @@ def normalize_fqid(author_id):
     return author_id_str
 
 
+# utils.py - make more flexible
 def is_local_author(author_id):
-    """Check if an author ID belongs to this node."""
     if not author_id:
         return False
     
     host_url = get_host_url()
-    return author_id.startswith(host_url)
+    # Match with OR without port
+    local_hosts = [
+        host_url.rstrip(':8000'),  # http://127.0.0.1
+        host_url,                  # http://127.0.0.1:8000
+    ]
+    return any(author_id.startswith(h) for h in local_hosts)

@@ -1,5 +1,5 @@
 from django.shortcuts import get_object_or_404, render, redirect
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST, require_http_methods
 from django.db.models import Q
@@ -8,9 +8,15 @@ from .models import Entry, HostedImage
 from accounts.models import Author, Follow
 from nodes.models import RemoteNode
 from interactions.views import user_can_access_entry
+from nodes.utils import send_entry_to_remote
 import json
 from functools import wraps
 import requests
+
+def get_entry_by_id(entry_id):
+    if str(entry_id).startswith("http"):
+        return get_object_or_404(Entry, fqid=entry_id)
+    return get_object_or_404(Entry, id=entry_id)
 
 def approved_author_required(view_func):
     @wraps(view_func)
@@ -128,7 +134,7 @@ def serialize_entry_for_stream(request, entry):
         }
 
     return {
-        "id": str(entry.id),
+        "id": entry.fqid,
         "title": entry.title,
         "content": entry.content,
         "contentType": entry.content_type,
@@ -172,7 +178,7 @@ def entry_detail(request, entry_id):
     Returns 403 if the user is not permitted to view the entry.
     """
 
-    entry = get_object_or_404(Entry, id=entry_id)
+    entry = get_entry_by_id(entry_id)
 
     if not user_can_access_entry(request.user, entry):
         return JsonResponse({'error': 'Forbidden'}, status=403)
@@ -186,6 +192,17 @@ def entry_detail(request, entry_id):
         'author_path': author_path,
     })
 
+def entry_image(request, author_id, entry_id):
+    entry = get_entry_by_id(entry_id)
+
+    if not entry.image:
+        return JsonResponse({"error": "Not an image"}, status=404)
+
+    from interactions.views import user_can_access_entry
+    if not user_can_access_entry(request.user, entry):
+        return JsonResponse({"error": "Forbidden"}, status=403)
+
+    return HttpResponse(entry.image.read(), content_type="image/png")
 
 @login_required
 def create_entry(request):
@@ -226,7 +243,11 @@ def create_entry(request):
             image=image_file
         )
 
-        return JsonResponse({"id": str(entry.id)}, status=201)
+        from nodes.utils import send_entry_to_remote
+
+        send_entry_to_remote(entry)
+
+        return JsonResponse({"id": entry.fqid}, status=201)
 
     try:
         data = json.loads(request.body.decode("utf-8") or "{}")
@@ -252,10 +273,13 @@ def create_entry(request):
         visibility=visibility
     )
 
+    from nodes.utils import send_entry_to_remote
+
     fanout_entry_to_remote_followers(entry, request.user)
 
-    return JsonResponse({"id": str(entry.id)}, status=201)
+    send_entry_to_remote(entry)
 
+    return JsonResponse({"id": entry.fqid}, status=201)
 
 @require_http_methods(["GET", "PATCH", "DELETE"])
 def entry_detail_api(request, entry_id):
@@ -266,7 +290,7 @@ def entry_detail_api(request, entry_id):
     - PATCH: Partially updates an entry (only author).
     - DELETE: Soft deletes an entry (only author).
     """
-    entry = get_object_or_404(Entry, id=entry_id)
+    entry = get_entry_by_id(entry_id)
     
     # GET - Read entry
     if request.method == "GET":
@@ -296,7 +320,7 @@ def entry_detail_api(request, entry_id):
                 image_url = None
 
         return JsonResponse({
-            "id": str(entry.id),
+            "id": entry.fqid,
             "title": entry.title,
             "content": entry.content,
             "contentType": entry.content_type,
@@ -330,7 +354,7 @@ def entry_detail_api(request, entry_id):
         entry.save()
 
         return JsonResponse({
-            "id": str(entry.id),
+            "id": entry.fqid,
             "message": "Updated successfully",
             "content": entry.content
         }, status=200)
@@ -400,7 +424,7 @@ def my_entries(request):
                 image_url = None
 
         return {
-            "id": str(e.id),
+            "id": e.fqid,
             "title": e.title,
             "content": e.content,
             "contentType": getattr(e, "content_type", "text/plain"),
@@ -423,7 +447,7 @@ def edit_entry(request, entry_id):
     Deleted entries cannot be edited.
     """
 
-    entry = get_object_or_404(Entry, id=entry_id)
+    entry = get_entry_by_id(entry_id)
 
     if entry.author != request.user:
         return HttpResponseForbidden()
@@ -493,7 +517,7 @@ def delete_entry_ui(request, entry_id):
     Only the author may delete.
     """
 
-    entry = get_object_or_404(Entry, id=entry_id)
+    entry = get_entry_by_id(entry_id)
 
     if entry.author != request.user:
         return HttpResponseForbidden("You cannot delete this entry.")
