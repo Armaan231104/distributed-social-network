@@ -56,7 +56,7 @@
             <!-- POST CONTENT -->
             {% if post.content_type == "image" and post.image %}
                 <figure class="stream-post-media">
-                    <img src="{{ post.image.url }}" alt="{{ post.title }}" class="post-content-image">
+                    <img src="/api/authors/{{ post.author.author.id|urlencode }}/entries/{{ post.id }}/image" class="post-content-image">
                     {% if post.content %}
                         <figcaption>{{ post.content }}</figcaption>
                     {% endif %}

@@ -37,6 +37,9 @@ def normalize_fqid(author_id):
     # If it's a raw local ID (no http), build the FQID
     if not author_id_str.startswith('http'):
         host_url = get_host_url()
+        # Replace localhost with deployed host
+        if "127.0.0.1" in author_id_str:
+            author_id_str = author_id_str.replace("http://127.0.0.1:8000", host_url)
         author_id_str = f"{host_url}/api/authors/{author_id_str}"
     
     return author_id_str

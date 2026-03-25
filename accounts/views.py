@@ -22,7 +22,7 @@ from .utils import get_host_url, is_local_author, normalize_fqid
 
 def build_local_author_id(user):
     host = get_host_url()
-    return f"{host}/api/authors/{user.id}"
+    return f"{host}/api/authors/{user.id}/"
 
 
 def get_or_create_author(author_data):
