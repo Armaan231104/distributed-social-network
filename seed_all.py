@@ -1,12 +1,19 @@
 import random
+import os
+import django
 
-from django.contrib.auth.models import User
-from posts.models import Entry
-from interactions.models import Comment, Like
-from accounts.models import Follow
+
+
 
 
 def run():
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'socialdistribution.settings')
+    django.setup()
+
+    from django.contrib.auth.models import User
+    from posts.models import Entry
+    from interactions.models import Comment, Like
+    from accounts.models import Follow
 
     print("Cleaning database...")
 

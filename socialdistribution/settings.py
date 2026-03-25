@@ -31,7 +31,10 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") + [
     "cmput404-crimson-swcarson-55711a031595.herokuapp.com",
 ]
 
-CSRF_TRUSTED_ORIGINS = ['https://crimson-hazel-f17dca3230bc.herokuapp.com']
+CSRF_TRUSTED_ORIGINS = [
+    'https://crimson-hazel-f17dca3230bc.herokuapp.com',
+    "cmput404-crimson-swcarson-55711a031595.herokuapp.com",
+]
 
 # Default to localhost for development, override in production
 NODE_BASE_URL = os.environ.get('NODE_BASE_URL', 'http://127.0.0.1:8000')
