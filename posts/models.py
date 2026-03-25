@@ -48,7 +48,6 @@ class Entry(models.Model):
     content = models.TextField(blank=True)
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default="PUBLIC", db_index=True)
     published_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    fqid = models.URLField(max_length=500, unique=True, null=True, blank=True)
 
     updated_at = models.DateTimeField(auto_now=True)
     
