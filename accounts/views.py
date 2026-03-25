@@ -95,8 +95,7 @@ def send_follow_to_remote(actor, target):
         return
     
     try:
-        remote_id = target.id.rstrip('/').split('/')[-1]
-        inbox_url = f"{target.host.rstrip('/')}/api/authors/{remote_id}/inbox/"
+        inbox_url = f"{target.id.rstrip('/')}/inbox/"
         
         follow_data = {
             'type': 'follow',
