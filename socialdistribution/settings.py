@@ -44,8 +44,8 @@ NODE_PASSWORD = os.getenv("NODE_PASSWORD", "node_password_change_me")
 # Application definition
 
 INSTALLED_APPS = [
-    'cloudinary_storage',  # must be BEFORE staticfiles
     'cloudinary',
+    'cloudinary_storage',  # must be BEFORE staticfiles
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
