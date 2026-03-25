@@ -27,10 +27,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me")
 DEBUG = os.getenv("DEBUG", "False") == "True"
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") + [
-    "crimson-hazel-f17dca3230bc.herokuapp.com",
+    "armaan-node-2f540b0851c6.herokuapp.com",
 ]
 
-CSRF_TRUSTED_ORIGINS = ['https://crimson-hazel-f17dca3230bc.herokuapp.com']
+CSRF_TRUSTED_ORIGINS = [
+    "https://armaan-node-2f540b0851c6.herokuapp.com",
+    "https://crimson-hazel-f17dca3230bc.herokuapp.com",
+]
 
 # Default to localhost for development, override in production
 NODE_BASE_URL = os.environ.get('NODE_BASE_URL', 'http://127.0.0.1:8000')
