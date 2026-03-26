@@ -1,2 +1,9 @@
 Watkin's node: 
 https://crimson2-7c4c90848441.herokuapp.com
+
+Armaan's node
+https://armaan-node-2f540b0851c6.herokuapp.com
+Armaan NODE_USERNAME
+node-armaan
+NODE_PASSWORD
+supersecretpassword
