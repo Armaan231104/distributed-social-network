@@ -15,44 +15,60 @@ from accounts.serializers import AuthorSerializer
 from accounts.utils import normalize_fqid
 from nodes.utils import find_remote_node_for_url, get_remote_author_entries_url
 
-
 def fetch_remote_author_posts(remote_author):
-    """
-    Fetch posts from a remote author and store them locally.
-    Returns a queryset of the fetched/stored entries.
-    """
+    print("\n--- ENTER fetch_remote_author_posts ---")
+    print("Remote author:", remote_author)
+
     if remote_author.user:
+        print("Remote author is actually local → skipping")
         return Entry.objects.none()
-    
+
     posts_url = get_remote_author_entries_url(remote_author.id)
+    print("Posts URL:", posts_url)
+
     node = find_remote_node_for_url(remote_author.id) or find_remote_node_for_url(remote_author.host)
-    
+
+    print("Node found:", node)
+
     if not node:
+        print("No node found → returning empty")
         return Entry.objects.none()
-    
+
     try:
+        print("Making request...")
         response = requests.get(
             posts_url,
             auth=(node.username, node.password),
             timeout=10
         )
-        
+
+        print("Response status:", response.status_code)
+
         if response.status_code != 200:
+            print("Bad response → skipping")
             return Entry.objects.none()
-        
+
         data = response.json()
+        print("Response JSON keys:", data.keys())
+
         posts = data.get('src', [])
-        
+        print("Posts received:", len(posts))
+
         stored_entries = []
-        for post in posts:
+
+        for i, post in enumerate(posts):
+            print(f"\nProcessing post {i}")
+
             visibility = post.get('visibility', 'PUBLIC')
             if visibility == 'DELETED':
+                print("Skipping deleted post")
                 continue
-            
+
             fqid = post.get('id')
             if not fqid:
+                print("Skipping post without ID")
                 continue
-            
+
             entry, created = Entry.objects.get_or_create(
                 fqid=fqid,
                 defaults={
@@ -64,43 +80,33 @@ def fetch_remote_author_posts(remote_author):
                 }
             )
 
-            if not created:
-                updated = False
-                if entry.remote_author_id != remote_author.id:
-                    entry.remote_author = remote_author
-                    updated = True
-                if entry.title != post.get('title', ''):
-                    entry.title = post.get('title', '')
-                    updated = True
-                if entry.content != post.get('content', ''):
-                    entry.content = post.get('content', '')
-                    updated = True
-                if entry.content_type != post.get('contentType', 'text/plain'):
-                    entry.content_type = post.get('contentType', 'text/plain')
-                    updated = True
-                if entry.visibility != visibility:
-                    entry.visibility = visibility
-                    updated = True
-                if updated:
-                    entry.save()
-            
+            print("Entry:", entry.id, "| Created:", created)
+
             if created or entry.published_at is None:
                 published = post.get('published')
+                print("Published raw:", published)
+
                 if published:
                     from django.utils.dateparse import parse_datetime
                     dt = parse_datetime(published)
+
+                    print("Parsed datetime:", dt)
+
                     if dt:
                         entry.published_at = dt
                         entry.save(update_fields=['published_at'])
-            
-            stored_entries.append(entry.id)
-        
-        return Entry.objects.filter(id__in=stored_entries)
-    
-    except Exception as e:
-        print(f"Error fetching remote posts from {remote_author.displayName}: {e}")
-        return Entry.objects.none()
 
+            stored_entries.append(entry.id)
+
+        result = Entry.objects.filter(id__in=stored_entries)
+        print("Returning stored entries:", result.count())
+
+        print("--- EXIT fetch_remote_author_posts ---\n")
+        return result
+
+    except Exception as e:
+        print("🔥 ERROR in fetch_remote_author_posts:", str(e))
+        raise  # IMPORTANT: re-raise so you see full traceback
 
 def serialize_entry(entry, request=None):
     """Serialize an Entry into the spec-style API shape used for federation."""
@@ -246,49 +252,55 @@ def approved_author_required(view_func):
 
         return view_func(request, *args, **kwargs)
     return wrapper
-
 def get_stream_entries_for_user(user):
-    """
-    Determines which entries should appear in a user's stream.
-
-    Visibility Rules:
-    - Unauthenticated users see only PUBLIC entries.
-    - Authenticated users see:
-        • Their own entries (excluding DELETED)
-        • All PUBLIC entries on the node
-        • UNLISTED entries from authors they follow (local and remote)
-        • FRIENDS entries from mutual followers
-    """
+    print("\n=== ENTER get_stream_entries_for_user ===")
 
     base_qs = Entry.objects.exclude(
         visibility="DELETED"
     ).select_related('author__author')
 
+    print("Base queryset ready")
+
     if not user.is_authenticated:
-        return base_qs.filter(
+        print("User not authenticated")
+        result = base_qs.filter(
             visibility="PUBLIC"
         ).order_by('-published_at')
+        print("Returning public posts:", result.count())
+        return result
 
     try:
         current_author = user.author
+        print("Current author:", current_author)
     except Author.DoesNotExist:
-        return base_qs.filter(
+        print("User has no Author object")
+        result = base_qs.filter(
             Q(author=user) | Q(visibility="PUBLIC")
         ).order_by('-published_at').distinct()
+        print("Fallback posts:", result.count())
+        return result
 
+    print("Fetching following relationships...")
     following_qs = Follow.objects.filter(
         follower=current_author,
         followee__user__isnull=False
     ).select_related('followee__user')
 
+    print("Following count:", following_qs.count())
+
     followed_authors = [f.followee for f in following_qs]
     followed_users = [a.user for a in followed_authors if a.user]
+
+    print("Followed users count:", len(followed_users))
 
     friend_users = [
         a.user for a in followed_authors
         if a.user and a.is_following(current_author)
     ]
 
+    print("Friend users count:", len(friend_users))
+
+    print("Building local entries query...")
     local_entries = base_qs.filter(
         Q(author=user) |
         Q(visibility="PUBLIC") |
@@ -296,46 +308,63 @@ def get_stream_entries_for_user(user):
         Q(author__in=friend_users, visibility="FRIENDS")
     )
 
+    print("Local entries count:", local_entries.count())
+
+    print("Fetching remote follows...")
     remote_following = Follow.objects.filter(
         follower=current_author,
         followee__user__isnull=True
     ).select_related('followee')
 
+    print("Remote follows count:", remote_following.count())
+
     remote_entries = Entry.objects.none()
+
     for follow in remote_following:
-        remote_author = follow.followee
-        posts = fetch_remote_author_posts(remote_author)
-        remote_entries = remote_entries | posts
+        print("Fetching remote posts for:", follow.followee)
+        try:
+            posts = fetch_remote_author_posts(follow.followee)
+            print("Fetched remote posts:", posts.count())
+            remote_entries = remote_entries | posts
+        except Exception as e:
+            print("ERROR in remote fetch:", e)
 
+    print("Combining local + remote entries...")
     all_entries = local_entries | remote_entries
-    return all_entries.order_by('-published_at').distinct()
 
-@approved_author_required
+    final = all_entries.order_by('-published_at').distinct()
+    print("Final entries count:", final.count())
+
+    print("=== EXIT get_stream_entries_for_user ===\n")
+    return final
+
 @approved_author_required
 def stream(request):
-    """
-    Renders the main timeline page.
+    print("\n=== ENTER stream ===")
 
-    Visibility Rules:
-    - Unauthenticated users see only PUBLIC entries.
-    - Authenticated users see:
-        • Their own entries (excluding DELETED)
-        • All PUBLIC entries on the node
-        • UNLISTED entries from authors they follow
-        • FRIENDS entries from mutual followers
-    """
     import os
     import cloudinary
     import socialdistribution.settings as settings
+
+    print("User:", request.user)
+    print("Authenticated:", request.user.is_authenticated)
+
     print("=== Cloudinary Config Check ===")
     print("CLOUDINARY_CLOUD_NAME :", os.environ.get('CLOUDINARY_CLOUD_NAME'))
     print("CLOUDINARY_API_KEY    :", os.environ.get('CLOUDINARY_API_KEY'))
     print("CLOUDINARY_API_SECRET :", os.environ.get('CLOUDINARY_API_SECRET'))
     print("DEBUG                 :", settings.DEBUG)
     print("DEFAULT_FILE_STORAGE  :", getattr(settings, 'DEFAULT_FILE_STORAGE', 'NOT SET'))
-    print(cloudinary.config().__dict__)
-    posts = get_stream_entries_for_user(request.user)
+    print("Cloudinary config     :", cloudinary.config().__dict__)
 
+    try:
+        posts = get_stream_entries_for_user(request.user)
+        print("Posts fetched:", posts.count())
+    except Exception as e:
+        print("ERROR in get_stream_entries_for_user:", e)
+        raise
+
+    print("=== EXIT stream ===\n")
     return render(request, 'posts/stream.html', {'posts': posts})
 
 def serialize_entry_for_stream(request, entry):

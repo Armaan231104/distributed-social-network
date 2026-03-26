@@ -66,7 +66,6 @@ def get_author_by_id(author_id):
     """Look up author by FQID using centralized normalization."""
     return Author.objects.get(id=normalize_fqid(author_id))
 
-
 def get_or_create_remote_author(foreign_id):
     """
     On first follow, create remote author.

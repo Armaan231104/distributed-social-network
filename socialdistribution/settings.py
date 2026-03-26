@@ -38,7 +38,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://crimson-aaron-aee261bd70fb.herokuapp.com"
     'https://crimson-hazel-f17dca3230bc.herokuapp.com',
     "https://cmput404-crimson-swcarson-55711a031595.herokuapp.com",
-    "https://crimson1-428ed6e5ba28.herokuapp.com"
+    "https://crimson1-428ed6e5ba28.herokuapp.com",
 ]
 
 # Default to localhost for development, override in production
