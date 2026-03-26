@@ -11,7 +11,7 @@ from nodes.authentication import RemoteNodeAuthentication
 from django.contrib.auth.models import User
 from django.contrib.auth import login
 from django.contrib.auth.forms import AuthenticationForm
-
+from posts.views import fetch_remote_author_posts
 from .models import Author, FollowRequest, Follow
 from posts.models import Entry
 from interactions.models import Like, Comment
@@ -21,7 +21,6 @@ from .serializers import (
     AuthorSerializer, AuthorListSerializer, 
     FollowRequestSerializer
 )
-from posts.views import fetch_remote_author_posts
 from .utils import get_host_url, is_local_author, normalize_fqid
 from nodes.utils import find_remote_node_for_url, get_remote_inbox_url
 
