@@ -714,7 +714,7 @@ def follow_remote_author(request):
     
     try:
         # Get or create the remote author
-        remote_author, created = get_or_create_remote_author(remote_fqid,remote_author)
+        remote_author, created = get_or_create_remote_author(remote_fqid,author_data)
 
         # Check if already following
         if current_author.is_following(remote_author):
