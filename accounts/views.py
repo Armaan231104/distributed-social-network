@@ -94,6 +94,8 @@ def send_follow_to_remote(actor, target):
         return
     
     try:
+        print(f"target.id: {target.id}")
+        print(f"target.host: {target.host}")
         inbox_url = get_remote_inbox_url(target.id)
         
         follow_data = {
