@@ -27,8 +27,9 @@ def fetch_remote_author_posts(remote_author):
     posts_url = f"{remote_host}/api/authors/{author_id_part}/posts/"
     
     node = None
+    remote_host_clean = remote_host.rstrip('/')
     for n in RemoteNode.objects.filter(is_active=True):
-        if remote_host in n.url:
+        if remote_host_clean.startswith(n.url.rstrip('/')):
             node = n
             break
     
@@ -377,9 +378,7 @@ def create_entry(request):
             image=image_file
         )
 
-        from nodes.utils import send_entry_to_remote
-
-        send_entry_to_remote(entry)
+        fanout_entry_to_remote_followers(entry, request.user)
 
         return JsonResponse({"id": entry.fqid}, status=201)
 
@@ -407,11 +406,7 @@ def create_entry(request):
         visibility=visibility
     )
 
-    from nodes.utils import send_entry_to_remote
-
     fanout_entry_to_remote_followers(entry, request.user)
-
-    send_entry_to_remote(entry)
 
     return JsonResponse({"id": entry.fqid}, status=201)
 
@@ -783,7 +778,7 @@ def send_entry_to_inbox(entry, author, inbox_url, node):
     """Send a spec-compliant entry object to a remote inbox."""
     payload = {
         "type": "entry",
-        "id": str(entry.id),
+        "id": entry.fqid,
         "title": entry.title,
         "content": entry.content,
         "contentType": entry.content_type,
@@ -826,10 +821,8 @@ def fanout_entry_to_remote_followers(entry, user):
         remote_author = follow.follower
 
         # find which node this remote author belongs to
-        node = RemoteNode.objects.filter(
-            is_active=True,
-            url__contains=remote_author.host
-        ).first()
+        remote_host = remote_author.host.rstrip('/')
+        node = next((n for n in RemoteNode.objects.filter(is_active=True) if remote_host.startswith(n.url.rstrip('/'))), None)
         if not node:
             continue
 

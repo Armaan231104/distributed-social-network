@@ -30,9 +30,11 @@ DEBUG = os.getenv("DEBUG", "False") == "True"
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") + [
     "crimson-hazel-f17dca3230bc.herokuapp.com",
     "cmput404-crimson-swcarson-55711a031595.herokuapp.com",
+    "crimson-aaron-aee261bd70fb.herokuapp.com"
 ]
 
 CSRF_TRUSTED_ORIGINS = [
+    "https://crimson-aaron-aee261bd70fb.herokuapp.com"
     'https://crimson-hazel-f17dca3230bc.herokuapp.com',
     "https://cmput404-crimson-swcarson-55711a031595.herokuapp.com",
 ]
@@ -164,6 +166,10 @@ REST_FRAMEWORK = {
     ],
 }
 MEDIA_URL = '/media/'
+# if not DEBUG:
+#     MEDIA_URL = f'https://res.cloudinary.com/{os.environ["CLOUDINARY_CLOUD_NAME"]}/image/upload/'
+# else:
+#     MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 CLOUDINARY_STORAGE = {
     'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME'),
