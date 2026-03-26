@@ -1,6 +1,10 @@
 Watkin's node: 
-https://crimson2-7c4c90848441.herokuapp.com
-
+URL: https://crimson2-7c4c90848441.herokuapp.com
 USERNAME: CrimAdmin
 PASS: CrimPass1
+
+Kaitlin's node:
+NODE_BASE_URL: https://cmput-404-crimson-86950bb0d9c1.herokuapp.com
+NODE_USERNAME: kaitlin-admin
+NODE_PASSWORD: kaitlincode222
 
