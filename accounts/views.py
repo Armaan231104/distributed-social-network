@@ -110,7 +110,6 @@ def get_or_create_remote_author(foreign_id):
         }
     )
 
-
 def send_follow_to_remote(actor, target):
     if target.is_local:
         return True, None
