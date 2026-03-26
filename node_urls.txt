@@ -7,3 +7,12 @@ Armaan NODE_USERNAME
 node-armaan
 NODE_PASSWORD
 supersecretpassword
+Kaitlin's node:
+NODE_BASE_URL: https://cmput-404-crimson-86950bb0d9c1.herokuapp.com
+NODE_USERNAME: kaitlin-admin
+NODE_PASSWORD: kaitlincode222
+
+Nick's node:
+https://crimson-hazel-f17dca3230bc.herokuapp.com
+crimson
+1234
