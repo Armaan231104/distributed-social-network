@@ -897,7 +897,26 @@ def author_profile(request, author_id):
                 remote_author=author,
                 visibility="PUBLIC"
             ).order_by('-published_at')
-
+    print(f"Posts type: {type(posts)}")
+    print(f"Posts value: {posts}")
+    try:
+        print(f"Posts count: {posts.count()}")
+    except Exception as e:
+        print(f"Posts count error: {e}")
+    try:
+        from django.template.loader import render_to_string
+        render_to_string('accounts/profile.html', {
+                'profile_author': author,
+                'current_user_author': current_user_author,
+                'is_following': is_following,
+                'has_pending_request': has_pending_request,
+                'posts': posts,
+            }, request=request)
+        print("Template rendered OK")
+    except Exception as e:
+        print(f"TEMPLATE ERROR: {e}")
+        import traceback
+        traceback.print_exc()
     return render(request, 'accounts/profile.html', {
         'profile_author': author,
         'current_user_author': current_user_author,
