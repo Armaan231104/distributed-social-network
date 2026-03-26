@@ -1,5 +1,7 @@
 Watkin's node: 
-https://crimson2-7c4c90848441.herokuapp.com
+URL: https://crimson2-7c4c90848441.herokuapp.com
+USERNAME: CrimAdmin
+PASS: CrimPass1
 
 Armaan's node
 https://armaan-node-2f540b0851c6.herokuapp.com
@@ -17,6 +19,12 @@ Nick's node:
 https://crimson-hazel-f17dca3230bc.herokuapp.com
 crimson
 1234
+
+Aaron's node:
+NODE_BASE_URL: https://crimson-aaron-aee261bd70fb.herokuapp.com
+NODE_USERNAME: crimson-aaron
+NODE_PASSWORD: aaron5432
+
 
 Sean
 https://cmput404-crimson-swcarson-55711a031595.herokuapp.com
