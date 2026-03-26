@@ -1,12 +1,19 @@
 Watkin's node: 
-https://crimson2-7c4c90848441.herokuapp.com
+URL: https://crimson1-428ed6e5ba28.herokuapp.com
+USERNAME: CrimAdmin
+PASS: CrimPass1
 
 Armaan's node
 https://armaan-node-2f540b0851c6.herokuapp.com
-Armaan NODE_USERNAME
+NODE_USERNAME
 node-armaan
 NODE_PASSWORD
 supersecretpassword
+Authors
+
+1. https://armaan-node-2f540b0851c6.herokuapp.com/authors/https://armaan-node-2f540b0851c6.herokuapp.com/api/authors/1//profile/
+2. https://armaan-node-2f540b0851c6.herokuapp.com/authors/https://armaan-node-2f540b0851c6.herokuapp.com/api/authors/34//profile/
+3. https://armaan-node-2f540b0851c6.herokuapp.com/authors/https://armaan-node-2f540b0851c6.herokuapp.com/api/authors/67//profile/
 
 Kaitlin's node:
 NODE_BASE_URL: https://cmput-404-crimson-86950bb0d9c1.herokuapp.com
@@ -17,3 +24,12 @@ Nick's node:
 https://crimson-hazel-f17dca3230bc.herokuapp.com
 crimson
 1234
+
+Aaron's node:
+NODE_BASE_URL: https://crimson-aaron-aee261bd70fb.herokuapp.com
+NODE_USERNAME: crimson-aaron
+NODE_PASSWORD: aaron5432
+
+
+Sean
+https://cmput404-crimson-swcarson-55711a031595.herokuapp.com
