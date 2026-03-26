@@ -1,7 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.admin.views.decorators import staff_member_required
 from django.views.decorators.http import require_POST
-from django.http import JsonResponse
 from django.views import View
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -164,18 +163,18 @@ class NodeDetailAPI(APIView):
 
     def patch(self, request, node_id):
         node = get_object_or_404(RemoteNode, id=node_id)
-        
-        if 'is_active' in request.data:
-            node.is_active = request.data['is_active']
-        if 'url' in request.data:
-            node.url = request.data['url']
-        if 'username' in request.data:
-            node.username = request.data['username']
-        if 'password' in request.data:
-            node.password = request.data['password']
-        
-        node.save()
-        return Response({'message': 'Node updated successfully'})
+        data = {
+            'url': request.data.get('url', node.url),
+            'username': request.data.get('username', node.username),
+            'password': request.data.get('password', node.password),
+            'is_active': request.data.get('is_active', node.is_active),
+        }
+
+        form = RemoteNodeForm(data, instance=node)
+        if form.is_valid():
+            form.save()
+            return Response({'message': 'Node updated successfully'})
+        return Response(form.errors, status=rf_status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, node_id):
         node = get_object_or_404(RemoteNode, id=node_id)

@@ -1,7 +1,9 @@
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
 from django.urls import reverse
+from unittest.mock import patch, Mock
 import base64
+import requests
 from .models import RemoteNode
 
 
@@ -90,16 +92,36 @@ class NodeUITest(TestCase):
     def test_add_node(self):
         """Test adding a new node."""
         self.client.login(username='admin', password='adminpass')
-        response = self.client.post(reverse('add-node'), {
-            'url': 'https://new-node.herokuapp.com',
-            'username': 'nodeadmin',
-            'password': 'nodepass123',
-            'is_active': True
-        }, follow=True)
+        with patch('nodes.forms.validate_remote_node_credentials', return_value=(True, None)):
+            response = self.client.post(reverse('add-node'), {
+                'url': 'https://new-node.herokuapp.com',
+                'username': 'nodeadmin',
+                'password': 'nodepass123',
+                'is_active': True
+            }, follow=True)
         
         self.assertTrue(RemoteNode.objects.filter(
             url='https://new-node.herokuapp.com'
         ).exists())
+
+    def test_add_node_shows_error_when_connection_validation_fails(self):
+        """Invalid node credentials should not create a node and should show an error."""
+        self.client.login(username='admin', password='adminpass')
+
+        with patch(
+            'nodes.forms.validate_remote_node_credentials',
+            return_value=(False, 'Connection failed. Check that the username and password are correct.')
+        ):
+            response = self.client.post(reverse('add-node'), {
+                'url': 'https://bad-node.herokuapp.com',
+                'username': 'wrong',
+                'password': 'wrongpass',
+                'is_active': True
+            })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(RemoteNode.objects.filter(url='https://bad-node.herokuapp.com').exists())
+        self.assertContains(response, 'Connection failed. Check that the username and password are correct.')
 
     def test_edit_node(self):
         """Test editing an existing node."""
@@ -110,12 +132,13 @@ class NodeUITest(TestCase):
         )
         
         self.client.login(username='admin', password='adminpass')
-        response = self.client.post(reverse('edit-node', args=[node.id]), {
-            'url': 'https://old-node.herokuapp.com',
-            'username': 'newuser',
-            'password': 'newpass',
-            'is_active': False
-        }, follow=True)
+        with patch('nodes.forms.validate_remote_node_credentials', return_value=(True, None)):
+            response = self.client.post(reverse('edit-node', args=[node.id]), {
+                'url': 'https://old-node.herokuapp.com',
+                'username': 'newuser',
+                'password': 'newpass',
+                'is_active': False
+            }, follow=True)
         
         node.refresh_from_db()
         self.assertEqual(node.username, 'newuser')
@@ -187,11 +210,12 @@ class NodeAPITest(TestCase):
     def test_create_node_api(self):
         """Test creating a node via API."""
         self.client.login(username='admin', password='adminpass')
-        response = self.client.post(reverse('node-list-api'), {
-            'url': 'https://api-create.herokuapp.com',
-            'username': 'admin',
-            'password': 'secret123'
-        })
+        with patch('nodes.forms.validate_remote_node_credentials', return_value=(True, None)):
+            response = self.client.post(reverse('node-list-api'), {
+                'url': 'https://api-create.herokuapp.com',
+                'username': 'admin',
+                'password': 'secret123'
+            })
         
         self.assertEqual(response.status_code, 201)
         self.assertTrue(RemoteNode.objects.filter(
@@ -208,15 +232,104 @@ class NodeAPITest(TestCase):
         )
         
         self.client.login(username='admin', password='adminpass')
-        response = self.client.patch(
-            reverse('node-detail-api', args=[node.id]),
-            {'is_active': False},
-            content_type='application/json'
-        )
+        with patch('nodes.forms.validate_remote_node_credentials', return_value=(True, None)):
+            response = self.client.patch(
+                reverse('node-detail-api', args=[node.id]),
+                {'is_active': False},
+                content_type='application/json'
+            )
         
         self.assertEqual(response.status_code, 200)
         node.refresh_from_db()
         self.assertFalse(node.is_active)
+
+    def test_update_node_api_rejects_invalid_connection(self):
+        """PATCH should not save invalid remote node credentials."""
+        node = RemoteNode.objects.create(
+            url='https://api-update.herokuapp.com',
+            username='admin',
+            password='secret123',
+            is_active=True
+        )
+
+        self.client.login(username='admin', password='adminpass')
+        with patch(
+            'nodes.forms.validate_remote_node_credentials',
+            return_value=(False, 'Connection failed. The remote node could not be reached at that URL.')
+        ):
+            response = self.client.patch(
+                reverse('node-detail-api', args=[node.id]),
+                {'url': 'https://missing-node.herokuapp.com'},
+                content_type='application/json'
+            )
+
+        self.assertEqual(response.status_code, 400)
+        node.refresh_from_db()
+        self.assertEqual(node.url, 'https://api-update.herokuapp.com')
+        self.assertIn('Connection failed. The remote node could not be reached at that URL.', str(response.json()))
+
+
+class RemoteNodeValidationTest(TestCase):
+    """Tests for remote node connection validation helpers."""
+
+    @patch('nodes.utils.requests.get')
+    def test_validate_remote_node_credentials_accepts_successful_auth(self, mock_get):
+        response = Mock(status_code=200)
+        mock_get.return_value = response
+
+        from nodes.utils import validate_remote_node_credentials
+
+        is_valid, error_message = validate_remote_node_credentials(
+            'https://remote-node.example.com',
+            'nodeuser',
+            'nodepass'
+        )
+
+        self.assertTrue(is_valid)
+        self.assertIsNone(error_message)
+        mock_get.assert_called_once_with(
+            'https://remote-node.example.com/api/authors/',
+            auth=('nodeuser', 'nodepass'),
+            timeout=5,
+            headers={'Accept': 'application/json'},
+        )
+
+    @patch('nodes.utils.requests.get')
+    def test_validate_remote_node_credentials_rejects_auth_errors(self, mock_get):
+        response = Mock(status_code=401)
+        mock_get.return_value = response
+
+        from nodes.utils import validate_remote_node_credentials
+
+        is_valid, error_message = validate_remote_node_credentials(
+            'https://remote-node.example.com',
+            'wrong',
+            'wrongpass'
+        )
+
+        self.assertFalse(is_valid)
+        self.assertEqual(
+            error_message,
+            'Connection failed. Check that the username and password are correct.'
+        )
+
+    @patch('nodes.utils.requests.get')
+    def test_validate_remote_node_credentials_rejects_unreachable_url(self, mock_get):
+        mock_get.side_effect = requests.exceptions.ConnectionError
+
+        from nodes.utils import validate_remote_node_credentials
+
+        is_valid, error_message = validate_remote_node_credentials(
+            'https://missing-node.example.com',
+            'nodeuser',
+            'nodepass'
+        )
+
+        self.assertFalse(is_valid)
+        self.assertEqual(
+            error_message,
+            'Connection failed. The remote node could not be reached at that URL.'
+        )
 
     def test_delete_node_api(self):
         """Test deleting a node via API."""

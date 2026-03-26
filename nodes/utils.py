@@ -34,6 +34,53 @@ def find_remote_node_for_url(url):
 
     return None
 
+
+def validate_remote_node_credentials(url, username, password):
+    """
+    Validate that a remote node is reachable and accepts the provided credentials.
+
+    Returns a tuple: (is_valid, error_message).
+    """
+    base_url = str(url).rstrip('/')
+    probe_urls = (
+        f"{base_url}/api/authors/",
+        f"{base_url}/api/",
+        base_url,
+    )
+
+    try:
+        for probe_url in probe_urls:
+            response = requests.get(
+                probe_url,
+                auth=(username, password),
+                timeout=5,
+                headers={"Accept": "application/json"},
+            )
+
+            if 200 <= response.status_code < 300:
+                return True, None
+
+            if response.status_code in (401, 403):
+                return False, "Connection failed. Check that the username and password are correct."
+
+            if response.status_code != 404:
+                return False, (
+                    f"Connection failed. The remote node responded with status "
+                    f"{response.status_code}."
+                )
+
+        return False, (
+            "Connection failed. Check that the base URL points to a compatible node."
+        )
+    except requests.exceptions.MissingSchema:
+        return False, "Connection failed. Enter a valid URL including http:// or https://."
+    except requests.exceptions.ConnectionError:
+        return False, "Connection failed. The remote node could not be reached at that URL."
+    except requests.exceptions.Timeout:
+        return False, "Connection failed. The remote node took too long to respond."
+    except requests.RequestException:
+        return False, "Connection failed. Unable to verify the remote node right now."
+
 def send_entry_to_remote(entry):
     nodes = RemoteNode.objects.filter(is_active=True)
 
