@@ -22,8 +22,13 @@ def fetch_remote_author_posts(remote_author):
     if remote_author.user:
         print("Remote author is actually local → skipping")
         return Entry.objects.none()
+    author_url = remote_author.id  # this SHOULD already be a full URL
 
-    posts_url = get_remote_author_entries_url(remote_author.id)
+    if not author_url.startswith("http"):
+        print("⚠️ Invalid remote author ID:", author_url)
+        return Entry.objects.none()
+
+    posts_url = author_url.rstrip("/") + "/entries/"
     print("Posts URL:", posts_url)
 
     node = find_remote_node_for_url(remote_author.id) or find_remote_node_for_url(remote_author.host)
