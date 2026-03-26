@@ -74,10 +74,9 @@ class Entry(models.Model):
         ordering = ['-published_at']
 
     def __str__(self):
-        """
-        Returns a readable representation of the entry.
-        """
-        return f"{self.title} by {self.author.username}"
+        author = self.get_author
+        name = author.displayName if author else "Unknown"
+        return f"{self.title} by {name}"
 
     def soft_delete(self):
         """
@@ -99,7 +98,7 @@ class Entry(models.Model):
                 author_obj = self.author.author
                 author_id = author_obj.id
             else:
-                return
+                return  # remote entries skip fqid generation — correct
 
             author_id = author_obj.id.rstrip("/")  # remove trailing /
 

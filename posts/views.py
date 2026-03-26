@@ -28,7 +28,7 @@ def fetch_remote_author_posts(remote_author):
         print("⚠️ Invalid remote author ID:", author_url)
         return Entry.objects.none()
 
-    posts_url = posts_url = remote_author.id.rstrip("/") + "/entries/"
+    posts_url = get_remote_author_entries_url(remote_author)
     print("Posts URL:", posts_url)
 
     node = find_remote_node_for_url(remote_author.id) or find_remote_node_for_url(remote_author.host)
@@ -69,7 +69,7 @@ def fetch_remote_author_posts(remote_author):
                 print("Skipping deleted post")
                 continue
 
-            fqid = post.get('id')
+            fqid = normalize_fqid(post.get('id'))
             if not fqid:
                 print("Skipping post without ID")
                 continue
@@ -149,7 +149,7 @@ def serialize_entry(entry, request=None):
             "count": entry.likes.count(),
             "src": [],
         },
-        "published": entry.published_at.isoformat(),
+        "published": entry.published_at.isoformat() if entry.published_at else None,
         "visibility": entry.visibility,
     }
 
@@ -207,11 +207,11 @@ class AuthorEntriesView(View):
             "count": total,
             "src": [serialize_entry(entry, request=request) for entry in page_entries],
         })
-
 def get_entry_by_id(entry_id):
-    if str(entry_id).startswith("http"):
-        return get_object_or_404(Entry, fqid=entry_id)
-    return get_object_or_404(Entry, id=entry_id)
+    entry_id = normalize_fqid(str(entry_id))
+
+    return Entry.objects.filter(fqid=entry_id).first() or \
+           get_object_or_404(Entry, id=entry_id)
 
 def approved_author_required(view_func):
     @wraps(view_func)
@@ -388,19 +388,24 @@ def serialize_entry_for_stream(request, entry):
     author_obj = None
 
     author_profile = entry.get_author
-    if author_profile:
-        author_obj = {
-            "id": author_profile.id,
-            "displayName": author_profile.displayName,
-            "host": author_profile.host,
-            "web": author_profile.web,
-            "github": author_profile.github,
-            "profileImage": request.build_absolute_uri(author_profile.profileImage.url)
-            if author_profile.profileImage else None,
-        }
+    profile_image = None
+
+    if author_profile.profileImage:
+        if hasattr(author_profile.profileImage, "url"):
+            profile_image = request.build_absolute_uri(author_profile.profileImage.url)
+        else:
+            profile_image = author_profile.profileImage  # remote URL
+
+    author_obj = {
+        "id": author_profile.id,
+        "displayName": author_profile.displayName,
+        "host": author_profile.host,
+        "web": author_profile.web,
+        "github": author_profile.github,
+        "profileImage": profile_image,
+    }
 
     return {
-        "id": entry.fqid,
         "id": entry.fqid,
         "title": entry.title,
         "content": entry.content,
@@ -437,22 +442,16 @@ def stream_api(request):
         "src": data,
     })
 
-
 @login_required
 def entry_detail(request, entry_id):
-    """
-    Renders the detailed view of a single entry.
-    Returns 403 if the user is not permitted to view the entry.
-    """
-
-    entry = get_entry_by_id(entry_id)
     entry = get_entry_by_id(entry_id)
 
     if not user_can_access_entry(request.user, entry):
         return JsonResponse({'error': 'Forbidden'}, status=403)
 
     comments = entry.comments.all()
-    author_path = entry.author.id
+    entry_author = entry.get_author
+    author_path = entry_author.id if entry_author else None
 
     return render(request, 'interactions/entry_detail.html', {
         'entry': entry,
@@ -777,7 +776,6 @@ def my_entries(request):
 
         return {
             "id": e.fqid,
-            "id": e.fqid,
             "title": e.title,
             "content": e.content,
             "contentType": getattr(e, "content_type", "text/plain"),
@@ -945,9 +943,8 @@ def send_entry_to_inbox(entry, author, inbox_url, node):
             auth=(node.username, node.password),
             timeout=5
         )
-    except requests.RequestException:
-        pass  # don't let a failed remote request break local functionality
-
+    except requests.RequestException as e:
+        print("Fanout failed:", e)
 def fanout_entry_to_remote_followers(entry, user):
     """Send entry to all remote followers' inboxes."""
     try:
