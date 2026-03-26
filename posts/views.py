@@ -208,36 +208,13 @@ class AuthorEntriesView(View):
             "src": [serialize_entry(entry, request=request) for entry in page_entries],
         })
 def get_entry_by_id(entry_id):
-    entry_id = normalize_fqid(str(entry_id))
+    entry_id = str(entry_id)
 
-    return Entry.objects.filter(fqid=entry_id).first() or \
-           get_object_or_404(Entry, id=entry_id)
-
-def approved_author_required(view_func):
-    @wraps(view_func)
-    def wrapper(request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return redirect("login")
-
-        if request.user.is_staff:
-            return view_func(request, *args, **kwargs)
-
-        try:
-            author = request.user.author
-        except Author.DoesNotExist:
-            return redirect("login")
-
-        if not author.is_approved:
-            return redirect("pending-approval")
-
-        return view_func(request, *args, **kwargs)
-    return wrapper
-
-def get_entry_by_id(entry_id):
-    if str(entry_id).startswith("http"):
+    if entry_id.startswith("http"):
+        entry_id = normalize_fqid(entry_id)
         return get_object_or_404(Entry, fqid=entry_id)
-    return get_object_or_404(Entry, id=entry_id)
 
+    return get_object_or_404(Entry, id=entry_id)
 def approved_author_required(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
@@ -257,6 +234,7 @@ def approved_author_required(view_func):
 
         return view_func(request, *args, **kwargs)
     return wrapper
+
 def get_stream_entries_for_user(user):
     print("\n=== ENTER get_stream_entries_for_user ===")
 
@@ -459,17 +437,6 @@ def entry_detail(request, entry_id):
         'author_path': author_path,
     })
 
-def entry_image(request, author_id, entry_id):
-    entry = get_entry_by_id(entry_id)
-
-    if not entry.image:
-        return JsonResponse({"error": "Not an image"}, status=404)
-
-    from interactions.views import user_can_access_entry
-    if not user_can_access_entry(request.user, entry):
-        return JsonResponse({"error": "Forbidden"}, status=403)
-
-    return HttpResponse(entry.image.read(), content_type="image/png")
 def entry_image(request, author_id, entry_id):
     entry = get_entry_by_id(entry_id)
 
