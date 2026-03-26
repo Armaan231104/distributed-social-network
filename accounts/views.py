@@ -115,6 +115,7 @@ def send_follow_to_remote(actor, target):
                 auth=(node.username, node.password)
             )
             response.raise_for_status()  # Optional: logs an error if the remote node rejects it
+            print(f"✓ Follow request sent successfully to {inbox_url} — status {response.status_code}")
         else:
             # log failed follow request instead of retrying since we don't have credentials and auth is required
             print(f"Error: Cannot send follow request. No active credentials configured for {target.host}")
