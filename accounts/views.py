@@ -87,19 +87,25 @@ def verify_remote_author_exists(foreign_id):
         print(f"Could not verify remote author at {foreign_id}: {e}")
         return None
 
-
 def get_or_create_remote_author(foreign_id):
-    """
-    On first follow, create remote author.
-    Extracts host from the FQID (basically everything before /api/authors/).
-    """
     foreign_id = normalize_fqid(foreign_id)
+    host = foreign_id.split('/api/authors/')[0] + '/api/'
+
+    # Try to get the remote author JSON
+    display_name = "Remote Author"  # fallback
+    try:
+        resp = requests.get(foreign_id, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            display_name = data.get('displayName', display_name)
+    except Exception as e:
+        print("Error fetching remote author info:", e)
 
     return Author.objects.get_or_create(
         id=foreign_id,
         defaults={
-            'host': foreign_id.split('/api/authors/')[0] + '/api/',
-            'displayName': 'Remote Author',
+            'host': host,
+            'displayName': display_name,
             'is_approved': True,
         }
     )
