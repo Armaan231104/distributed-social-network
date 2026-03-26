@@ -85,42 +85,45 @@ def get_or_create_remote_author(foreign_id):
 
 
 def send_follow_to_remote(actor, target):
-    """
-    Send a follow request to a remote author's inbox on their node.
-    Fails loudly if node credentials are missing instead of sending a 401 Unauthorized request.
-    """
-    # Use the property you already have in your model
     if target.is_local:
-        return
-    
+        return True, None
+
     try:
         inbox_url = get_remote_inbox_url(target.id)
-        
+
         follow_data = {
-            'type': 'follow',
+            'type': 'Follow',
             'summary': f'{actor.displayName} wants to follow {target.displayName}',
             'actor': AuthorSerializer(actor).data,
             'object': AuthorSerializer(target).data
         }
-        
-        # Try to get credentials from stored nodes
+
         node = find_remote_node_for_url(target.id) or find_remote_node_for_url(target.host)
-        
-        if node:
-            # Use stored node credentials
-            response = requests.post(
-                inbox_url, 
-                json=follow_data, 
-                timeout=10, 
-                auth=(node.username, node.password)
-            )
-            response.raise_for_status()  # Optional: logs an error if the remote node rejects it
-        else:
-            # log failed follow request instead of retrying since we don't have credentials and auth is required
-            print(f"Error: Cannot send follow request. No active credentials configured for {target.host}")
-            
+        if not node:
+            error = f"No active remote node credentials configured for {target.host}"
+            print(error)
+            return False, error
+
+        print("FOLLOW inbox_url:", inbox_url)
+        print("FOLLOW payload:", follow_data)
+        print("FOLLOW auth username:", node.username)
+
+        response = requests.post(
+            inbox_url,
+            json=follow_data,
+            timeout=10,
+            auth=(node.username, node.password)
+        )
+
+        print("FOLLOW status:", response.status_code)
+        print("FOLLOW body:", response.text)
+
+        response.raise_for_status()
+        return True, None
+
     except Exception as e:
         print(f"Failed to send follow request to remote node: {e}")
+        return False, str(e)
 
 
 def create_follow_request(actor, target):
@@ -370,7 +373,12 @@ class FollowView(APIView):
         elif state == 'accepted':
             return Response({'error': 'Already following'}, status=status.HTTP_400_BAD_REQUEST)
         
-        send_follow_to_remote(current_author, foreign_author)
+        success, error = send_follow_to_remote(current_author, foreign_author)
+        if not success:
+            return Response({
+                'error': 'Failed to deliver follow request to remote node',
+                'details': error,
+            }, status=status.HTTP_502_BAD_GATEWAY)
         return Response({'status': 'follow request sent'}, status=status.HTTP_201_CREATED)
 
     def delete(self, request, author_id, foreign_id):
@@ -501,19 +509,21 @@ class InboxView(APIView):
             author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        data = request.data
         
-        # POST FOLLOW
-        if data.get('type') == 'follow':
+        data = request.data
+        msg_type = str(data.get('type', '')).lower()
+
+        if msg_type == 'follow':
             actor_data = data.get('actor', {})
             object_data = data.get('object', {})
 
             object_id = object_data.get('id', '')
 
-            # Compare the exact FQIDs directly
-            if object_id != author.id:
-                return Response({'error': 'Not the intended recipient'}, status=status.HTTP_400_BAD_REQUEST)
+            if object_id.rstrip('/') != author.id.rstrip('/'):
+                return Response(
+                    {'error': 'Not the intended recipient'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
             actor = get_or_create_author(actor_data)
             if not actor:
@@ -530,7 +540,7 @@ class InboxView(APIView):
 
             if not created and follow_request.status == FollowRequest.Status.PENDING:
                 return Response({'status': 'follow request already exists'}, status=status.HTTP_200_OK)
-            
+
             if follow_request.status != FollowRequest.Status.PENDING:
                 follow_request.status = FollowRequest.Status.PENDING
                 follow_request.save()
@@ -538,7 +548,7 @@ class InboxView(APIView):
             return Response({'status': 'follow request received'}, status=status.HTTP_201_CREATED)
         
         # POST ENTRY (ALSO UPDATE AND SOFT DELETE)
-        elif data.get('type') == 'entry':
+        elif msg_type == 'entry':
             entry_id = data.get('id')
             remote_author_data = data.get('author', {})
             
@@ -578,7 +588,7 @@ class InboxView(APIView):
             )
             return Response({'status': 'entry received'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
-        elif data.get('type') in ['like', 'Like']:
+        elif msg_type == 'entry':
             actor = get_or_create_author(data.get('author', {}))
             obj_url = str(data.get('object', ''))
             if actor and obj_url:
@@ -587,7 +597,7 @@ class InboxView(APIView):
                     Like.objects.get_or_create(author=actor, entry=entry)
             return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
             
-        elif data.get('type') in ['comment', 'Comment']:
+        elif msg_type == 'comment':
             actor = get_or_create_author(data.get('author', {}))
             content = data.get('comment', 'remote comment')
             # Spec states comments are often sent directly to POST /api/authors/{id}/posts/{id}/comments
@@ -677,13 +687,20 @@ def follow_remote_author(request):
         if not remote_author.user:
             Follow.objects.get_or_create(follower=current_author, followee=remote_author)
         
-        if state in ('pending', 'accepted'):
-            messages.success(request, f'Follow request sent to {remote_author.displayName}! They will need to approve your request before you can see their posts.')
+        if state == 'pending':
+            messages.info(request, f'You already have a pending follow request to {remote_author.displayName}.')
+        elif state == 'accepted':
+            messages.info(request, f'You are already following {remote_author.displayName}.')
         else:
-            # Try to send to remote
-            send_follow_to_remote(current_author, remote_author)
-            messages.success(request, f'Follow request sent to {remote_author.displayName}!')
-        
+            success, error = send_follow_to_remote(current_author, remote_author)
+            if success:
+                messages.success(request, f'Follow request sent to {remote_author.displayName}!')
+            else:
+                messages.error(
+                    request,
+                    f'Could not deliver follow request to {remote_author.displayName}. {error}'
+                )
+                
         return redirect('authors-list')
         
     except Exception as e:
@@ -841,7 +858,9 @@ def follow_author(request, author_id):
     if state in ('pending', 'accepted'):
         return redirect('author-profile', author_id=author_id)
     
-    send_follow_to_remote(current_author, target_author)
+    success, error = send_follow_to_remote(current_author, target_author)
+    if not success:
+        messages.error(request, f'Could not deliver follow request. {error}')
     return redirect('author-profile', author_id=author_id)
 
 @approved_author_required
