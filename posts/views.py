@@ -28,7 +28,7 @@ def fetch_remote_author_posts(remote_author):
         print("⚠️ Invalid remote author ID:", author_url)
         return Entry.objects.none()
 
-    posts_url = author_url.rstrip("/") + "/entries/"
+    posts_url = posts_url = remote_author.id.rstrip("/") + "/entries/"
     print("Posts URL:", posts_url)
 
     node = find_remote_node_for_url(remote_author.id) or find_remote_node_for_url(remote_author.host)

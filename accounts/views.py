@@ -99,7 +99,7 @@ def get_or_create_remote_author(foreign_id):
     print(foreign_id)
     foreign_id = normalize_fqid(foreign_id)
 
-    return Author.objects.get_or_createx(
+    return Author.objects.get_or_create(
         id=foreign_id,
         defaults={
             'host': foreign_id.split('/api/authors/')[0] + '/api/',
