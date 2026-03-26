@@ -31,14 +31,13 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") + [
     "crimson-hazel-f17dca3230bc.herokuapp.com",
     "cmput404-crimson-swcarson-55711a031595.herokuapp.com",
     "crimson-aaron-aee261bd70fb.herokuapp.com",
-    "https://crimson1-428ed6e5ba28.herokuapp.com"
+    "crimson1-428ed6e5ba28.herokuapp.com"
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://crimson-aaron-aee261bd70fb.herokuapp.com"
     'https://crimson-hazel-f17dca3230bc.herokuapp.com',
     "https://cmput404-crimson-swcarson-55711a031595.herokuapp.com",
-    "https://crimson2-7c4c90848441.herokuapp.com",
     "https://crimson1-428ed6e5ba28.herokuapp.com"
 ]
 
