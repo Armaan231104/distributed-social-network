@@ -66,6 +66,27 @@ def get_author_by_id(author_id):
     """Look up author by FQID using centralized normalization."""
     return Author.objects.get(id=normalize_fqid(author_id))
 
+def verify_remote_author_exists(foreign_id):
+    """
+    Fetch the remote author URL and return their data if they exist, None otherwise.
+    """
+    node = find_remote_node_for_url(foreign_id)
+    if not node:
+        return None
+    
+    try:
+        response = requests.get(
+            foreign_id,
+            auth=(node.username, node.password),
+            timeout=10
+        )
+
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"Could not verify remote author at {foreign_id}: {e}")
+        return None
+
 
 def get_or_create_remote_author(foreign_id):
     """
@@ -73,7 +94,7 @@ def get_or_create_remote_author(foreign_id):
     Extracts host from the FQID (basically everything before /api/authors/).
     """
     foreign_id = normalize_fqid(foreign_id)
-    
+
     return Author.objects.get_or_create(
         id=foreign_id,
         defaults={
@@ -661,10 +682,16 @@ def follow_remote_author(request):
         messages.error(request, 'To follow local authors, use the Follow button on their profile.')
         return redirect('authors-list')
     
+    # Check if the requested author exists
+    author_data = verify_remote_author_exists(remote_fqid)
+    if not author_data:
+        messages.error(request, 'Could not find that author on their node. Please check the URL and try again.')
+        return redirect('authors-list')
+    
     try:
         # Get or create the remote author
         remote_author, created = get_or_create_remote_author(remote_fqid)
-        
+
         # Check if already following
         if current_author.is_following(remote_author):
             messages.info(request, f'You are already following {remote_author.displayName}.')
