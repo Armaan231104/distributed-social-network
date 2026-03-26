@@ -14,7 +14,7 @@ class AuthorUpdateForm(forms.ModelForm):
 
     class Meta:
         model = Author
-        fields = ['displayName', 'description', 'github', 'profileImage', 'web', 'is_approved']
+        fields = ['displayName', 'description', 'github', 'profileImage', 'web', 'is_approved', 'username']
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
