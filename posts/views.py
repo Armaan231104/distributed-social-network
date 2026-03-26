@@ -326,7 +326,6 @@ def get_stream_entries_for_user(user):
     ).select_related('followee')
 
     print("Remote follows count:", remote_following.count())
-    ).select_related("followee")
 
     remote_entries = Entry.objects.none()
 
@@ -347,24 +346,6 @@ def get_stream_entries_for_user(user):
 
     print("=== EXIT get_stream_entries_for_user ===\n")
     return final
-
-        remote_author = follow.followee
-        posts = fetch_remote_author_posts(remote_author)
-
-        if hasattr(posts, "model") and posts.model == Entry:
-            remote_entry_ids.extend(posts.values_list("id", flat=True))
-        elif isinstance(posts, list):
-            remote_entry_ids.extend(
-                [p.id for p in posts if isinstance(p, Entry) and p.id]
-            )
-
-    if remote_entry_ids:
-        remote_entries = Entry.objects.filter(id__in=remote_entry_ids)
-        all_entries = local_entries | remote_entries
-    else:
-        all_entries = local_entries
-
-    return all_entries.order_by("-published_at").distinct()
 
 @approved_author_required
 @approved_author_required
@@ -836,7 +817,7 @@ def edit_entry(request, entry_id):
     if request.method != "PUT":
         return JsonResponse({"error": "PUT required"}, status=400)
 
-    # A) multipart/form-data => editing image/caption/title, optionally replace image
+    # A multipart/form-data => editing image/caption/title, optionally replace image
     if request.content_type and request.content_type.startswith("multipart/form-data"):
 
         entry.title = request.POST.get("title", entry.title)
@@ -858,7 +839,7 @@ def edit_entry(request, entry_id):
 
         return JsonResponse({"updated": True}, status=200)
     
-    # B) JSON => editing title/content/contentType for text posts
+    # B JSON => editing title/content/contentType for text posts
     try:
         data = json.loads(request.body.decode("utf-8") or "{}")
     except json.JSONDecodeError:
