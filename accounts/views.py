@@ -89,17 +89,10 @@ def verify_remote_author_exists(foreign_id):
     except Exception as e:
         print(f"Could not verify remote author at {foreign_id}: {e}")
         return None
-
-
-def get_or_create_remote_author(foreign_id):
-    """
-    On first follow, create remote author.
-    Extracts host from the FQID (basically everything before /api/authors/).
-    """
-    print(foreign_id)
+def get_or_create_remote_author(foreign_id, remote_author=None):
     foreign_id = normalize_fqid(foreign_id)
 
-    return Author.objects.get_or_create(
+    author, created = Author.objects.get_or_create(
         id=foreign_id,
         defaults={
             'host': foreign_id.split('/api/authors/')[0] + '/api/',
@@ -108,6 +101,33 @@ def get_or_create_remote_author(foreign_id):
         }
     )
 
+    # Sync with latest remote data if provided
+    if remote_author:
+        updated = False
+
+        # map fields safely
+        field_map = {
+            "displayName": "displayName",
+            "github": "github",
+            "profileImage": "profileImage",
+            "web": "web",
+            "host": "host",
+        }
+
+        for api_field, model_field in field_map.items():
+            new_val = remote_author.get(api_field)
+
+            # only update if:
+            # - new_val exists
+            # - different from current
+            if new_val and getattr(author, model_field) != new_val:
+                setattr(author, model_field, new_val)
+                updated = True
+
+        if updated:
+            author.save()
+
+    return author, created
 
 def send_follow_to_remote(actor, target):
     if target.is_local:
@@ -694,7 +714,7 @@ def follow_remote_author(request):
     
     try:
         # Get or create the remote author
-        remote_author, created = get_or_create_remote_author(remote_fqid)
+        remote_author, created = get_or_create_remote_author(remote_fqid,remote_author)
 
         # Check if already following
         if current_author.is_following(remote_author):
