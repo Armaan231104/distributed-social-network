@@ -825,11 +825,15 @@ def author_friends(request, author_id):
     })
 @approved_author_required
 def author_profile(request, author_id):
-    """Show an author's profile along with their posts."""
+    print(f"\n=== ENTER author_profile ===")
+    print(f"Raw author_id: {author_id}")
+
     if not author_id.endswith('/'):
         author_id += '/'
+    print(f"Normalized author_id: {author_id}")
 
     author = get_object_or_404(Author, id=author_id)
+    print(f"Author found: {author} | is_local: {author.user is not None}")
 
     current_user_author = None
     is_following = False
@@ -844,79 +848,82 @@ def author_profile(request, author_id):
                 object=author,
                 status=FollowRequest.Status.PENDING
             ).exists()
+            print(f"Viewer: {current_user_author} | is_following: {is_following} | pending: {has_pending_request}")
         except Author.DoesNotExist:
-            pass
+            print("Viewer has no Author object")
 
     posts = []
 
     if author.user:
-        # ── Local author ──
+        print("Taking LOCAL author branch")
         if current_user_author == author:
+            print("Viewer is the author themselves")
             posts = Entry.objects.filter(
                 author=author.user
             ).exclude(visibility="DELETED").order_by('-published_at')
-
         elif current_user_author and current_user_author.is_friend(author):
+            print("Viewer is a friend")
             posts = Entry.objects.filter(
                 author=author.user,
                 visibility__in=["PUBLIC", "UNLISTED", "FRIENDS"]
             ).order_by('-published_at')
-
         elif is_following:
+            print("Viewer is a follower")
             posts = Entry.objects.filter(
                 author=author.user,
                 visibility__in=["PUBLIC", "UNLISTED"]
             ).order_by('-published_at')
-
         else:
+            print("Viewer is a stranger")
             posts = Entry.objects.filter(
                 author=author.user,
                 visibility="PUBLIC"
             ).order_by('-published_at')
+        print(f"Local posts count: {posts.count()}")
 
     else:
-        # ── Remote author ── same pattern as get_stream_entries_for_user
+        print("Taking REMOTE author branch")
         try:
             remote_posts = fetch_remote_author_posts(author)
-            # Apply visibility filtering for remote posts too
+            print(f"Remote posts fetched: {remote_posts.count()}")
+
+            # Extract IDs first — can't call .filter() directly on a union queryset
+            stored_ids = list(remote_posts.values_list('id', flat=True))
+            print(f"Stored IDs: {stored_ids}")
+
             if current_user_author and current_user_author.is_friend(author):
-                posts = remote_posts.filter(
+                print("Viewer is a friend of remote author")
+                posts = Entry.objects.filter(
+                    id__in=stored_ids,
                     visibility__in=["PUBLIC", "UNLISTED", "FRIENDS"]
                 ).order_by('-published_at')
             elif is_following:
-                posts = remote_posts.filter(
+                print("Viewer is following remote author")
+                posts = Entry.objects.filter(
+                    id__in=stored_ids,
                     visibility__in=["PUBLIC", "UNLISTED"]
                 ).order_by('-published_at')
             else:
-                posts = remote_posts.filter(
+                print("Viewer is a stranger to remote author")
+                posts = Entry.objects.filter(
+                    id__in=stored_ids,
                     visibility="PUBLIC"
                 ).order_by('-published_at')
+
+            print(f"Filtered remote posts count: {posts.count()}")
+
         except Exception as e:
-            print(f"Failed to fetch remote posts for {author.id}: {e}")
+            print(f"ERROR fetching remote posts: {e}")
+            import traceback
+            traceback.print_exc()
             posts = Entry.objects.filter(
                 remote_author=author,
                 visibility="PUBLIC"
             ).order_by('-published_at')
-    print(f"Posts type: {type(posts)}")
-    print(f"Posts value: {posts}")
-    try:
-        print(f"Posts count: {posts.count()}")
-    except Exception as e:
-        print(f"Posts count error: {e}")
-    try:
-        from django.template.loader import render_to_string
-        render_to_string('accounts/profile.html', {
-                'profile_author': author,
-                'current_user_author': current_user_author,
-                'is_following': is_following,
-                'has_pending_request': has_pending_request,
-                'posts': posts,
-            }, request=request)
-        print("Template rendered OK")
-    except Exception as e:
-        print(f"TEMPLATE ERROR: {e}")
-        import traceback
-        traceback.print_exc()
+            print(f"Fallback cached posts count: {posts.count()}")
+
+    print(f"=== EXIT author_profile ===\n")
+
     return render(request, 'accounts/profile.html', {
         'profile_author': author,
         'current_user_author': current_user_author,
