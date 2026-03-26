@@ -109,16 +109,15 @@ class Entry(models.Model):
     @property
     def is_edited(self):
         return (self.updated_at - self.published_at) > timedelta(seconds=1)
-    
     @property
     def get_author(self):
-        """Returns the Author object regardless of whether local or remote."""
-        if self.remote_author:
-            return self.remote_author
-        try:
-            return self.author.author
-        except Exception:
-            return None
+        """Returns the Author object for this post. Prefer local author over remote."""
+        if self.author:
+            try:
+                return self.author.author  # The local Author linked to the Django User
+            except Exception:
+                pass
+        return self.remote_author
     
 class HostedImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
