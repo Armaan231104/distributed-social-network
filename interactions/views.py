@@ -11,6 +11,7 @@ from posts.models import Entry
 from accounts.models import Author
 from .models import Like, Comment
 from nodes.models import RemoteNode
+from nodes.utils import find_remote_node_for_url
 from .serializers import (
     LikeSerializer, CommentSerializer,
     serialize_likes, serialize_comments
@@ -60,12 +61,13 @@ def toggle_like(request, object_type, object_id):
     either adds or deletes a like depending on current status.
     """
     liking_author = request.user.author
+    target_author = None
 
     if object_type == 'entry':
         obj = get_object_or_404(Entry, id=object_id)
         if not user_can_access_entry(request.user, obj):
             return JsonResponse({'error': 'Forbidden'}, status=403)
-        
+
         target_author = obj.get_author
         object_url = obj.fqid
 
@@ -75,9 +77,10 @@ def toggle_like(request, object_type, object_id):
         obj = get_object_or_404(Comment, id=object_id)
         if not user_can_access_entry(request.user, obj.entry):
             return JsonResponse({'error': 'Forbidden'}, status=403)
-        
+
         target_author = obj.author
-        object_url = f"{target_author.id}/comments/{obj.id}"
+        # Fixed: include the entry segment in the comment URL
+        object_url = f"{target_author.id.rstrip('/')}/posts/{obj.entry.id}/comments/{obj.id}"
 
         like, created = Like.objects.get_or_create(author=liking_author, entry=None, comment=obj)
 
@@ -91,27 +94,26 @@ def toggle_like(request, object_type, object_id):
         liked = True
 
     if target_author and not target_author.is_local:
-        send_like_to_remote_inbox(liking_author, target_author, object_url)
+        if created:
+            send_like_to_remote_inbox(liking_author, target_author, object_url)
+        else:
+            send_undo_like_to_remote_inbox(liking_author, target_author, object_url)
 
     return JsonResponse({'liked': liked, 'like_count': obj.likes.count()})
 
 
 def send_like_to_remote_inbox(sender, recipient, object_url):
     """
-    Sends a standard 'Like' object to the recipient's inbox.
+    Sends a standard 'Like' activity to the recipient's inbox.
+    Uses the same node lookup pattern as the rest of the codebase.
     """
-    target_host = recipient.host.rstrip('/')
-    # Recipient ID is already the full URL (e.g., http://node/api/authors/uuid)
     inbox_url = recipient.id.rstrip('/') + '/inbox/'
 
-    try:
-        node_config = RemoteNode.objects.get(url__icontains=target_host, is_active=True)
-        auth_credentials = (node_config.username, node_config.password)
-    except RemoteNode.DoesNotExist:
-        # if no node is configured, the request will likely fail with 401/403
-        print(f"No credentials found for host: {target_host}")
+    node = find_remote_node_for_url(recipient.id) or find_remote_node_for_url(recipient.host)
+    if not node:
+        print(f"No credentials found for host: {recipient.host}")
         return None
-    
+
     payload = {
         "type": "Like",
         "author": {
@@ -121,14 +123,70 @@ def send_like_to_remote_inbox(sender, recipient, object_url):
             "displayName": sender.displayName,
             "url": sender.id,
             "github": sender.github,
-            "profileImage": sender.profileImage.url if sender.profileImage else None
+            "profileImage": sender.profileImage.url if sender.profileImage else None,
         },
         "object": object_url
     }
 
     try:
-        # 5-second timeout to prevent Heroku worker hang-ups
-        response = requests.post(inbox_url, json=payload, auth=auth_credentials, timeout=5)
+        response = requests.post(
+            inbox_url,
+            json=payload,
+            auth=(node.username, node.password),
+            timeout=5
+        )
+        print(f"Like sent to {inbox_url} → {response.status_code}")
+        return response.status_code
+    except requests.exceptions.RequestException as e:
+        print(f"Remote conn failed: {e}")
+        return None
+
+
+def send_undo_like_to_remote_inbox(sender, recipient, object_url):
+    """
+    Sends an 'Undo' wrapping a 'Like' to the recipient's inbox when a user unlikes.
+    """
+    inbox_url = recipient.id.rstrip('/') + '/inbox/'
+
+    node = find_remote_node_for_url(recipient.id) or find_remote_node_for_url(recipient.host)
+    if not node:
+        print(f"No credentials found for host: {recipient.host}")
+        return None
+
+    payload = {
+        "type": "Undo",
+        "actor": {
+            "type": "author",
+            "id": sender.id,
+            "host": sender.host,
+            "displayName": sender.displayName,
+            "url": sender.id,
+            "github": sender.github,
+            "profileImage": sender.profileImage.url if sender.profileImage else None,
+        },
+        "object": {
+            "type": "Like",
+            "author": {
+                "type": "author",
+                "id": sender.id,
+                "host": sender.host,
+                "displayName": sender.displayName,
+                "url": sender.id,
+                "github": sender.github,
+                "profileImage": sender.profileImage.url if sender.profileImage else None,
+            },
+            "object": object_url
+        }
+    }
+
+    try:
+        response = requests.post(
+            inbox_url,
+            json=payload,
+            auth=(node.username, node.password),
+            timeout=5
+        )
+        print(f"Undo Like sent to {inbox_url} → {response.status_code}")
         return response.status_code
     except requests.exceptions.RequestException as e:
         print(f"Remote conn failed: {e}")
@@ -157,18 +215,14 @@ def add_comment(request, entry_id):
 
     return redirect('entry_detail', entry_id=entry_id)
 
+
 def send_comment_to_remote_inbox(comment, entry):
     """Send a comment to the remote entry author's inbox."""
-    # get the remote author of the entry
     remote_author = entry.remote_author
     if not remote_author or remote_author.is_local:
         return
 
-    # find the node for this remote author
-    node = RemoteNode.objects.filter(
-        is_active=True,
-        url__contains=remote_author.host
-    ).first()
+    node = find_remote_node_for_url(remote_author.id) or find_remote_node_for_url(remote_author.host)
     if not node:
         return
 
