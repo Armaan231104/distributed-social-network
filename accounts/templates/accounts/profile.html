@@ -93,6 +93,7 @@
                   - If you're viewing your own profile: show Edit Profile + Create Post
                   - If you're viewing someone else: show Follow/Unfollow/Cancel Request
                 -->
+                {%if current_user_author.host == profile_author.host%}
                 <div class="profile-actions">
                     {% if current_user_author %}
                         {% if current_user_author == profile_author%}
@@ -130,6 +131,8 @@
                     {% endif %}
                     {% endif %}
                 </div>
+
+                {%endif%}
 
             </div>
         </div>
