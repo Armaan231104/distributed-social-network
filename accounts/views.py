@@ -203,7 +203,7 @@ class AuthorListView(APIView):
         user = request.user
 
         # If admin → see all authors
-        if user.is_authenticated and user.is_superuser:
+        if user.is_authenticated and getattr(user, 'is_superuser', False):
             authors = Author.objects.all()
         else:
             # Everyone else → only approved authors
