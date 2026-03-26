@@ -19,6 +19,7 @@
     {% if posts %}
     <div class="posts-grid">
         {% for post in posts %}
+        {% with entry_author=post.get_author %}
         <div class="post-card" onclick="window.location.href='{% url 'entry_detail' post.id %}'">
 
             <!-- POST HEADER -->
@@ -27,9 +28,9 @@
                 <!-- Top row: avatar + author name -->
                 <div class="post-header-top">
                     <div class="post-avatar-wrapper">
-                        {% if post.author.author and post.author.author.profileImage %}
-                            <img src="{{ post.author.author.profileImage.url }}"
-                                 alt="{{ post.author.author.displayName }}"
+                        {% if entry_author and entry_author.profileImage %}
+                            <img src="{{ entry_author.profileImage.url }}"
+                                 alt="{{ entry_author.displayName }}"
                                  class="post-avatar">
                         {% else %}
                             <div class="post-avatar-placeholder">
@@ -38,9 +39,8 @@
                         {% endif %}
                     </div>
 
-
-        <a class="post-author-name author-link" href="{% url 'author-profile' post.author.id %}">
-            {{ post.author.author.displayName|default:post.author.username }}
+        <a class="post-author-name author-link" href="{% if entry_author %}{% url 'author-profile' entry_author.id %}{% else %}#{% endif %}">
+            {{ entry_author.displayName|default:post.author.username }}
         </a>
                 </div>
 
@@ -131,6 +131,7 @@
 {% endif %}
 
         </div>
+        {% endwith %}
         {% endfor %}
 
     </div>

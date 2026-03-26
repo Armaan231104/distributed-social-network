@@ -3,6 +3,7 @@ from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST, require_http_methods
 from django.db.models import Q
+from django.views import View
 from .models import Entry, HostedImage
 from accounts.models import Author, Follow
 from nodes.models import RemoteNode
@@ -10,6 +11,9 @@ from interactions.views import user_can_access_entry
 import json
 from functools import wraps
 import requests
+from accounts.serializers import AuthorSerializer
+from accounts.utils import normalize_fqid
+from nodes.utils import find_remote_node_for_url, get_remote_author_entries_url
 
 
 def fetch_remote_author_posts(remote_author):
@@ -20,18 +24,8 @@ def fetch_remote_author_posts(remote_author):
     if remote_author.user:
         return Entry.objects.none()
     
-    remote_author_id = remote_author.id.rstrip('/')
-    author_id_part = remote_author_id.split('/')[-1]
-    
-    remote_host = remote_author.host.rstrip('/')
-    posts_url = f"{remote_host}/api/authors/{author_id_part}/posts/"
-    
-    node = None
-    remote_host_clean = remote_host.rstrip('/')
-    for n in RemoteNode.objects.filter(is_active=True):
-        if remote_host_clean.startswith(n.url.rstrip('/')):
-            node = n
-            break
+    posts_url = get_remote_author_entries_url(remote_author.id)
+    node = find_remote_node_for_url(remote_author.id) or find_remote_node_for_url(remote_author.host)
     
     if not node:
         return Entry.objects.none()
@@ -66,9 +60,29 @@ def fetch_remote_author_posts(remote_author):
                     'content': post.get('content', ''),
                     'content_type': post.get('contentType', 'text/plain'),
                     'visibility': visibility,
-                    'author': remote_author,
+                    'remote_author': remote_author,
                 }
             )
+
+            if not created:
+                updated = False
+                if entry.remote_author_id != remote_author.id:
+                    entry.remote_author = remote_author
+                    updated = True
+                if entry.title != post.get('title', ''):
+                    entry.title = post.get('title', '')
+                    updated = True
+                if entry.content != post.get('content', ''):
+                    entry.content = post.get('content', '')
+                    updated = True
+                if entry.content_type != post.get('contentType', 'text/plain'):
+                    entry.content_type = post.get('contentType', 'text/plain')
+                    updated = True
+                if entry.visibility != visibility:
+                    entry.visibility = visibility
+                    updated = True
+                if updated:
+                    entry.save()
             
             if created or entry.published_at is None:
                 published = post.get('published')
@@ -86,6 +100,102 @@ def fetch_remote_author_posts(remote_author):
     except Exception as e:
         print(f"Error fetching remote posts from {remote_author.displayName}: {e}")
         return Entry.objects.none()
+
+
+def serialize_entry(entry, request=None):
+    """Serialize an Entry into the spec-style API shape used for federation."""
+    author = entry.get_author
+    comments_url = None
+    likes_url = None
+    if entry.fqid:
+        comments_url = f"{entry.fqid.rstrip('/')}/comments"
+        likes_url = f"{entry.fqid.rstrip('/')}/likes"
+
+    return {
+        "type": "entry",
+        "title": entry.title,
+        "id": entry.fqid,
+        "web": None,
+        "description": entry.title,
+        "contentType": entry.content_type,
+        "content": entry.content,
+        "author": AuthorSerializer(author).data if author else None,
+        "comments": {
+            "type": "comments",
+            "id": comments_url,
+            "web": None,
+            "page_number": 1,
+            "size": 5,
+            "count": entry.comments.count(),
+            "src": [],
+        },
+        "likes": {
+            "type": "likes",
+            "id": likes_url,
+            "web": None,
+            "page_number": 1,
+            "size": 50,
+            "count": entry.likes.count(),
+            "src": [],
+        },
+        "published": entry.published_at.isoformat(),
+        "visibility": entry.visibility,
+    }
+
+
+def get_entries_visible_to_requester(author, request):
+    """Return entries visible to the current requester for a given author."""
+    qs = Entry.objects.exclude(visibility="DELETED").order_by('-published_at')
+
+    if author.user:
+        qs = qs.filter(author=author.user)
+    else:
+        qs = qs.filter(remote_author=author)
+
+    if not request.user.is_authenticated:
+        return qs.filter(visibility="PUBLIC")
+
+    if getattr(request.user, "is_remote_node", False):
+        return qs.filter(visibility="PUBLIC")
+
+    try:
+        viewer = request.user.author
+    except Author.DoesNotExist:
+        return qs.filter(visibility="PUBLIC")
+
+    if viewer.id == author.id:
+        return qs
+
+    if viewer.is_friend(author):
+        return qs.filter(visibility__in=["PUBLIC", "UNLISTED", "FRIENDS"])
+
+    if viewer.is_following(author):
+        return qs.filter(visibility__in=["PUBLIC", "UNLISTED"])
+
+    return qs.filter(visibility="PUBLIC")
+
+
+class AuthorEntriesView(View):
+    """GET recent entries for a specific author, using the spec path."""
+
+    def get(self, request, author_id):
+        author = get_object_or_404(Author, id=normalize_fqid(author_id))
+        page = int(request.GET.get('page', 1))
+        size = int(request.GET.get('size', 10))
+
+        visible_entries = get_entries_visible_to_requester(author, request)
+        total = visible_entries.count()
+        start = (page - 1) * size
+        end = start + size
+        page_entries = visible_entries[start:end]
+
+        return JsonResponse({
+            "type": "entries",
+            "page_number": page,
+            "size": size,
+            "count": total,
+            "src": [serialize_entry(entry, request=request) for entry in page_entries],
+        })
 
 def get_entry_by_id(entry_id):
     if str(entry_id).startswith("http"):
@@ -243,8 +353,8 @@ def serialize_entry_for_stream(request, entry):
 
     author_obj = None
 
-    if hasattr(entry.author, "author"):
-        author_profile = entry.author.author
+    author_profile = entry.get_author
+    if author_profile:
         author_obj = {
             "id": author_profile.id,
             "displayName": author_profile.displayName,

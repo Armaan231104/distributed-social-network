@@ -22,6 +22,7 @@ from .serializers import (
     FollowRequestSerializer
 )
 from .utils import get_host_url, is_local_author, normalize_fqid
+from nodes.utils import find_remote_node_for_url, get_remote_inbox_url
 
 def build_local_author_id(user):
     host = get_host_url()
@@ -88,16 +89,12 @@ def send_follow_to_remote(actor, target):
     Send a follow request to a remote author's inbox on their node.
     Fails loudly if node credentials are missing instead of sending a 401 Unauthorized request.
     """
-    from nodes.models import RemoteNode
-    
     # Use the property you already have in your model
     if target.is_local:
         return
     
     try:
-        remote_author_id = target.id.rstrip('/').split('/')[-1]
-        target_host = target.host.rstrip('/')
-        inbox_url = f"{target_host}/api/authors/{remote_author_id}/inbox/"
+        inbox_url = get_remote_inbox_url(target.id)
         
         follow_data = {
             'type': 'follow',
@@ -107,7 +104,7 @@ def send_follow_to_remote(actor, target):
         }
         
         # Try to get credentials from stored nodes
-        node = next((n for n in RemoteNode.objects.filter(is_active=True) if target_host.startswith(n.url.rstrip('/'))), None)
+        node = find_remote_node_for_url(target.id) or find_remote_node_for_url(target.host)
         
         if node:
             # Use stored node credentials
@@ -1138,4 +1135,3 @@ def login_view(request):
         form = AuthenticationForm()
 
     return render(request, "accounts/login.html", {"form": form})
-

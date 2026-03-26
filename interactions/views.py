@@ -38,7 +38,8 @@ def user_can_access_entry(user, entry):
             return True
         try:
             author = user.author
-            return author.is_friend(entry.author.author)
+            entry_author = entry.get_author
+            return bool(entry_author and author.is_friend(entry_author))
         except Exception:
             return False
     return False
@@ -66,7 +67,7 @@ def toggle_like(request, object_type, object_id):
             return JsonResponse({'error': 'Forbidden'}, status=403)
         
         target_author = obj.get_author
-        object_url = obj.fqid or f"{liking_author.host}api/authors/{target_author.id}/posts/{obj.id}"
+        object_url = obj.fqid
 
         like, created = Like.objects.get_or_create(author=liking_author, entry=obj, comment=None)
 

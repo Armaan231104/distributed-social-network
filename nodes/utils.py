@@ -2,6 +2,38 @@ import requests
 from nodes.models import RemoteNode
 from posts.utils import encode_image
 
+
+def get_remote_inbox_url(author_fqid):
+    """Build a remote inbox URL from a fully-qualified author ID."""
+    return f"{str(author_fqid).rstrip('/')}/inbox/"
+
+
+def get_remote_author_entries_url(author_fqid):
+    """Build a remote author entries URL from a fully-qualified author ID."""
+    return f"{str(author_fqid).rstrip('/')}/entries/"
+
+
+def find_remote_node_for_url(url):
+    """
+    Match a remote URL to a configured RemoteNode.
+
+    Supports nodes saved either as a bare host (https://node.example)
+    or with an API suffix (https://node.example/api).
+    """
+    if not url:
+        return None
+
+    normalized_url = str(url).rstrip('/')
+
+    for node in RemoteNode.objects.filter(is_active=True):
+        node_url = node.url.rstrip('/')
+        node_api_url = f"{node_url}/api"
+
+        if normalized_url.startswith(node_url) or normalized_url.startswith(node_api_url):
+            return node
+
+    return None
+
 def send_entry_to_remote(entry):
     nodes = RemoteNode.objects.filter(is_active=True)
 

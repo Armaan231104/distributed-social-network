@@ -9,6 +9,7 @@ from accounts.models import Author, Follow
 from posts.models import Entry
 from nodes.models import RemoteNode
 import base64
+from posts.views import fetch_remote_author_posts
 
 
 class PostsApiTests(TestCase):
@@ -1031,3 +1032,110 @@ class FanoutFQIDTests(TestCase):
 
             self.assertIn("id", sent_data)
             self.assertTrue(sent_data["id"].startswith("http"))
+
+
+class RemoteAuthorEntriesApiTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(username='entries-owner', password='pass12345')
+        self.author = self.user.author
+
+    def test_author_entries_endpoint_returns_public_entries(self):
+        Entry.objects.create(
+            author=self.user,
+            title='Public Entry',
+            content='hello world',
+            content_type='text/plain',
+            visibility='PUBLIC',
+        )
+
+        response = self.client.get(f'/api/authors/{self.author.id.rstrip("/")}/entries/')
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['type'], 'entries')
+        self.assertEqual(payload['count'], 1)
+        self.assertEqual(payload['src'][0]['title'], 'Public Entry')
+
+
+class RemoteFetchStreamTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+        self.user = User.objects.create_user(username='local-reader', password='pass12345')
+        self.author = self.user.author
+
+        self.remote_node = RemoteNode.objects.create(
+            url='https://remote-node.example.com',
+            username='remoteuser',
+            password='remotepass',
+            is_active=True,
+        )
+
+        self.remote_author = Author.objects.create(
+            id='https://remote-node.example.com/api/authors/remote-user/',
+            host='https://remote-node.example.com/api/',
+            displayName='Remote User',
+            user=None,
+            is_approved=True,
+        )
+
+        Follow.objects.create(follower=self.author, followee=self.remote_author)
+
+    @patch('posts.views.requests.get')
+    def test_fetch_remote_author_posts_uses_entries_endpoint_and_stores_remote_author(self, mock_get):
+        mock_response = type('Resp', (), {})()
+        mock_response.status_code = 200
+        mock_response.json = lambda: {
+            'type': 'entries',
+            'src': [
+                {
+                    'type': 'entry',
+                    'id': 'https://remote-node.example.com/api/authors/remote-user/entries/entry-1',
+                    'title': 'Remote Post',
+                    'content': 'federated hello',
+                    'contentType': 'text/plain',
+                    'visibility': 'PUBLIC',
+                    'published': '2026-03-01T12:00:00+00:00',
+                }
+            ],
+        }
+        mock_get.return_value = mock_response
+
+        entries = fetch_remote_author_posts(self.remote_author)
+
+        self.assertEqual(entries.count(), 1)
+        entry = Entry.objects.get(fqid='https://remote-node.example.com/api/authors/remote-user/entries/entry-1')
+        self.assertEqual(entry.remote_author, self.remote_author)
+        self.assertEqual(entry.author, None)
+        args, kwargs = mock_get.call_args
+        self.assertEqual(args[0], 'https://remote-node.example.com/api/authors/remote-user/entries/')
+        self.assertEqual(kwargs['auth'], ('remoteuser', 'remotepass'))
+
+    @patch('posts.views.requests.get')
+    def test_stream_includes_fetched_remote_entries(self, mock_get):
+        mock_response = type('Resp', (), {})()
+        mock_response.status_code = 200
+        mock_response.json = lambda: {
+            'type': 'entries',
+            'src': [
+                {
+                    'type': 'entry',
+                    'id': 'https://remote-node.example.com/api/authors/remote-user/entries/entry-2',
+                    'title': 'Remote Stream Post',
+                    'content': 'hello from another node',
+                    'contentType': 'text/plain',
+                    'visibility': 'PUBLIC',
+                    'published': '2026-03-02T12:00:00+00:00',
+                }
+            ],
+        }
+        mock_get.return_value = mock_response
+
+        self.client.login(username='local-reader', password='pass12345')
+        response = self.client.get('/posts/api/entries/stream/')
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['count'], 1)
+        self.assertEqual(payload['src'][0]['title'], 'Remote Stream Post')

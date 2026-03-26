@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="{% static 'css/interactions/entry_detail.css' %}">
 
 <div class="post-detail-wrapper">
+    {% with entry_author=entry.get_author %}
 
     <!-- POST CARD WITH COMMENTS INSIDE -->
     <div class="post-card full-card">
@@ -19,9 +20,9 @@
     <!-- Row 1: avatar + username -->
     <div class="post-header-top">
         <div class="post-avatar-wrapper">
-            {% if entry.author.author and entry.author.author.profileImage %}
-                <img src="{{ entry.author.author.profileImage.url }}"
-                     alt="{{ entry.author.author.displayName }}"
+            {% if entry_author and entry_author.profileImage %}
+                <img src="{{ entry_author.profileImage.url }}"
+                     alt="{{ entry_author.displayName }}"
                      class="post-avatar">
             {% else %}
                 <div class="post-avatar-placeholder">
@@ -31,7 +32,7 @@
         </div>
 
         <span class="post-author-name">
-            <a style="font-size: 20px;" class="author-link" href="{% url 'author-profile' entry.author.author.id %}">{{ entry.author.author.displayName|default:entry.author.username }}</a>
+            <a style="font-size: 20px;" class="author-link" href="{% if entry_author %}{% url 'author-profile' entry_author.id %}{% else %}#{% endif %}">{{ entry_author.displayName|default:entry.author.username }}</a>
         </span>
     </div>
 
@@ -140,7 +141,7 @@
                 {% csrf_token %}
                 <textarea name="content" placeholder="Write a comment..." required></textarea>
                 <div class="comment-form-actions">
-                    <a href="{% url 'author-profile' entry.author.author.id %}" class="btn btn-secondary">
+                    <a href="{% if entry_author %}{% url 'author-profile' entry_author.id %}{% else %}#{% endif %}" class="btn btn-secondary">
                         <i class="fa-solid fa-hand-point-left"></i> Back
                     </a>
                     <button type="submit" class="btn btn-primary"><i class="fa-solid fa-bullhorn fa-rotate-by" style="--fa-rotate-angle: -15deg;"></i> Comment</button>
@@ -150,6 +151,7 @@
         </div>
 
     </div>
+    {% endwith %}
 </div>
 <!-- Edit Description Modal – only bio/description editable -->
 <div id="edit-description-modal" class="modal hidden">

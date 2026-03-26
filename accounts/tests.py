@@ -4,6 +4,7 @@ import json
 from unittest.mock import patch, MagicMock
 
 from accounts.models import Author, FollowRequest, Follow
+from nodes.models import RemoteNode
 
 
 class AuthorModelTest(TestCase):
@@ -330,6 +331,13 @@ class FollowViewTest(TestCase):
         
         self.user2 = User.objects.create_user(username='author2', password='testpass123')
         self.author2 = self.user2.author
+
+        self.remote_node = RemoteNode.objects.create(
+            url='https://remote-node.example.com',
+            username='remoteuser',
+            password='remotepass',
+            is_active=True,
+        )
     
     def test_follow_requires_auth(self):
         """Verifies 403 returned when not authenticated."""
@@ -395,6 +403,32 @@ class FollowViewTest(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn('Already following', response.json()['error'])
+
+    @patch('accounts.views.requests.post')
+    def test_follow_remote_author_posts_to_author_inbox(self, mock_post):
+        """Verifies remote follow uses the target author FQID inbox, not host + /api/api."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_post.return_value = mock_response
+
+        remote_author = Author.objects.create(
+            id='https://remote-node.example.com/api/authors/remote-user/',
+            host='https://remote-node.example.com/api/',
+            displayName='Remote User',
+            user=None,
+            is_approved=True,
+        )
+
+        self.client.login(username='author1', password='testpass123')
+        response = self.client.put(
+            f'/api/authors/{self.author1.id.rstrip("/")}/following/{remote_author.id.rstrip("/")}/',
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 201)
+        args, kwargs = mock_post.call_args
+        self.assertEqual(args[0], 'https://remote-node.example.com/api/authors/remote-user/inbox/')
+        self.assertEqual(kwargs['auth'], ('remoteuser', 'remotepass'))
     
     def test_resend_after_rejection(self):
         """Verifies rejected requests can be resent."""

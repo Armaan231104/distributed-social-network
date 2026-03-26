@@ -6,6 +6,7 @@ apiurlpatterns = [
     path('api/authors/', views.AuthorListView.as_view(), name='author-list'),
     path('api/authors/<path:author_id>/inbox/', views.InboxView.as_view(), name='author-inbox'),
     path('api/authors/<path:author_id>/following/', views.FollowingListView.as_view(), name='author-following-api'),
+    path('api/authors/<path:author_id>/entries/', posts.views.AuthorEntriesView.as_view(), name='author-entries-api'),
     path('api/authors/<path:author_id>/following/<path:foreign_id>/', views.FollowView.as_view(), name='author-follow-api'),
     path('api/authors/<path:author_id>/followers/', views.FollowersListView.as_view(), name='author-followers-api'),
     path('api/authors/<path:author_id>/followers/<path:foreign_id>/', views.AcceptFollowView.as_view(), name='author-followers-manage-api'),
