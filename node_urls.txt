@@ -17,3 +17,9 @@ Nick's node:
 https://crimson-hazel-f17dca3230bc.herokuapp.com
 crimson
 1234
+
+Aaron's node:
+NODE_BASE_URL: https://crimson-aaron-aee261bd70fb.herokuapp.com
+NODE_USERNAME: crimson-aaron
+NODE_PASSWORD: aaron5432
+
