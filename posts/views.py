@@ -262,24 +262,24 @@ def get_stream_entries_for_user(user):
 
     base_qs = Entry.objects.exclude(
         visibility="DELETED"
-    ).select_related('author__author')
+    ).select_related("author__author")
 
     if not user.is_authenticated:
         return base_qs.filter(
             visibility="PUBLIC"
-        ).order_by('-published_at')
+        ).order_by("-published_at")
 
     try:
         current_author = user.author
     except Author.DoesNotExist:
         return base_qs.filter(
             Q(author=user) | Q(visibility="PUBLIC")
-        ).order_by('-published_at').distinct()
+        ).order_by("-published_at").distinct()
 
     following_qs = Follow.objects.filter(
         follower=current_author,
         followee__user__isnull=False
-    ).select_related('followee__user')
+    ).select_related("followee__user")
 
     followed_authors = [f.followee for f in following_qs]
     followed_users = [a.user for a in followed_authors if a.user]
@@ -296,19 +296,31 @@ def get_stream_entries_for_user(user):
         Q(author__in=friend_users, visibility="FRIENDS")
     )
 
+    remote_entry_ids = []
+
     remote_following = Follow.objects.filter(
         follower=current_author,
         followee__user__isnull=True
-    ).select_related('followee')
+    ).select_related("followee")
 
-    remote_entries = Entry.objects.none()
     for follow in remote_following:
         remote_author = follow.followee
         posts = fetch_remote_author_posts(remote_author)
-        remote_entries = remote_entries | posts
 
-    all_entries = local_entries | remote_entries
-    return all_entries.order_by('-published_at').distinct()
+        if hasattr(posts, "model") and posts.model == Entry:
+            remote_entry_ids.extend(posts.values_list("id", flat=True))
+        elif isinstance(posts, list):
+            remote_entry_ids.extend(
+                [p.id for p in posts if isinstance(p, Entry) and p.id]
+            )
+
+    if remote_entry_ids:
+        remote_entries = Entry.objects.filter(id__in=remote_entry_ids)
+        all_entries = local_entries | remote_entries
+    else:
+        all_entries = local_entries
+
+    return all_entries.order_by("-published_at").distinct()
 
 @approved_author_required
 @approved_author_required
