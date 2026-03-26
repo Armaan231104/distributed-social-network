@@ -514,6 +514,7 @@ class InboxView(APIView):
         msg_type = str(data.get('type', '')).lower()
 
         if msg_type == 'follow':
+            print("FOLLOW REQUEST RECEIVED")
             actor_data = data.get('actor', {})
             object_data = data.get('object', {})
 
