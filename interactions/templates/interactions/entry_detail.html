@@ -21,9 +21,13 @@
     <div class="post-header-top">
         <div class="post-avatar-wrapper">
             {% if entry_author and entry_author.profileImage %}
-                <img src="{{ entry_author.profileImage.url }}"
-                     alt="{{ entry_author.displayName }}"
-                     class="post-avatar">
+                {% if entry_author and entry_author.profileImage %}
+                {% if entry_author.profileImage.url %}
+                    <img src="{{ entry_author.profileImage.url }}" class="post-avatar">
+                {% else %}
+                    <img src="{{ entry_author.profileImage }}" class="post-avatar">
+                {% endif %}
+            {% else %}
             {% else %}
                 <div class="post-avatar-placeholder">
                     <i class="fa-regular fa-user"></i>
@@ -32,7 +36,11 @@
         </div>
 
         <span class="post-author-name">
-            <a style="font-size: 20px;" class="author-link" href="{% if entry_author %}{% url 'author-profile' entry_author.id %}{% else %}#{% endif %}">{{ entry_author.displayName|default:entry.author.username }}</a>
+            <a style="font-size: 20px;" class="author-link" href="{% if entry_author %}{% url 'author-profile' entry_author.id %}{% else %}#{% endif %}">{% if entry_author %}
+                {{ entry_author.displayName }}
+            {% else %}
+                Unknown Author
+            {% endif %}</a>
         </span>
     </div>
 
