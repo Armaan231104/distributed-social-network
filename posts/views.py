@@ -422,20 +422,36 @@ def stream_api(request):
 
 @login_required
 def entry_detail(request, entry_id):
-    entry = get_entry_by_id(entry_id)
+    try:
+        print("ENTRY ID:", entry_id)
 
-    if not user_can_access_entry(request.user, entry):
-        return JsonResponse({'error': 'Forbidden'}, status=403)
+        entry = get_entry_by_id(entry_id)
+        print("ENTRY:", entry)
 
-    comments = entry.comments.all()
-    entry_author = entry.get_author
-    author_path = entry_author.id if entry_author else None
+        print("CHECK ACCESS")
+        access = user_can_access_entry(request.user, entry)
+        print("ACCESS RESULT:", access)
 
-    return render(request, 'interactions/entry_detail.html', {
-        'entry': entry,
-        'comments': comments,
-        'author_path': author_path,
-    })
+        if not access:
+            return JsonResponse({'error': 'Forbidden'}, status=403)
+
+        print("COMMENTS")
+        comments = entry.comments.all()
+
+        print("AUTHOR")
+        entry_author = entry.get_author
+
+        author_path = entry_author.id if entry_author else None
+
+        return render(request, 'interactions/entry_detail.html', {
+            'entry': entry,
+            'comments': comments,
+            'author_path': author_path,
+        })
+
+    except Exception as e:
+        print("🔥 ERROR:", str(e))
+        raise
 
 def entry_image(request, author_id, entry_id):
     entry = get_entry_by_id(entry_id)
