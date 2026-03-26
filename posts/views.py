@@ -450,7 +450,7 @@ def entry_detail(request, entry_id):
         })
 
     except Exception as e:
-        print("🔥 ERROR:", str(e))
+        print("ERROR:", str(e))
         raise
 
 def entry_image(request, author_id, entry_id):
