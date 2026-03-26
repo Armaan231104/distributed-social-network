@@ -72,6 +72,7 @@ def verify_remote_author_exists(foreign_id):
     """
     node = find_remote_node_for_url(foreign_id)
     if not node:
+        print(f"DEBUG: No node found for {foreign_id}")
         return None
     
     try:
@@ -81,6 +82,8 @@ def verify_remote_author_exists(foreign_id):
             timeout=10
         )
 
+        print(f"DEBUG: Response status: {response.status_code}")
+        print(f"DEBUG: Response body: {response.text}")
         response.raise_for_status()
         return response.json()
     except Exception as e:
