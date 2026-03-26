@@ -180,123 +180,107 @@
         {% if posts %}
         <div class="posts-grid">
             {% for post in posts %}
-            <div class="post-card" onclick="window.location.href='{% url 'entry_detail' post.id %}'">
+{% with entry_author=post.get_author %}
+<div class="post-card" onclick="window.location.href='{% url 'entry_detail' post.id %}'">
 
-            <!--
-              Post header: small avatar and author name.
-            -->
-            <!-- Post header -->
-            <div class="post-header">
-
-                <!-- Row 1: avatar + username -->
-                <div class="post-header-top">
-                    <div class="post-avatar-wrapper">
-                        {% if post.author.author and post.author.author.profileImage %}
-                            <img src="{{ post.author.author.profileImage.url }}"
-                                alt="{{ post.author.author.displayName }}"
-                                class="post-avatar">
-                        {% else %}
-                            <div class="post-avatar-placeholder">
-                                <i class="fa-regular fa-user"></i>
-                            </div>
-                        {% endif %}
+    <!-- POST HEADER -->
+    <div class="post-header">
+        <div class="post-header-top">
+            <div class="post-avatar-wrapper">
+                {% if entry_author and entry_author.profileImage %}
+                    <img src="{{ entry_author.profileImage.url }}"
+                         alt="{{ entry_author.displayName }}"
+                         class="post-avatar">
+                {% else %}
+                    <div class="post-avatar-placeholder">
+                        <i class="fa-regular fa-user"></i>
                     </div>
-
-                    <a class="post-author-name author-link" href="{% url 'author-profile' post.author.id %}">
-                        {{ post.author.author.displayName|default:post.author.username }}
-                    </a>
-                </div>
-                <hr class="menu-divider">
-
-                <!-- Row 2: title -->
-                <div class="post-title-row">
-                    <h3 class="post-title">{{ post.title }}</h3>
-                </div>
-
+                {% endif %}
             </div>
 
-            <!--
-              Post body: can be image, plaintext, or commonmark and renders
-              differently depending on which it is.
-              
-              The following section edited by Open AI, Chat GPT 5.2, "please fix the following section of code so that
-              commonmark entries will render properly with links, bullet points, etc.", 2026-02-27 
-            -->
-            {% if post.content_type == "image" and post.image %}
-                <figure class="stream-post-media">
-                    <img src="{{post.image.url}}" class="post-content-image">
+            <a class="post-author-name author-link"
+               href="{% if entry_author %}{% url 'author-profile' entry_author.id %}{% else %}#{% endif %}">
+                {% if entry_author %}
+                    {{ entry_author.displayName }}
+                {% else %}
+                    Unknown Author
+                {% endif %}
+            </a>
+        </div>
 
-                </figure>
-                    {% if post.content %}
-                        <figcaption>{{ post.content }}</figcaption>
-                    {% endif %}
+        <hr class="menu-divider">
 
-            {% elif post.content_type == "text/markdown" %}
-                <section class="stream-post-body">
-                    {{ post.content | render_markdown }}
-                </section>
-
-            {% else %}
-                <p class="stream-post-body">{{ post.content }}</p>
-            {% endif %}
-
-            <!-- Timestamp under each post -->
-            <span class="post-date">
-                Published on {{ post.published_at|date:"M d, Y H:i" }}
-            {% if post.is_edited %}
-               <br>(edited)
-            {% endif %}
-            </span>
-            </span>
-<div class="post-interactions">
-    <!-- COMMENT BUTTON -->
-    <button class="comment-btn">
-        <i class="fa-regular fa-comment"></i>
-        <span class="comment-count">{{ post.comments.count }}</span>
-    </button>
-
-    <!-- LIKE BUTTON -->
-    {% user_has_liked post request.user as liked %}
-    <button id="like-btn-{{ post.id }}" class="like-btn-heart" onclick="event.stopPropagation(); toggleLike('entry', '{{ post.id }}')">
-        <i class="fa{% if liked %}s{% else %}r{% endif %} fa-heart"></i>
-        <span id="like-count-{{ post.id }}">{{ post.likes.count }}</span>
-    </button>
-</div>
-
-
-<!-- POST OPTIONS (three dots menu) -->
-{% if post.visibility != "DELETED" and post.author == request.user %}
-<div class="post-options">
-    <button class="options-btn" 
-            onclick="event.stopPropagation(); togglePostOptions('{{ post.id }}')">
-        <i class="fa-solid fa-ellipsis-v"></i>
-    </button>
-
-    <div id="post-options-menu-{{ post.id }}" class="post-options-menu hidden">
-        <button class="menu-edit-btn" type="button"
-        onclick="event.stopPropagation();window.openEditPostDescription('{{ post.id }}', `{{ post.content|escapejs }}`);">
-            <i class="fa-solid fa-pen-to-square"></i> Edit Post
-        </button>
-        <button class="menu-delete-btn" type="button"
-                onclick="event.stopPropagation();if (confirm('Are you sure you want to delete?\n\nThis cannot be undone >:(')) { 
-                        document.getElementById('delete-form-{{ post.id }}').submit(); 
-                        }">
-            <i class="fa-solid fa-trash"></i> Delete
-        </button>
-        <!-- Future options can go here, e.g. -->
-        <!-- <button class="menu-item">Edit Post</button> -->
+        <div class="post-title-row">
+            <h3 class="post-title">{{ post.title }}</h3>
+        </div>
     </div>
 
-    <!-- Hidden form (keeps POST + CSRF, but triggered via JS) -->
-    <form id="delete-form-{{ post.id }}" method="POST" 
-          action="{% url 'delete_entry_ui' post.id %}" style="display:none;">
-        {% csrf_token %}
-    </form>
-</div>
-{% endif %}
+    <!-- POST CONTENT -->
+    {% if post.content_type == "image" and post.image %}
+        <figure class="stream-post-media">
+            <img src="{{ post.image.url }}" class="post-content-image">
+            {% if post.content %}
+                <figcaption>{{ post.content }}</figcaption>
+            {% endif %}
+        </figure>
+    {% elif post.content_type == "text/markdown" %}
+        <section class="stream-post-body">
+            {{ post.content | render_markdown }}
+        </section>
+    {% else %}
+        <p class="stream-post-body">{{ post.content }}</p>
+    {% endif %}
 
+    <!-- POST DATE -->
+    <span class="post-date">
+        Published on {{ post.published_at|date:"M d, Y H:i" }}
+        {% if post.is_edited %}<br>(edited){% endif %}
+    </span>
+
+    <!-- POST INTERACTIONS -->
+    <div class="post-interactions">
+        <button class="comment-btn">
+            <i class="fa-regular fa-comment"></i>
+            <span class="comment-count">{{ post.comments.count }}</span>
+        </button>
+
+        {% user_has_liked post request.user as liked %}
+        <button id="like-btn-{{ post.id }}" class="like-btn-heart" onclick="event.stopPropagation(); toggleLike('entry', '{{ post.id }}')">
+            <i class="fa{% if liked %}s{% else %}r{% endif %} fa-heart"></i>
+            <span id="like-count-{{ post.id }}">{{ post.likes.count }}</span>
+        </button>
+    </div>
+
+    <!-- POST OPTIONS (only for local posts you own) -->
+    {% if post.visibility != "DELETED" and post.author == request.user %}
+    <div class="post-options">
+        <button class="options-btn"
+                onclick="event.stopPropagation(); togglePostOptions('{{ post.id }}')">
+            <i class="fa-solid fa-ellipsis-v"></i>
+        </button>
+
+        <div id="post-options-menu-{{ post.id }}" class="post-options-menu hidden">
+            <button class="menu-edit-btn" type="button"
+                    onclick="event.stopPropagation(); window.openEditPostDescription('{{ post.id }}', `{{ post.content|escapejs }}`);">
+                <i class="fa-solid fa-pen-to-square"></i> Edit Post
+            </button>
+            <hr class="menu-divider">
+            <button class="menu-delete-btn" type="button"
+                    onclick="event.stopPropagation(); if (confirm('Are you sure you want to delete?\n\nThis cannot be undone >:(')) { document.getElementById('delete-form-{{ post.id }}').submit(); }">
+                <i class="fa-solid fa-trash"></i> Delete
+            </button>
         </div>
-            {% endfor %}
+
+        <form id="delete-form-{{ post.id }}" method="POST"
+              action="{% url 'delete_entry_ui' post.id %}" style="display:none;">
+            {% csrf_token %}
+        </form>
+    </div>
+    {% endif %}
+
+</div>
+{% endwith %}
+{% endfor %}
         </div>
         {% else %}
             <p class="empty-state">No public posts yet.</p>
