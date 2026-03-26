@@ -39,8 +39,15 @@
                         {% endif %}
                     </div>
 
-        <a class="post-author-name author-link" href="{% if entry_author %}{% url 'author-profile' entry_author.id %}{% else %}#{% endif %}">
-            {{ entry_author.displayName|default:post.author.username }}
+        <a class="post-author-name author-link"
+            href="{% if entry_author and entry_author.id %}{% url 'author-profile' entry_author.id %}{% else %}#{% endif %}">
+            {% if entry_author and entry_author.displayName %}
+                {{ entry_author.displayName }}
+            {% elif post.author and post.author.username %}
+                {{ post.author.username }}
+            {% else %}
+                Unknown Author
+            {% endif %}
         </a>
                 </div>
 
