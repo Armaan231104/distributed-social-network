@@ -452,6 +452,7 @@ def entry_detail(request, entry_id):
             'entry': entry,
             'comments': comments,
             'author_path': author_path,
+            'entry_author':entry_author,
         })
 
     except Exception as e:
