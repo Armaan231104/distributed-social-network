@@ -762,15 +762,6 @@ def entry_detail_api(request, entry_id):
         fanout_entry_to_remote_followers(entry, request.user)
         
         return JsonResponse({"deleted": True})
-        return JsonResponse({
-            "id": entry.fqid,
-            "title": entry.title,
-            "content": entry.content,
-            "contentType": entry.content_type,
-            "visibility": entry.visibility,
-            "published": entry.published_at.isoformat(),
-            "image": image_url,
-        })
     
     # PATCH - Partial update (only author)
     if request.method == "PATCH":
