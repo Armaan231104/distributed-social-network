@@ -24,40 +24,90 @@ def fetch_remote_author_posts(remote_author):
         return Entry.objects.none()
 
     author_url = normalize_fqid(remote_author.id)
+    print("Author URL:", author_url)
 
     if not author_url or not author_url.startswith("http"):
         print("⚠️ Invalid remote author ID:", author_url)
         return Entry.objects.none()
 
-    posts_url = f"{author_url.rstrip('/')}/entries/"
-    print("Posts URL:", posts_url)
-
     node = find_remote_node_for_url(author_url) or find_remote_node_for_url(remote_author.host)
-
     print("Node found:", node)
 
     if not node:
         print("No node found → returning empty")
         return Entry.objects.none()
 
+    def _extract_posts(payload):
+        if isinstance(payload, list):
+            return payload
+
+        if not isinstance(payload, dict):
+            return []
+
+        if isinstance(payload.get("src"), list):
+            return payload["src"]
+        if isinstance(payload.get("items"), list):
+            return payload["items"]
+        if isinstance(payload.get("entries"), list):
+            return payload["entries"]
+        if isinstance(payload.get("posts"), list):
+            return payload["posts"]
+
+        return []
+
+    def _extract_posts_url(author_payload, fallback_author_url):
+        if isinstance(author_payload, dict):
+            for key in ("entries", "posts", "items"):
+                value = author_payload.get(key)
+                if isinstance(value, str) and value.startswith("http"):
+                    return value.rstrip("/") + "/"
+
+        return f"{fallback_author_url.rstrip('/')}/entries/"
+
     try:
-        print("Making request...")
+        print("Fetching remote author object...")
+        author_response = requests.get(
+            author_url,
+            auth=(node.username, node.password),
+            timeout=10,
+        )
+
+        print("Author response status:", author_response.status_code)
+
+        if author_response.status_code != 200:
+            print("Could not fetch remote author → skipping")
+            return Entry.objects.none()
+
+        author_data = author_response.json()
+        if isinstance(author_data, dict):
+            print("Author JSON keys:", author_data.keys())
+        else:
+            print("Author JSON type:", type(author_data))
+
+        posts_url = _extract_posts_url(author_data, author_url)
+        print("Posts URL:", posts_url)
+
+        print("Fetching posts...")
         response = requests.get(
             posts_url,
             auth=(node.username, node.password),
-            timeout=10
+            timeout=10,
         )
 
-        print("Response status:", response.status_code)
+        print("Posts response status:", response.status_code)
 
         if response.status_code != 200:
-            print("Bad response → skipping")
+            print("Bad posts response → skipping")
+            print("Response text:", response.text[:500])
             return Entry.objects.none()
 
         data = response.json()
-        print("Response JSON keys:", data.keys())
+        if isinstance(data, dict):
+            print("Posts JSON keys:", data.keys())
+        else:
+            print("Posts JSON type:", type(data))
 
-        posts = data.get('src', [])
+        posts = _extract_posts(data)
         print("Posts received:", len(posts))
 
         stored_entries = []
@@ -65,12 +115,16 @@ def fetch_remote_author_posts(remote_author):
         for i, post in enumerate(posts):
             print(f"\nProcessing post {i}")
 
-            visibility = post.get('visibility', 'PUBLIC')
-            if visibility == 'DELETED':
+            if not isinstance(post, dict):
+                print("Skipping non-dict post payload")
+                continue
+
+            visibility = post.get("visibility", "PUBLIC")
+            if visibility == "DELETED":
                 print("Skipping deleted post")
                 continue
 
-            fqid = normalize_fqid(post.get('id'))
+            fqid = normalize_fqid(post.get("id"))
             if not fqid:
                 print("Skipping post without ID")
                 continue
@@ -78,41 +132,62 @@ def fetch_remote_author_posts(remote_author):
             entry, created = Entry.objects.get_or_create(
                 fqid=fqid,
                 defaults={
-                    'title': post.get('title', ''),
-                    'content': post.get('content', ''),
-                    'content_type': post.get('contentType', 'text/plain'),
-                    'visibility': visibility,
-                    'remote_author': remote_author,
-                }
+                    "title": post.get("title", ""),
+                    "content": post.get("content", ""),
+                    "content_type": post.get("contentType", "text/plain"),
+                    "visibility": visibility,
+                    "remote_author": remote_author,
+                },
             )
 
             print("Entry:", entry.id, "| Created:", created)
 
+            update_fields = []
+
+            if not created:
+                if entry.remote_author_id != remote_author.id:
+                    entry.remote_author = remote_author
+                    update_fields.append("remote_author")
+                if entry.title != post.get("title", ""):
+                    entry.title = post.get("title", "")
+                    update_fields.append("title")
+                if entry.content != post.get("content", ""):
+                    entry.content = post.get("content", "")
+                    update_fields.append("content")
+                if entry.content_type != post.get("contentType", "text/plain"):
+                    entry.content_type = post.get("contentType", "text/plain")
+                    update_fields.append("content_type")
+                if entry.visibility != visibility:
+                    entry.visibility = visibility
+                    update_fields.append("visibility")
+
             if created or entry.published_at is None:
-                published = post.get('published')
+                published = post.get("published")
                 print("Published raw:", published)
 
                 if published:
                     from django.utils.dateparse import parse_datetime
-                    dt = parse_datetime(published)
 
+                    dt = parse_datetime(published)
                     print("Parsed datetime:", dt)
 
                     if dt:
                         entry.published_at = dt
-                        entry.save(update_fields=['published_at'])
+                        update_fields.append("published_at")
+
+            if update_fields:
+                entry.save(update_fields=list(set(update_fields)))
 
             stored_entries.append(entry.id)
 
         result = Entry.objects.filter(id__in=stored_entries)
         print("Returning stored entries:", result.count())
-
         print("--- EXIT fetch_remote_author_posts ---\n")
         return result
 
     except Exception as e:
         print("🔥 ERROR in fetch_remote_author_posts:", str(e))
-        raise  # IMPORTANT: re-raise so you see full traceback
+        raise
 
 def serialize_entry(entry, request=None):
     """Serialize an Entry into the spec-style API shape used for federation."""
