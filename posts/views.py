@@ -448,7 +448,7 @@ def entry_detail(request, entry_id):
         author_path = entry_author.id if entry_author else None
         current_user_author = request.user.author if request.user.is_authenticated else None
         return render(request, 'interactions/entry_detail.html', {
-    '       current_user_author': current_user_author,
+            'current_user_author': current_user_author,
             'entry': entry,
             'comments': comments,
             'author_path': author_path,
