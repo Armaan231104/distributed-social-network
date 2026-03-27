@@ -291,6 +291,10 @@ def get_stream_entries_for_user(user):
         Q(author__in=friend_users, visibility="FRIENDS")
     )
 
+    remote_entry_ids = []
+
+    remote_entry_ids = []
+
     print("Local entries count:", local_entries.count())
 
     print("Fetching remote follows...")
@@ -321,6 +325,7 @@ def get_stream_entries_for_user(user):
     print("=== EXIT get_stream_entries_for_user ===\n")
     return final
 
+@approved_author_required
 @approved_author_required
 def stream(request):
     print("\n=== ENTER stream ===")
@@ -799,7 +804,7 @@ def edit_entry(request, entry_id):
     if request.method != "PUT":
         return JsonResponse({"error": "PUT required"}, status=400)
 
-    # A) multipart/form-data => editing image/caption/title, optionally replace image
+    # A multipart/form-data => editing image/caption/title, optionally replace image
     if request.content_type and request.content_type.startswith("multipart/form-data"):
 
         entry.title = request.POST.get("title", entry.title)
@@ -821,7 +826,7 @@ def edit_entry(request, entry_id):
 
         return JsonResponse({"updated": True}, status=200)
     
-    # B) JSON => editing title/content/contentType for text posts
+    # B JSON => editing title/content/contentType for text posts
     try:
         data = json.loads(request.body.decode("utf-8") or "{}")
     except json.JSONDecodeError:

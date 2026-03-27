@@ -1,5 +1,6 @@
 from django import forms
 from .models import RemoteNode
+from .utils import validate_remote_node_credentials
 
 
 class RemoteNodeForm(forms.ModelForm):
@@ -48,4 +49,21 @@ class RemoteNodeForm(forms.ModelForm):
         url = self.cleaned_data.get('url')
         if url:
             url = url.rstrip('/')
+            if url.endswith('/api'):
+                url = url[:-4]
         return url
+
+    def clean(self):
+        cleaned_data = super().clean()
+        url = cleaned_data.get('url')
+        username = cleaned_data.get('username')
+        password = cleaned_data.get('password')
+
+        if not url or not username or not password:
+            return cleaned_data
+
+        is_valid, error_message = validate_remote_node_credentials(url, username, password)
+        if not is_valid:
+            raise forms.ValidationError(error_message)
+
+        return cleaned_data
