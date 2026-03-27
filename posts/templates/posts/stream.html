@@ -84,7 +84,7 @@
             <span class="post-date">
                 Published on {{ post.published_at|date:"M d, Y H:i" }}
 
-        {%current_user_author.host ==  entry_author.host%}
+        {%if current_user_author.host ==  entry_author.host%}
         {% if post.is_edited %}<br>(edited){% endif %}
         {%endif%}
             </span>
