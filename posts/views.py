@@ -347,8 +347,12 @@ def stream(request):
         print("ERROR in get_stream_entries_for_user:", e)
         raise
 
+    current_user_author = request.user.author if request.user.is_authenticated else None
     print("=== EXIT stream ===\n")
-    return render(request, 'posts/stream.html', {'posts': posts})
+    return render(request, 'posts/stream.html', {
+        'posts': posts,                                       
+        'current_user_author': current_user_author,
+    })
 
 def serialize_entry_for_stream(request, entry):
     """
@@ -442,8 +446,9 @@ def entry_detail(request, entry_id):
         entry_author = entry.get_author
 
         author_path = entry_author.id if entry_author else None
-
+        current_user_author = request.user.author if request.user.is_authenticated else None
         return render(request, 'interactions/entry_detail.html', {
+    '       current_user_author': current_user_author,
             'entry': entry,
             'comments': comments,
             'author_path': author_path,
