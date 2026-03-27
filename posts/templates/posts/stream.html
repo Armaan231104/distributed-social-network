@@ -84,8 +84,9 @@
             <span class="post-date">
                 Published on {{ post.published_at|date:"M d, Y H:i" }}
 
-       {{post.author.host}}{{current_user_author.host}}
+        {{post.author.host}}HEY{{current_user_author.host}}nah{{post.author.user.host}}poke{{entry_author.}}poke2{{entry_author.host}}
         {% if post.is_edited %}<br>(edited){% endif %}
+        {%endif%}
             </span>
             <!-- POST INTERACTIONS -->
             <div class="post-interactions">
