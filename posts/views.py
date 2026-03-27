@@ -13,7 +13,7 @@ from functools import wraps
 import requests
 from accounts.serializers import AuthorSerializer
 from accounts.utils import normalize_fqid
-from nodes.utils import find_remote_node_for_url, get_remote_author_entries_url
+from nodes.utils import find_remote_node_for_url
 
 def fetch_remote_author_posts(remote_author):
     print("\n--- ENTER fetch_remote_author_posts ---")
@@ -44,25 +44,36 @@ def fetch_remote_author_posts(remote_author):
         if not isinstance(payload, dict):
             return []
 
-        if isinstance(payload.get("src"), list):
-            return payload["src"]
-        if isinstance(payload.get("items"), list):
-            return payload["items"]
-        if isinstance(payload.get("entries"), list):
-            return payload["entries"]
-        if isinstance(payload.get("posts"), list):
-            return payload["posts"]
+        for key in ("src", "items", "entries", "posts"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return value
 
         return []
 
-    def _extract_posts_url(author_payload, fallback_author_url):
+    def _candidate_posts_urls(author_payload, fallback_author_url):
+        urls = []
+
         if isinstance(author_payload, dict):
-            for key in ("entries", "posts", "items"):
+            for key in ("posts", "entries", "items"):
                 value = author_payload.get(key)
                 if isinstance(value, str) and value.startswith("http"):
-                    return value.rstrip("/") + "/"
+                    urls.append(value.rstrip("/") + "/")
 
-        return f"{fallback_author_url.rstrip('/')}/entries/"
+        base = fallback_author_url.rstrip("/")
+        urls.extend([
+            f"{base}/posts/",
+            f"{base}/entries/",
+        ])
+
+        seen = set()
+        deduped = []
+        for url in urls:
+            if url not in seen:
+                deduped.append(url)
+                seen.add(url)
+
+        return deduped
 
     try:
         print("Fetching remote author object...")
@@ -84,31 +95,43 @@ def fetch_remote_author_posts(remote_author):
         else:
             print("Author JSON type:", type(author_data))
 
-        posts_url = _extract_posts_url(author_data, author_url)
-        print("Posts URL:", posts_url)
+        candidate_urls = _candidate_posts_urls(author_data, author_url)
+        print("Candidate posts URLs:", candidate_urls)
 
-        print("Fetching posts...")
-        response = requests.get(
-            posts_url,
-            auth=(node.username, node.password),
-            timeout=10,
-        )
+        posts = []
+        posts_url_used = None
 
-        print("Posts response status:", response.status_code)
+        for posts_url in candidate_urls:
+            print("Trying posts URL:", posts_url)
 
-        if response.status_code != 200:
-            print("Bad posts response → skipping")
-            print("Response text:", response.text[:500])
+            response = requests.get(
+                posts_url,
+                auth=(node.username, node.password),
+                timeout=10,
+            )
+
+            print("Posts response status:", response.status_code)
+
+            if response.status_code != 200:
+                print("Not usable, trying next URL...")
+                continue
+
+            data = response.json()
+            if isinstance(data, dict):
+                print("Posts JSON keys:", data.keys())
+            else:
+                print("Posts JSON type:", type(data))
+
+            posts = _extract_posts(data)
+            posts_url_used = posts_url
+            print("Posts received:", len(posts))
+            break
+
+        if posts_url_used is None:
+            print("No working posts endpoint found")
             return Entry.objects.none()
 
-        data = response.json()
-        if isinstance(data, dict):
-            print("Posts JSON keys:", data.keys())
-        else:
-            print("Posts JSON type:", type(data))
-
-        posts = _extract_posts(data)
-        print("Posts received:", len(posts))
+        print("Using posts URL:", posts_url_used)
 
         stored_entries = []
 
@@ -167,7 +190,6 @@ def fetch_remote_author_posts(remote_author):
 
                 if published:
                     from django.utils.dateparse import parse_datetime
-
                     dt = parse_datetime(published)
                     print("Parsed datetime:", dt)
 
