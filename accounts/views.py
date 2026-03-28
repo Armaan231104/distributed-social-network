@@ -40,6 +40,7 @@ def get_or_create_author(author_data):
     existing = Author.objects.filter(id=author_id).first()
     if existing:
         return existing
+    print(author_data.get('profileImage'))
     
     return Author.objects.create(
         id=author_id,
