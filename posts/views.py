@@ -333,26 +333,6 @@ def approved_author_required(view_func):
         return view_func(request, *args, **kwargs)
     return wrapper
 
-def fetch_all_remote_public_posts():
-    print("Fetching ALL remote public posts...")
-
-    remote_entries = Entry.objects.none()
-
-    remote_authors = Author.objects.filter(user__isnull=True)
-
-    for author in remote_authors:
-        try:
-            posts = fetch_remote_author_posts(author)
-
-            # ONLY PUBLIC POSTS
-            posts = posts.filter(visibility="PUBLIC")
-
-            remote_entries = remote_entries | posts
-
-        except Exception as e:
-            print(f"Remote fetch failed for {author}: {e}")
-
-    return remote_entries
 def get_stream_entries_for_user(user):
     print("\n=== ENTER get_stream_entries_for_user ===")
 
@@ -360,48 +340,48 @@ def get_stream_entries_for_user(user):
         visibility="DELETED"
     ).select_related('author__author')
 
-    # -------------------------
-    # 1. HANDLE UNAUTHENTICATED
-    # -------------------------
+    print("Base queryset ready")
+
     if not user.is_authenticated:
         print("User not authenticated")
-        return base_qs.filter(
+        result = base_qs.filter(
             visibility="PUBLIC"
         ).order_by('-published_at')
+        print("Returning public posts:", result.count())
+        return result
 
-    # -------------------------
-    # 2. GET CURRENT AUTHOR
-    # -------------------------
     try:
         current_author = user.author
+        print("Current author:", current_author)
     except Author.DoesNotExist:
         print("User has no Author object")
-        return base_qs.filter(
+        result = base_qs.filter(
             Q(author=user) | Q(visibility="PUBLIC")
         ).order_by('-published_at').distinct()
+        print("Fallback posts:", result.count())
+        return result
 
-    print("Current author:", current_author)
-
-    # -------------------------
-    # 3. FOLLOW RELATIONSHIPS
-    # -------------------------
-    following = Follow.objects.filter(
-        follower=current_author
+    print("Fetching following relationships...")
+    following_qs = Follow.objects.filter(
+        follower=current_author,
+        followee__user__isnull=False
     ).select_related('followee__user')
 
-    followed_authors = [f.followee for f in following if f.followee.user]
+    print("Following count:", following_qs.count())
+
+    followed_authors = [f.followee for f in following_qs]
     followed_users = [a.user for a in followed_authors if a.user]
+
+    print("Followed users count:", len(followed_users))
 
     friend_users = [
         a.user for a in followed_authors
         if a.user and a.is_following(current_author)
     ]
 
-    print(f"Following: {len(followed_users)} | Friends: {len(friend_users)}")
+    print("Friend users count:", len(friend_users))
 
-    # -------------------------
-    # 4. LOCAL POSTS
-    # -------------------------
+    print("Building local entries query...")
     local_entries = base_qs.filter(
         Q(author=user) |
         Q(visibility="PUBLIC") |
@@ -409,26 +389,40 @@ def get_stream_entries_for_user(user):
         Q(author__in=friend_users, visibility="FRIENDS")
     )
 
-    print("Local entries:", local_entries.count())
+    remote_entry_ids = []
 
-    # -------------------------
-    # 5. REMOTE PUBLIC POSTS (ALL)
-    # -------------------------
-    remote_entries = fetch_all_remote_public_posts()
+    remote_entry_ids = []
 
-    print("Remote entries:", remote_entries.count())
+    print("Local entries count:", local_entries.count())
 
-    # -------------------------
-    # 6. MERGE + SORT
-    # -------------------------
-    final = (local_entries | remote_entries).order_by(
-        '-published_at'
-    ).distinct()
+    print("Fetching remote follows...")
+    remote_following = Follow.objects.filter(
+        follower=current_author,
+        followee__user__isnull=True
+    ).select_related('followee')
 
-    print("Final entries:", final.count())
+    print("Remote follows count:", remote_following.count())
+
+    remote_entries = Entry.objects.none()
+
+    for follow in remote_following:
+        print("Fetching remote posts for:", follow.followee)
+        try:
+            posts = fetch_remote_author_posts(follow.followee)
+            print("Fetched remote posts:", posts.count())
+            remote_entries = remote_entries | posts
+        except Exception as e:
+            print("ERROR in remote fetch:", e)
+
+    print("Combining local + remote entries...")
+    all_entries = local_entries | remote_entries
+
+    final = all_entries.order_by('-published_at').distinct()
+    print("Final entries count:", final.count())
+
     print("=== EXIT get_stream_entries_for_user ===\n")
-
     return final
+
 @approved_author_required
 def stream(request):
     print("\n=== ENTER stream ===")
