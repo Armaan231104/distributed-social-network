@@ -40,7 +40,6 @@ def get_or_create_author(author_data):
     existing = Author.objects.filter(id=author_id).first()
     if existing:
         return existing
-    print(author_data.get('profileImage'))
     
     return Author.objects.create(
         id=author_id,
@@ -116,6 +115,7 @@ def get_or_create_remote_author(foreign_id, remote_author=None):
         }
 
         for api_field, model_field in field_map.items():
+            print(api_field)
             new_val = remote_author.get(api_field)
 
             # only update if:
