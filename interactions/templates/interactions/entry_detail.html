@@ -20,16 +20,12 @@
     <!-- Row 1: avatar + username -->
     <div class="post-header-top">
         <div class="post-avatar-wrapper">
-            {% if entry_author and entry_author.profileImage %}
-                
-                        {% if entry_author.profileImageUrl %}
-                            <img src="{{ entry_author.profileImageUrl }}" alt="Profile Image" class="post-avatar">
-                        {% elif entry_author.profileImage %}
-                            <img src="{{ entry_author.profileImage.url }}" alt="Profile Image" class="post-avatar">
-                        {% else %}
-                    <img src="{{ entry_author.profileImage }}" class="post-avatar">
-                {% endif %}
-            {% else %}
+            
+            {% if entry_author and entry_author.profileImageUrl %}
+                    <img src="{{ entry_author.profileImageUrl }}" alt="Profile Image" class="profile-avatar">
+                {% elif entry_author.profileImage %}
+                    <img src="{{ entry_author.profileImage.url }}" alt="Profile Image" class="profile-avatar">
+                {% else %}
                 <div class="post-avatar-placeholder">
                     <i class="fa-regular fa-user"></i>
                 </div>
