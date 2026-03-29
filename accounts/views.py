@@ -101,6 +101,7 @@ def verify_remote_author_exists(foreign_id):
     except Exception as e:
         print(f"Could not verify remote author at {foreign_id}: {e}")
         return None
+    
 def get_or_create_remote_author(foreign_id, remote_author=None):
     foreign_id = normalize_fqid(foreign_id)
 
@@ -116,8 +117,6 @@ def get_or_create_remote_author(foreign_id, remote_author=None):
     # Sync with latest remote data if provided
     if remote_author:
         updated = False
-
-        # map fields safely
         field_map = {
             "displayName": "displayName",
             "github": "github",
@@ -131,25 +130,25 @@ def get_or_create_remote_author(foreign_id, remote_author=None):
                 setattr(author, model_field, new_val)
                 updated = True
 
-                if updated:
-                    author.save()
+        if updated:
+            author.save()
 
     return author, created
+
 
 def send_follow_to_remote(actor, target):
     if target.is_local:
         return True, None
 
     try:
-        print(f"target.id: {target.id}")
-        print(f"target.host: {target.host}")
         inbox_url = get_remote_inbox_url(target.id)
 
         follow_data = {
-            'type': 'Follow',
+            'type': 'follow',
             'summary': f'{actor.displayName} wants to follow {target.displayName}',
+            'state': 'requesting',
             'actor': AuthorSerializer(actor).data,
-            'object': AuthorSerializer(target).data
+            'object': AuthorSerializer(target).data,
         }
 
         node = find_remote_node_for_url(target.id) or find_remote_node_for_url(target.host)
@@ -419,8 +418,8 @@ class FollowView(APIView):
         
         # For remote authors, create Follow object immediately so stream can fetch posts
         # Per spec: "A's node can assume that A is following B, even before author B accepts"
-        if not foreign_author.user:
-            Follow.objects.get_or_create(follower=current_author, followee=foreign_author)
+        # if not foreign_author.user:
+            # Follow.objects.get_or_create(follower=current_author, followee=foreign_author)
         
         if state == 'pending':
             return Response({'error': 'Follow request already pending'}, status=status.HTTP_400_BAD_REQUEST)
@@ -643,7 +642,7 @@ class InboxView(APIView):
             )
             return Response({'status': 'entry received'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
-        elif msg_type == 'entry':
+        elif msg_type == 'like':
             actor = get_or_create_author(data.get('author', {}))
             obj_url = str(data.get('object', ''))
             if actor and obj_url:
@@ -745,8 +744,8 @@ def follow_remote_author(request):
         
         # For remote authors, create Follow object immediately so stream can fetch posts
         # Per spec: "A's node can assume that A is following B, even before author B accepts"
-        if not remote_author.user:
-            Follow.objects.get_or_create(follower=current_author, followee=remote_author)
+        # if not remote_author.user:
+            # Follow.objects.get_or_create(follower=current_author, followee=remote_author)
         
         if state == 'pending':
             messages.info(request, f'You already have a pending follow request to {remote_author.displayName}.')
