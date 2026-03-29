@@ -115,13 +115,12 @@ def get_or_create_remote_author(foreign_id, remote_author=None):
         }
 
         for api_field, model_field in field_map.items():
-            print(api_field)
             new_val = remote_author.get(api_field)
 
             # only update if:
             # - new_val exists
             # - different from current
-            if new_val and getattr(author, model_field) != new_val:
+            if new_val is not None and getattr(author, model_field) != new_val:
                 setattr(author, model_field, new_val)
                 updated = True
 
@@ -397,9 +396,9 @@ class FollowView(APIView):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
         is_remote = str(foreign_id).startswith('http')
-        
         if is_remote:
-            foreign_author, _ = get_or_create_remote_author(foreign_id)
+            author_data = verify_remote_author_exists(foreign_id)  # fetch first
+            foreign_author, _ = get_or_create_remote_author(foreign_id, author_data)
         else:
             foreign_author = get_author_by_id(foreign_id)
 
@@ -951,7 +950,8 @@ def follow_author(request, author_id):
         except Author.DoesNotExist:
             return redirect('authors-list')
     else:
-        target_author, _ = get_or_create_remote_author(author_id)
+        author_data = verify_remote_author_exists(author_id)  # fetch first
+        target_author, _ = get_or_create_remote_author(author_id, author_data)
     
     if current_author == target_author:
         return redirect('author-profile', author_id=author_id)
