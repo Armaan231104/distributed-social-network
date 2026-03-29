@@ -196,24 +196,14 @@ def fetch_remote_author_posts(remote_author):
                 if entry.visibility != visibility:
                     entry.visibility = visibility
                     update_fields.append("visibility")
-
-            if created or entry.published_at is None:
-                published = post.get("published")
-                print("Published raw:", published)
-
-                if published:
-                    from django.utils.dateparse import parse_datetime
-                    dt = parse_datetime(published)
-                    print("Parsed datetime:", dt)
-
-                    if dt:
-                        entry.published_at = dt
-                        update_fields.append("published_at")
-
-            if update_fields:
-                entry.save(update_fields=list(set(update_fields)))
-
-            stored_entries.append(entry.id)
+                
+                # sync remote image URL
+                incoming_image_url = post.get("image")
+                if not isinstance(incoming_image_url, str) or not incoming_image_url.startswith("http"):
+                    incoming_image_url = None
+                if entry.image_url != incoming_image_url:
+                    entry.image_url = incoming_image_url
+                    update_fields.append("image_url")
 
         result = Entry.objects.filter(id__in=stored_entries)
         print("Returning stored entries:", result.count())
