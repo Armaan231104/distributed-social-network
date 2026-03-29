@@ -11,7 +11,7 @@ from nodes.authentication import RemoteNodeAuthentication
 from django.contrib.auth.models import User
 from django.contrib.auth import login
 from django.contrib.auth.forms import AuthenticationForm
-from posts.views import fetch_remote_author_posts
+
 from .models import Author, FollowRequest, Follow
 from posts.models import Entry
 from interactions.models import Like, Comment
@@ -30,41 +30,29 @@ def build_local_author_id(user):
 
 
 def get_or_create_author(author_data):
+    """Create or retrieve an author from remote data (e.g., from another node)."""
     author_id = author_data.get('id')
     if not author_id:
         return None
 
     author_id = normalize_fqid(author_id)
-
-    author, created = Author.objects.get_or_create(
+    
+    existing = Author.objects.filter(id=author_id).first()
+    if existing:
+        return existing
+    
+    return Author.objects.create(
         id=author_id,
-        defaults={
-            'user': None,
-            'host': author_data.get('host', ''),
-            'displayName': author_data.get('displayName', 'Unknown'),
-            'is_approved': True,
-        }
+        user=None,
+        host=author_data.get('host', ''),
+        displayName=author_data.get('displayName', 'Unknown'),
+        github=author_data.get('github'),
+        # if string URL set to None, since we can't import images yet.  fix in future
+        profileImage=author_data.get('profileImage') if not isinstance(author_data.get('profileImage'), str) else None,
+        web=author_data.get('web'),
+        is_approved=True,
     )
 
-    if not created:
-        # Sync latest data even if author already exists
-        updated = False
-        field_map = {
-            'displayName': 'displayName',
-            'github': 'github',
-            'profileImage': 'profileImageUrl',
-            'web': 'web',
-            'host': 'host',
-        }
-        for api_field, model_field in field_map.items():
-            new_val = author_data.get(api_field)
-            if new_val is not None and new_val != '' and getattr(author, model_field) != new_val:
-                setattr(author, model_field, new_val)
-                updated = True
-        if updated:
-            author.save()
-
-    return author
 
 # Helpers for author lookup
 # These handle the difference between local authors (user_id) and remote authors (FQID)
@@ -78,34 +66,15 @@ def get_author_by_id(author_id):
     """Look up author by FQID using centralized normalization."""
     return Author.objects.get(id=normalize_fqid(author_id))
 
-def verify_remote_author_exists(foreign_id):
-    """
-    Fetch the remote author URL and return their data if they exist, None otherwise.
-    """
-    node = find_remote_node_for_url(foreign_id)
-    if not node:
-        print(f"DEBUG: No node found for {foreign_id}")
-        return None
-    
-    try:
-        response = requests.get(
-            foreign_id,
-            auth=(node.username, node.password),
-            timeout=10
-        )
 
-        print(f"DEBUG: Response status: {response.status_code}")
-        print(f"DEBUG: Response body: {response.text}")
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        print(f"Could not verify remote author at {foreign_id}: {e}")
-        return None
-    
-def get_or_create_remote_author(foreign_id, remote_author=None):
+def get_or_create_remote_author(foreign_id):
+    """
+    On first follow, create remote author.
+    Extracts host from the FQID (basically everything before /api/authors/).
+    """
     foreign_id = normalize_fqid(foreign_id)
-
-    author, created = Author.objects.get_or_create(
+    
+    return Author.objects.get_or_create(
         id=foreign_id,
         defaults={
             'host': foreign_id.split('/api/authors/')[0] + '/api/',
@@ -113,27 +82,6 @@ def get_or_create_remote_author(foreign_id, remote_author=None):
             'is_approved': True,
         }
     )
-
-    # Sync with latest remote data if provided
-    if remote_author:
-        updated = False
-        field_map = {
-            "displayName": "displayName",
-            "github": "github",
-            "profileImage": "profileImageUrl",
-            "web": "web",
-            "host": "host",
-        }
-        for api_field, model_field in field_map.items():
-            new_val = remote_author.get(api_field)
-            if new_val is not None and new_val != '' and getattr(author, model_field) != new_val:
-                setattr(author, model_field, new_val)
-                updated = True
-
-        if updated:
-            author.save()
-
-    return author, created
 
 
 def send_follow_to_remote(actor, target):
@@ -144,11 +92,10 @@ def send_follow_to_remote(actor, target):
         inbox_url = get_remote_inbox_url(target.id)
 
         follow_data = {
-            'type': 'follow',
+            'type': 'Follow',
             'summary': f'{actor.displayName} wants to follow {target.displayName}',
-            'state': 'requesting',
             'actor': AuthorSerializer(actor).data,
-            'object': AuthorSerializer(target).data,
+            'object': AuthorSerializer(target).data
         }
 
         node = find_remote_node_for_url(target.id) or find_remote_node_for_url(target.host)
@@ -402,9 +349,9 @@ class FollowView(APIView):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
         is_remote = str(foreign_id).startswith('http')
+        
         if is_remote:
-            author_data = verify_remote_author_exists(foreign_id)  # fetch first
-            foreign_author, _ = get_or_create_remote_author(foreign_id, author_data)
+            foreign_author, _ = get_or_create_remote_author(foreign_id)
         else:
             foreign_author = get_author_by_id(foreign_id)
 
@@ -418,8 +365,8 @@ class FollowView(APIView):
         
         # For remote authors, create Follow object immediately so stream can fetch posts
         # Per spec: "A's node can assume that A is following B, even before author B accepts"
-        # if not foreign_author.user:
-            # Follow.objects.get_or_create(follower=current_author, followee=foreign_author)
+        if not foreign_author.user:
+            Follow.objects.get_or_create(follower=current_author, followee=foreign_author)
         
         if state == 'pending':
             return Response({'error': 'Follow request already pending'}, status=status.HTTP_400_BAD_REQUEST)
@@ -567,7 +514,7 @@ class InboxView(APIView):
         msg_type = str(data.get('type', '')).lower()
 
         if msg_type == 'follow':
-            print("FOLLOW REQUEST RECEIVED")
+            print("FOLLOW REQUEST")
             actor_data = data.get('actor', {})
             object_data = data.get('object', {})
 
@@ -642,7 +589,7 @@ class InboxView(APIView):
             )
             return Response({'status': 'entry received'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
-        elif msg_type == 'like':
+        elif msg_type == 'entry':
             actor = get_or_create_author(data.get('author', {}))
             obj_url = str(data.get('object', ''))
             if actor and obj_url:
@@ -713,16 +660,10 @@ def follow_remote_author(request):
         messages.error(request, 'To follow local authors, use the Follow button on their profile.')
         return redirect('authors-list')
     
-    # Check if the requested author exists
-    author_data = verify_remote_author_exists(remote_fqid)
-    if not author_data:
-        messages.error(request, 'Could not find that author on their node. Please check the URL and try again.')
-        return redirect('authors-list')
-    
     try:
         # Get or create the remote author
-        remote_author, created = get_or_create_remote_author(remote_fqid,author_data)
-
+        remote_author, created = get_or_create_remote_author(remote_fqid)
+        
         # Check if already following
         if current_author.is_following(remote_author):
             messages.info(request, f'You are already following {remote_author.displayName}.')
@@ -744,8 +685,8 @@ def follow_remote_author(request):
         
         # For remote authors, create Follow object immediately so stream can fetch posts
         # Per spec: "A's node can assume that A is following B, even before author B accepts"
-        # if not remote_author.user:
-            # Follow.objects.get_or_create(follower=current_author, followee=remote_author)
+        if not remote_author.user:
+            Follow.objects.get_or_create(follower=current_author, followee=remote_author)
         
         if state == 'pending':
             messages.info(request, f'You already have a pending follow request to {remote_author.displayName}.')
@@ -830,17 +771,13 @@ def author_friends(request, author_id):
         'current_user_author': current_user_author,
         'page_title': f"{author.displayName.capitalize()}'s Friends",
     })
+
 @approved_author_required
 def author_profile(request, author_id):
-    print(f"\n=== ENTER author_profile ===")
-    print(f"Raw author_id: {author_id}")
-
+    """Show an author's profile along with their posts."""
     if not author_id.endswith('/'):
         author_id += '/'
-    print(f"Normalized author_id: {author_id}")
-
     author = get_object_or_404(Author, id=author_id)
-    print(f"Author found: {author} | is_local: {author.user is not None}")
 
     current_user_author = None
     is_following = False
@@ -855,87 +792,35 @@ def author_profile(request, author_id):
                 object=author,
                 status=FollowRequest.Status.PENDING
             ).exists()
-            print(f"Viewer: {current_user_author} | is_following: {is_following} | pending: {has_pending_request}")
         except Author.DoesNotExist:
-            print("Viewer has no Author object")
+            pass
 
+    # For local authors, get their posts
     posts = []
-
-    if author.user:
-        print("Taking LOCAL author branch")
+    if author.user:  # only if this author has a local User
         if current_user_author == author:
-            print("Viewer is the author themselves")
+            # Viewing your own profile → show all except deleted
             posts = Entry.objects.filter(
                 author=author.user
-            ).exclude(visibility="DELETED").order_by('-published_at')
+            ).exclude(visibility="DELETED")
         elif current_user_author and current_user_author.is_friend(author):
-            print("Viewer is a friend")
+            # Mutual followers (friends) can see public, unlisted, and friends posts
             posts = Entry.objects.filter(
                 author=author.user,
                 visibility__in=["PUBLIC", "UNLISTED", "FRIENDS"]
-            ).order_by('-published_at')
+            )
         elif is_following:
-            print("Viewer is a follower")
+            # One-way followers can see public and unlisted posts
             posts = Entry.objects.filter(
                 author=author.user,
                 visibility__in=["PUBLIC", "UNLISTED"]
-            ).order_by('-published_at')
+            )
         else:
-            print("Viewer is a stranger")
+            # Viewing someone else's profile → only public
             posts = Entry.objects.filter(
                 author=author.user,
                 visibility="PUBLIC"
-            ).order_by('-published_at')
-        print(f"Local posts count: {posts.count()}")
-
-    else:
-        print("Taking REMOTE author branch")
-        # Sync remote author data on every profile view
-        fresh_data = verify_remote_author_exists(author.id)
-        if fresh_data:
-            get_or_create_remote_author(author.id, fresh_data)
-            author.refresh_from_db()  # pick up the updated fields
-        try:
-            remote_posts = fetch_remote_author_posts(author)
-            print(f"Remote posts fetched: {remote_posts.count()}")
-
-            # Extract IDs first — can't call .filter() directly on a union queryset
-            stored_ids = list(remote_posts.values_list('id', flat=True))
-            print(f"Stored IDs: {stored_ids}")
-
-            if current_user_author and current_user_author.is_friend(author):
-                print("Viewer is a friend of remote author")
-                posts = Entry.objects.filter(
-                    id__in=stored_ids,
-                    visibility__in=["PUBLIC", "UNLISTED", "FRIENDS"]
-                ).order_by('-published_at')
-            elif is_following:
-                print("Viewer is following remote author")
-                posts = Entry.objects.filter(
-                    id__in=stored_ids,
-                    visibility__in=["PUBLIC", "UNLISTED"]
-                ).order_by('-published_at')
-            else:
-                print("Viewer is a stranger to remote author")
-                posts = Entry.objects.filter(
-                    id__in=stored_ids,
-                    visibility="PUBLIC"
-                ).order_by('-published_at')
-
-            print(f"Filtered remote posts count: {posts.count()}")
-
-        except Exception as e:
-            print(f"ERROR fetching remote posts: {e}")
-            import traceback
-            traceback.print_exc()
-            posts = Entry.objects.filter(
-                remote_author=author,
-                visibility="PUBLIC"
-            ).order_by('-published_at')
-            print(f"Fallback cached posts count: {posts.count()}")
-
-    print(f"=== EXIT author_profile ===\n")
-
+            )
     return render(request, 'accounts/profile.html', {
         'profile_author': author,
         'current_user_author': current_user_author,
@@ -961,8 +846,7 @@ def follow_author(request, author_id):
         except Author.DoesNotExist:
             return redirect('authors-list')
     else:
-        author_data = verify_remote_author_exists(author_id)  # fetch first
-        target_author, _ = get_or_create_remote_author(author_id, author_data)
+        target_author, _ = get_or_create_remote_author(author_id)
     
     if current_author == target_author:
         return redirect('author-profile', author_id=author_id)
