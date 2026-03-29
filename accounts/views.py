@@ -58,7 +58,7 @@ def get_or_create_author(author_data):
         }
         for api_field, model_field in field_map.items():
             new_val = author_data.get(api_field)
-            if new_val is not None and getattr(author, model_field) != new_val:
+            if new_val is not None and new_val != '' and getattr(author, model_field) != new_val:
                 setattr(author, model_field, new_val)
                 updated = True
         if updated:
@@ -125,19 +125,14 @@ def get_or_create_remote_author(foreign_id, remote_author=None):
             "web": "web",
             "host": "host",
         }
-
         for api_field, model_field in field_map.items():
             new_val = remote_author.get(api_field)
-
-            # only update if:
-            # - new_val exists
-            # - different from current
-            if new_val is not None and getattr(author, model_field) != new_val:
+            if new_val is not None and new_val != '' and getattr(author, model_field) != new_val:
                 setattr(author, model_field, new_val)
                 updated = True
 
-        if updated:
-            author.save()
+                if updated:
+                    author.save()
 
     return author, created
 
