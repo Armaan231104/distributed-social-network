@@ -15,6 +15,17 @@ from accounts.serializers import AuthorSerializer
 from accounts.utils import normalize_fqid
 from nodes.utils import find_remote_node_for_url
 
+def get_image_url(entry, request):
+    if not entry.image:
+        return None
+    try:
+        url = entry.image.url
+        if url.startswith('http'):
+            return url  # Cloudinary or remote URL
+        return request.build_absolute_uri(url)  # local file
+    except (ValueError, AttributeError):
+        return None
+    
 def fetch_remote_author_posts(remote_author):
     print("\n--- ENTER fetch_remote_author_posts ---")
     print("Remote author:", remote_author)
@@ -160,6 +171,8 @@ def fetch_remote_author_posts(remote_author):
                     "content_type": post.get("contentType", "text/plain"),
                     "visibility": visibility,
                     "remote_author": remote_author,
+                    "image_url": post.get("image") if isinstance(post.get("image"), str) and post.get("image", "").startswith("http") else None,
+
                 },
             )
 
