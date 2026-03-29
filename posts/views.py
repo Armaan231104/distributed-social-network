@@ -164,15 +164,14 @@ def fetch_remote_author_posts(remote_author):
                 continue
 
             entry, created = Entry.objects.get_or_create(
-                fqid=fqid,
-                defaults={
+            fqid=fqid,
+            defaults={
                     "title": post.get("title", ""),
                     "content": post.get("content", ""),
                     "content_type": post.get("contentType", "text/plain"),
                     "visibility": visibility,
                     "remote_author": remote_author,
                     "image_url": post.get("image") if isinstance(post.get("image"), str) and post.get("image", "").startswith("http") else None,
-
                 },
             )
 
@@ -204,6 +203,11 @@ def fetch_remote_author_posts(remote_author):
                 if entry.image_url != incoming_image_url:
                     entry.image_url = incoming_image_url
                     update_fields.append("image_url")
+
+            if update_fields:
+                entry.save(update_fields=list(set(update_fields)))
+
+            stored_entries.append(entry.id) 
 
         result = Entry.objects.filter(id__in=stored_entries)
         print("Returning stored entries:", result.count())
@@ -464,13 +468,7 @@ def serialize_entry_for_stream(request, entry):
     Converts an entry into JSON format for the stream API.
     """
 
-    image_url = None
-
-    if entry.image:
-        try:
-            image_url = request.build_absolute_uri(entry.image.url)
-        except ValueError:
-            image_url = None
+    image_url = entry.image_url or get_image_url(entry, requests)
 
     author_obj = None
 
@@ -698,18 +696,8 @@ def entry_detail_api(request, entry_id):
                 if not viewer_author.is_friend(entry_author):
                     return JsonResponse({"error": "Forbidden"}, status=403)
 
-        image_url = None
-        if entry.image:
-            try:
-                image_url = request.build_absolute_uri(entry.image.url)
-            except ValueError:
-                image_url = None
-        image_url = None
-        if entry.image:
-            try:
-                image_url = request.build_absolute_uri(entry.image.url)
-            except ValueError:
-                image_url = None
+        image_url = entry.image_url or get_image_url(entry, request)
+    
 
         return JsonResponse({
             "id": entry.fqid,
@@ -851,14 +839,7 @@ def my_entries(request):
 
     def entry_to_dict(e):
 
-        image_url = None
-
-        if getattr(e, "image", None):
-            try:
-                image_url = request.build_absolute_uri(e.image.url)
-            except ValueError:
-                image_url = None
-
+        image_url = e.image_url or get_image_url(e, request)
         return {
             "id": e.fqid,
             "title": e.title,
