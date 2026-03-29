@@ -64,8 +64,8 @@ class Entry(models.Model):
         choices=CONTENT_TYPES,
         default = "text/plain"
     )
-    
     image = models.ImageField(upload_to="entries/", blank=True, null=True, storage=image_storage)
+    image_url = models.URLField(max_length=500, blank=True, null=True)  # for remote entries
 
     class Meta:
         """
