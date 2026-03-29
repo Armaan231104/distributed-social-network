@@ -935,6 +935,5 @@ figcaption {
 .stream-post-body img{    
     max-width: 90%;
     height: auto;
-    display: block;
     margin: auto;
 }

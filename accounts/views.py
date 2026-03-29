@@ -30,27 +30,41 @@ def build_local_author_id(user):
 
 
 def get_or_create_author(author_data):
-    """Create or retrieve an author from remote data (e.g., from another node)."""
     author_id = author_data.get('id')
     if not author_id:
         return None
 
     author_id = normalize_fqid(author_id)
-    
-    existing = Author.objects.filter(id=author_id).first()
-    if existing:
-        return existing
-    return Author.objects.create(
+
+    author, created = Author.objects.get_or_create(
         id=author_id,
-        user=None,
-        host=author_data.get('host', ''),
-        displayName=author_data.get('displayName', 'Unknown'),
-        github=author_data.get('github'),
-        profileImage=author_data.get('profileImage'),  # just store the URL string
-        web=author_data.get('web'),
-        is_approved=True,
+        defaults={
+            'user': None,
+            'host': author_data.get('host', ''),
+            'displayName': author_data.get('displayName', 'Unknown'),
+            'is_approved': True,
+        }
     )
 
+    if not created:
+        # Sync latest data even if author already exists
+        updated = False
+        field_map = {
+            'displayName': 'displayName',
+            'github': 'github',
+            'profileImage': 'profileImageUrl',
+            'web': 'web',
+            'host': 'host',
+        }
+        for api_field, model_field in field_map.items():
+            new_val = author_data.get(api_field)
+            if new_val is not None and getattr(author, model_field) != new_val:
+                setattr(author, model_field, new_val)
+                updated = True
+        if updated:
+            author.save()
+
+    return author
 
 # Helpers for author lookup
 # These handle the difference between local authors (user_id) and remote authors (FQID)
@@ -107,7 +121,7 @@ def get_or_create_remote_author(foreign_id, remote_author=None):
         field_map = {
             "displayName": "displayName",
             "github": "github",
-            "profileImage": "profileImage",
+            "profileImage": "profileImageUrl",
             "web": "web",
             "host": "host",
         }
