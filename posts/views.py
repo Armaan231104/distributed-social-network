@@ -199,8 +199,8 @@ def fetch_remote_author_posts(remote_author):
                 # sync remote image URL
 
                 iincoming_image_url = post.get("image")
-                if not isinstance(incoming_image_url, str) or not (incoming_image_url.startswith("http") or incoming_image_url.startswith("data:")):
-                    incoming_image_url = None
+            if not isinstance(incoming_image_url, str) or not (incoming_image_url.startswith("http") or incoming_image_url.startswith("data:")):
+                incoming_image_url = None
                 if entry.image_url != incoming_image_url:
                     entry.image_url = incoming_image_url
                     update_fields.append("image_url")
