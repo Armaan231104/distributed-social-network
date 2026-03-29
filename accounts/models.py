@@ -22,6 +22,7 @@ class Author(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+
     class Meta:
         ordering = ['-created_at']
 
@@ -38,6 +39,8 @@ class Author(models.Model):
         null=True,
         storage=image_storage
     )
+    profileImageUrl = models.URLField(max_length=500, blank=True, null=True)  # for remote authors
+
     def __str__(self):
         return self.displayName
 
