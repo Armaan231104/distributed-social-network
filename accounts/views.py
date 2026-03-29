@@ -891,6 +891,11 @@ def author_profile(request, author_id):
 
     else:
         print("Taking REMOTE author branch")
+        # Sync remote author data on every profile view
+        fresh_data = verify_remote_author_exists(author.id)
+        if fresh_data:
+            get_or_create_remote_author(author.id, fresh_data)
+            author.refresh_from_db()  # pick up the updated fields
         try:
             remote_posts = fetch_remote_author_posts(author)
             print(f"Remote posts fetched: {remote_posts.count()}")
