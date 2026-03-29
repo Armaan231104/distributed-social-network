@@ -153,6 +153,12 @@ def send_follow_to_remote(actor, target):
     if target.is_local:
         return True, None
 
+    print(f"DEBUG node url in DB: {node.url}")
+    print(f"DEBUG node username: '{node.username}'")
+    print(f"DEBUG node password: '{node.password}'")
+    print(f"DEBUG target.id: {target.id}")
+    print(f"DEBUG target.host: {target.host}")
+    print(f"DEBUG inbox_url: {inbox_url}")
     try:
         print(f"target.id: {target.id}")
         print(f"target.host: {target.host}")
@@ -708,7 +714,6 @@ def follow_remote_author(request):
         return redirect('authors-list')
 
     remote_fqid = request.POST.get('remote_author_fqid', '').strip()
-
     if not remote_fqid:
         messages.error(request, 'Please enter an author URL.')
         return redirect('authors-list')
