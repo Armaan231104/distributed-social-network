@@ -171,7 +171,7 @@ def fetch_remote_author_posts(remote_author):
                     "content_type": post.get("contentType", "text/plain"),
                     "visibility": visibility,
                     "remote_author": remote_author,
-                    "image_url": post.get("image") if isinstance(post.get("image"), str) and post.get("image", "").startswith("http") else None,
+                    "image_url": post.get("image") if isinstance(post.get("image"), str) and (post.get("image", "").startswith("http") or post.get("image", "").startswith("data:")) else None,
                 },
             )
 
@@ -197,8 +197,9 @@ def fetch_remote_author_posts(remote_author):
                     update_fields.append("visibility")
                 
                 # sync remote image URL
-                incoming_image_url = post.get("image")
-                if not isinstance(incoming_image_url, str) or not incoming_image_url.startswith("http"):
+
+                iincoming_image_url = post.get("image")
+                if not isinstance(incoming_image_url, str) or not (incoming_image_url.startswith("http") or incoming_image_url.startswith("data:")):
                     incoming_image_url = None
                 if entry.image_url != incoming_image_url:
                     entry.image_url = incoming_image_url
