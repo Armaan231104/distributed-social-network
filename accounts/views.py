@@ -153,12 +153,6 @@ def send_follow_to_remote(actor, target):
     if target.is_local:
         return True, None
 
-    print(f"DEBUG node url in DB: {node.url}")
-    print(f"DEBUG node username: '{node.username}'")
-    print(f"DEBUG node password: '{node.password}'")
-    print(f"DEBUG target.id: {target.id}")
-    print(f"DEBUG target.host: {target.host}")
-    print(f"DEBUG inbox_url: {inbox_url}")
     try:
         print(f"target.id: {target.id}")
         print(f"target.host: {target.host}")
@@ -177,6 +171,12 @@ def send_follow_to_remote(actor, target):
             print(error)
             return False, error
 
+        print(f"DEBUG node url in DB: {node.url}")
+        print(f"DEBUG node username: '{node.username}'")
+        print(f"DEBUG node password: '{node.password}'")
+        print(f"DEBUG target.id: {target.id}")
+        print(f"DEBUG target.host: {target.host}")
+        print(f"DEBUG inbox_url: {inbox_url}")
         print("FOLLOW inbox_url:", inbox_url)
         print("FOLLOW payload:", follow_data)
         print("FOLLOW auth username:", node.username)
