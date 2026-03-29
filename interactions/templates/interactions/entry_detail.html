@@ -21,9 +21,12 @@
     <div class="post-header-top">
         <div class="post-avatar-wrapper">
             {% if entry_author and entry_author.profileImage %}
-                {% if entry_author.profileImage.url %}
-                    <img src="{{ entry_author.profileImage.url }}" class="post-avatar">
-                {% else %}
+                
+                        {% if entry_author.profileImageUrl %}
+                            <img src="{{ entry_author.profileImageUrl }}" alt="Profile Image" class="post-avatar">
+                        {% elif entry_author.profileImage %}
+                            <img src="{{ entry_author.profileImage.url }}" alt="Profile Image" class="post-avatar">
+                        {% else %}
                     <img src="{{ entry_author.profileImage }}" class="post-avatar">
                 {% endif %}
             {% else %}
