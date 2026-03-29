@@ -40,15 +40,13 @@ def get_or_create_author(author_data):
     existing = Author.objects.filter(id=author_id).first()
     if existing:
         return existing
-    
     return Author.objects.create(
         id=author_id,
         user=None,
         host=author_data.get('host', ''),
         displayName=author_data.get('displayName', 'Unknown'),
         github=author_data.get('github'),
-        # if string URL set to None, since we can't import images yet.  fix in future
-        profileImage=author_data.get('profileImage') if not isinstance(author_data.get('profileImage'), str) else None,
+        profileImage=author_data.get('profileImage'),  # just store the URL string
         web=author_data.get('web'),
         is_approved=True,
     )

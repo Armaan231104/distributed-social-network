@@ -54,10 +54,11 @@
             -->
 
             <div class="profile-avatar-wrapper">
-                {% if profile_author.profileImage %}
-                    <img src="{{ profile_author.profileImage.url }}" 
-                         alt="{{ profile_author.displayName }}" 
-                         class="profile-avatar">
+{% if profile_author.profileImageUrl %}
+    <img src="{{ profile_author.profileImageUrl }}" alt="Profile Image">
+{% elif profile_author.profileImage %}
+    <img src="{{ profile_author.profileImage.url }}" alt="Profile Image">
+
                 {% else %}
                     <div class="profile-avatar-placeholder">
                         {{ profile_author.displayName|make_list|first }}
