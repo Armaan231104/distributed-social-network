@@ -702,7 +702,7 @@ class InboxView(APIView):
                                         # Try casting to UUID
                                         comment = Comment.objects.get(id=uuid.UUID(comment_id))
                                     except (ValueError, Comment.DoesNotExist):
-                                        pass
+                                        print("Comment does not exist, UUID Cast")
                                     break
                         else:
                             # Try as plain UUID
@@ -710,6 +710,7 @@ class InboxView(APIView):
                             try:
                                 comment = Comment.objects.get(id=uuid.UUID(obj_url))
                             except:
+                                print("UUID plain failed")
                                 pass
                     except Exception as e:
                         print(f"Comment lookup failed: {e}")
