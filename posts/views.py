@@ -1,3 +1,4 @@
+from email.mime import image
 from django.shortcuts import get_object_or_404, render, redirect
 from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
 from django.contrib.auth.decorators import login_required
@@ -14,6 +15,8 @@ import requests
 from accounts.serializers import AuthorSerializer
 from accounts.utils import normalize_fqid
 from nodes.utils import find_remote_node_for_url
+import uuid
+import base64
 
 def get_image_url(entry, request):
     if not entry.image:
@@ -175,6 +178,7 @@ def fetch_remote_author_posts(remote_author):
                 },
             )
 
+
             print("Entry:", entry.id, "| Created:", created)
 
             update_fields = []
@@ -227,7 +231,7 @@ def serialize_entry(entry, request=None):
     if entry.fqid:
         comments_url = f"{entry.fqid.rstrip('/')}/comments"
         likes_url = f"{entry.fqid.rstrip('/')}/likes"
-
+    image_url = entry.image_url or get_image_url(entry, request)
     return {
         "type": "entry",
         "title": entry.title,
@@ -257,6 +261,7 @@ def serialize_entry(entry, request=None):
         },
         "published": entry.published_at.isoformat() if entry.published_at else None,
         "visibility": entry.visibility,
+        "image":image_url,
     }
 
 
@@ -1001,34 +1006,51 @@ def deleted_entries(request):
 
 
 def send_entry_to_inbox(entry, author, inbox_url, node):
-    """Send a spec-compliant entry object to a remote inbox."""
+    """Send a spec-compliant entry to a remote inbox with proper image handling."""
     payload = {
         "type": "entry",
         "id": entry.fqid,
-        "title": entry.title,
-        "content": entry.content,
+        "title": entry.title or "",
+        "content": entry.content or "",
         "contentType": entry.content_type,
         "visibility": entry.visibility,
-        "published": entry.published_at.isoformat(),
-        "author": {
-            "type": "author",
-            "id": author.id,
-            "displayName": author.displayName,
-            "host": author.host,
-            "github": author.github or None,
-            "profileImage": author.profileImage.url if author.profileImage else None,
-            "web": author.web or None,
-        }
+        "published": entry.published_at.isoformat() if entry.published_at else None,
+        "author": AuthorSerializer(author).data,
     }
+
+    # === IMAGE HANDLING ===
+    if entry.image and entry.content_type and "image" in entry.content_type.lower():
+        try:
+            with entry.image.open('rb') as f:
+                image_data = f.read()
+                base64_image = base64.b64encode(image_data).decode('utf-8')
+            
+            # Put base64 in 'content' and mark contentType properly
+            payload["content"] = base64_image
+            payload["contentType"] = f"{entry.content_type};base64"
+            
+            print(f"Sent image as base64 ({len(base64_image)} chars)")
+        except Exception as e:
+            print(f"Failed to base64 encode image: {e}")
+            # fallback: send image URL if possible
+            image_url = get_image_url(entry)
+            if image_url:
+                payload["image"] = image_url
+
+    elif entry.image_url:  # remote-style image URL
+        payload["image"] = entry.image_url
+
     try:
-        requests.post(
+        response = requests.post(
             inbox_url,
             json=payload,
             auth=(node.username, node.password),
-            timeout=5
+            timeout=15
         )
-    except requests.RequestException as e:
-        print("Fanout failed:", e)
+        response.raise_for_status()
+        print(f"Entry sent successfully to {inbox_url}")
+    except Exception as e:
+        print(f"Failed to send entry to {inbox_url}: {e}")
 
 
 def fanout_entry_to_remote_followers(entry, user):
