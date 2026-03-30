@@ -11,7 +11,6 @@ from nodes.authentication import RemoteNodeAuthentication
 from django.contrib.auth.models import User
 from django.contrib.auth import login
 from django.contrib.auth.forms import AuthenticationForm
-from posts.views import fetch_remote_author_posts
 
 from .models import Author, FollowRequest, Follow
 from posts.models import Entry
@@ -19,12 +18,11 @@ from interactions.models import Like, Comment
 from .forms import SignUpForm
 from functools import wraps
 from .serializers import (
-    AuthorSerializer, AuthorListSerializer,
+    AuthorSerializer, AuthorListSerializer, 
     FollowRequestSerializer
 )
 from .utils import get_host_url, is_local_author, normalize_fqid
 from nodes.utils import find_remote_node_for_url, get_remote_inbox_url
-
 
 def build_local_author_id(user):
     host = get_host_url()
@@ -32,44 +30,28 @@ def build_local_author_id(user):
 
 
 def get_or_create_author(author_data):
-    """Create or retrieve an author from remote data (e.g., from another node).
-    Uses get_or_create and syncs latest fields if the author already exists.
-    """
+    """Create or retrieve an author from remote data (e.g., from another node)."""
     author_id = author_data.get('id')
     if not author_id:
         return None
 
     author_id = normalize_fqid(author_id)
-
-    author, created = Author.objects.get_or_create(
+    
+    existing = Author.objects.filter(id=author_id).first()
+    if existing:
+        return existing
+    
+    return Author.objects.create(
         id=author_id,
-        defaults={
-            'user': None,
-            'host': author_data.get('host', ''),
-            'displayName': author_data.get('displayName', 'Unknown'),
-            'is_approved': True,
-        }
+        user=None,
+        host=author_data.get('host', ''),
+        displayName=author_data.get('displayName', 'Unknown'),
+        github=author_data.get('github'),
+        # if string URL set to None, since we can't import images yet.  fix in future
+        profileImage=author_data.get('profileImage') if not isinstance(author_data.get('profileImage'), str) else None,
+        web=author_data.get('web'),
+        is_approved=True,
     )
-
-    if not created:
-        # Sync latest data even if author already exists
-        updated = False
-        field_map = {
-            'displayName': 'displayName',
-            'github': 'github',
-            'profileImage': 'profileImageUrl',
-            'web': 'web',
-            'host': 'host',
-        }
-        for api_field, model_field in field_map.items():
-            new_val = author_data.get(api_field)
-            if new_val is not None and new_val != '' and getattr(author, model_field) != new_val:
-                setattr(author, model_field, new_val)
-                updated = True
-        if updated:
-            author.save()
-
-    return author
 
 
 # Helpers for author lookup
@@ -84,23 +66,22 @@ def get_author_by_id(author_id):
     """Look up author by FQID using centralized normalization."""
     return Author.objects.get(id=normalize_fqid(author_id))
 
-
 def verify_remote_author_exists(foreign_id):
     """
     Fetch the remote author URL and return their data if they exist, None otherwise.
-    Used to pre-validate before creating a local stub for a remote author.
     """
     node = find_remote_node_for_url(foreign_id)
     if not node:
         print(f"DEBUG: No node found for {foreign_id}")
         return None
-
+    
     try:
         response = requests.get(
             foreign_id,
             auth=(node.username, node.password),
             timeout=10
         )
+
         print(f"DEBUG: Response status: {response.status_code}")
         print(f"DEBUG: Response body: {response.text}")
         response.raise_for_status()
@@ -109,45 +90,28 @@ def verify_remote_author_exists(foreign_id):
         print(f"Could not verify remote author at {foreign_id}: {e}")
         return None
 
-
-def get_or_create_remote_author(foreign_id, remote_author=None):
-    """
-    Get or create a local stub for a remote author.
-    Optionally syncs latest fields if remote_author data is provided.
-    Extracts host from the FQID (everything before /api/authors/).
-    """
+def get_or_create_remote_author(foreign_id):
     foreign_id = normalize_fqid(foreign_id)
+    host = foreign_id.split('/api/authors/')[0] + '/api/'
 
-    author, created = Author.objects.get_or_create(
+    # Try to get the remote author JSON
+    display_name = "Remote Author"  # fallback
+    try:
+        resp = requests.get(foreign_id, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            display_name = data.get('displayName', display_name)
+    except Exception as e:
+        print("Error fetching remote author info:", e)
+
+    return Author.objects.get_or_create(
         id=foreign_id,
         defaults={
-            'host': foreign_id.split('/api/authors/')[0] + '/api/',
-            'displayName': 'Remote Author',
+            'host': host,
+            'displayName': display_name,
             'is_approved': True,
         }
     )
-
-    # Sync with latest remote data if provided
-    if remote_author:
-        updated = False
-        field_map = {
-            "displayName": "displayName",
-            "github": "github",
-            "profileImage": "profileImageUrl",
-            "web": "web",
-            "host": "host",
-        }
-        for api_field, model_field in field_map.items():
-            new_val = remote_author.get(api_field)
-            if new_val is not None and new_val != '' and getattr(author, model_field) != new_val:
-                setattr(author, model_field, new_val)
-                updated = True
-        # Fix: save is outside the loop, not nested inside the field check
-        if updated:
-            author.save()
-
-    return author, created
-
 
 def send_follow_to_remote(actor, target):
     if target.is_local:
@@ -162,7 +126,7 @@ def send_follow_to_remote(actor, target):
             'type': 'Follow',
             'summary': f'{actor.displayName} wants to follow {target.displayName}',
             'actor': AuthorSerializer(actor).data,
-            'object': AuthorSerializer(target).data,
+            'object': AuthorSerializer(target).data
         }
 
         node = find_remote_node_for_url(target.id) or find_remote_node_for_url(target.host)
@@ -171,12 +135,6 @@ def send_follow_to_remote(actor, target):
             print(error)
             return False, error
 
-        print(f"DEBUG node url in DB: {node.url}")
-        print(f"DEBUG node username: '{node.username}'")
-        print(f"DEBUG node password: '{node.password}'")
-        print(f"DEBUG target.id: {target.id}")
-        print(f"DEBUG target.host: {target.host}")
-        print(f"DEBUG inbox_url: {inbox_url}")
         print("FOLLOW inbox_url:", inbox_url)
         print("FOLLOW payload:", follow_data)
         print("FOLLOW auth username:", node.username)
@@ -201,7 +159,7 @@ def send_follow_to_remote(actor, target):
 
 def create_follow_request(actor, target):
     existing = FollowRequest.objects.filter(actor=actor, object=target).first()
-
+    
     if existing:
         if existing.status == FollowRequest.Status.PENDING:
             return None, 'pending'
@@ -219,14 +177,13 @@ def create_follow_request(actor, target):
             existing.status = FollowRequest.Status.PENDING
             existing.save()
             return existing, 'resent'
-
+    
     return FollowRequest.objects.create(
         actor=actor,
         object=target,
         summary=f'{actor.displayName} wants to follow {target.displayName}',
         status=FollowRequest.Status.PENDING
     ), 'created'
-
 
 class IsApprovedAuthor(BasePermission):
     """
@@ -246,8 +203,7 @@ class IsApprovedAuthor(BasePermission):
             return user.author.is_approved
         except Author.DoesNotExist:
             return False
-
-
+        
 # API Views
 def approved_author_required(view_func):
     @wraps(view_func)
@@ -269,7 +225,6 @@ def approved_author_required(view_func):
         return view_func(request, *args, **kwargs)
     return wrapper
 
-
 class AuthorListView(APIView):
     """List authors on this node."""
     authentication_classes = [RemoteNodeAuthentication, SessionAuthentication]
@@ -278,9 +233,11 @@ class AuthorListView(APIView):
     def get(self, request):
         user = request.user
 
+        # If admin → see all authors
         if user.is_authenticated and getattr(user, 'is_superuser', False):
             authors = Author.objects.all()
         else:
+            # Everyone else → only approved authors
             authors = Author.objects.filter(is_approved=True)
 
         serializer = AuthorListSerializer(authors, many=True)
@@ -288,8 +245,7 @@ class AuthorListView(APIView):
             'type': 'authors',
             'authors': serializer.data
         })
-
-
+    
 class AuthorDetailView(APIView):
     """Get details for a specific author."""
     authentication_classes = [RemoteNodeAuthentication, SessionAuthentication]
@@ -301,7 +257,7 @@ class AuthorDetailView(APIView):
             author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
-
+        
         serializer = AuthorSerializer(author)
         return Response(serializer.data)
 
@@ -317,17 +273,17 @@ class FollowingListView(APIView):
             author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
-
+        
         page = int(request.query_params.get('page', 1))
         size = int(request.query_params.get('size', 50))
-
+        
         all_following = list(author.following.all())
         total = len(all_following)
-
+        
         start = (page - 1) * size
         end = start + size
         paginated_following = all_following[start:end]
-
+        
         following_authors = [f.followee for f in paginated_following]
         serializer = AuthorSerializer(following_authors, many=True)
         return Response({
@@ -350,17 +306,18 @@ class FollowersListView(APIView):
             author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
-
+        
         page = int(request.query_params.get('page', 1))
         size = int(request.query_params.get('size', 50))
-
+        
         all_followers = list(author.followers.all())
         total = len(all_followers)
-
+        
+        # pagination logic since the follower list could grow large.
         start = (page - 1) * size
         end = start + size
         paginated_followers = all_followers[start:end]
-
+        
         follower_authors = [f.follower for f in paginated_followers]
         serializer = AuthorSerializer(follower_authors, many=True)
         return Response({
@@ -383,17 +340,17 @@ class FriendsListView(APIView):
             author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
-
+        
         page = int(request.query_params.get('page', 1))
         size = int(request.query_params.get('size', 50))
-
+        
         all_friends = list(author.get_friends())
         total = len(all_friends)
-
+        
         start = (page - 1) * size
         end = start + size
         paginated_friends = all_friends[start:end]
-
+        
         serializer = AuthorSerializer(paginated_friends, many=True)
         return Response({
             'type': 'friends',
@@ -407,24 +364,25 @@ class FriendsListView(APIView):
 class FollowView(APIView):
     """
     Handle following and unfollowing authors.
-    Note: Follow requests go to inbox first; Follow only created after approval
-    for local authors. For remote authors, Follow is created immediately per spec.
+    
+    Note: Follow requests go to inbox first, Follow only created after approval.
     """
     permission_classes = [IsAuthenticated]
 
     def put(self, request, author_id, foreign_id):
         """Send a follow request to another author."""
         current_author = get_current_author(request)
-
+        
+        # Normalize author_id to FQID for comparison
         author_id = normalize_fqid(author_id)
-
+        
         if current_author.id != author_id:
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
         is_remote = str(foreign_id).startswith('http')
+        
         if is_remote:
-            author_data = verify_remote_author_exists(foreign_id)
-            foreign_author, _ = get_or_create_remote_author(foreign_id, author_data)
+            foreign_author, _ = get_or_create_remote_author(foreign_id)
         else:
             foreign_author = get_author_by_id(foreign_id)
 
@@ -435,17 +393,17 @@ class FollowView(APIView):
             return Response({'error': 'Already following'}, status=status.HTTP_400_BAD_REQUEST)
 
         request_result, state = create_follow_request(current_author, foreign_author)
-
-        # For remote authors, create Follow immediately so the stream can fetch posts.
-        # Per spec: "A's node can assume that A is following B, even before B accepts"
+        
+        # For remote authors, create Follow object immediately so stream can fetch posts
+        # Per spec: "A's node can assume that A is following B, even before author B accepts"
         if not foreign_author.user:
             Follow.objects.get_or_create(follower=current_author, followee=foreign_author)
-
+        
         if state == 'pending':
             return Response({'error': 'Follow request already pending'}, status=status.HTTP_400_BAD_REQUEST)
         elif state == 'accepted':
             return Response({'error': 'Already following'}, status=status.HTTP_400_BAD_REQUEST)
-
+        
         success, error = send_follow_to_remote(current_author, foreign_author)
         if not success:
             return Response({
@@ -457,9 +415,10 @@ class FollowView(APIView):
     def delete(self, request, author_id, foreign_id):
         """Unfollow an author."""
         current_author = get_current_author(request)
-
+        
+        # Normalize author_id to FQID for comparison
         author_id = normalize_fqid(author_id)
-
+        
         if current_author.id != author_id:
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -472,15 +431,18 @@ class FollowView(APIView):
 
 
 class AcceptFollowView(APIView):
-    """Handle approving or rejecting follow requests."""
+    """
+    Handle approving or rejecting follow requests.
+    """
     permission_classes = [IsAuthenticated]
 
     def put(self, request, author_id, foreign_id):
         """Accept a follow request."""
         current_author = get_current_author(request)
-
+        
+        # Normalize author_id to FQID for comparison
         author_id = normalize_fqid(author_id)
-
+        
         if current_author.id != author_id:
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -505,9 +467,10 @@ class AcceptFollowView(APIView):
     def delete(self, request, author_id, foreign_id):
         """Reject or remove a follower."""
         current_author = get_current_author(request)
-
+        
+        # Normalize author_id to FQID for comparison
         author_id = normalize_fqid(author_id)
-
+        
         if current_author.id != author_id:
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -515,7 +478,7 @@ class AcceptFollowView(APIView):
 
         Follow.objects.filter(follower=foreign_author, followee=current_author).delete()
         FollowRequest.objects.filter(
-            actor=foreign_author,
+            actor=foreign_author, 
             object=current_author
         ).update(status=FollowRequest.Status.REJECTED)
 
@@ -523,30 +486,33 @@ class AcceptFollowView(APIView):
 
 
 class FollowRequestListView(APIView):
-    """Get pending follow requests for an author."""
+    """
+    Get pending follow requests for an author.
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request, author_id):
         current_author = get_current_author(request)
-
+        
+        # Normalize author_id to FQID for comparison
         author_id = normalize_fqid(author_id)
-
+        
         if current_author.id != author_id:
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
         page = int(request.query_params.get('page', 1))
         size = int(request.query_params.get('size', 50))
-
+        
         all_requests = list(FollowRequest.objects.filter(
             object=current_author,
             status=FollowRequest.Status.PENDING
         ))
         total = len(all_requests)
-
+        
         start = (page - 1) * size
         end = start + size
         paginated_requests = all_requests[start:end]
-
+        
         serializer = FollowRequestSerializer(paginated_requests, many=True)
         return Response({
             'type': 'follow_requests',
@@ -556,12 +522,14 @@ class FollowRequestListView(APIView):
             'count': total
         })
 
-
 # ---------- INBOX ---------- #
 
 class InboxView(APIView):
     """
-    Receive items from remote nodes: follow requests, entries, likes, comments.
+    Receive follow requests from remote nodes.
+    
+    When a remote author wants to follow you, their node contacts this endpoint
+    to create a follow request in your inbox.
     """
     authentication_classes = [RemoteNodeAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
@@ -572,68 +540,79 @@ class InboxView(APIView):
             author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
-
+        
         data = request.data
         msg_type = str(data.get('type', '')).lower()
+        msg_status = 
 
         if msg_type == 'follow':
+            
             print("FOLLOW REQUEST RECEIVED")
             actor_data = data.get('actor', {})
             object_data = data.get('object', {})
-
             object_id = object_data.get('id', '')
 
-            if object_id.rstrip('/') != author.id.rstrip('/'):
-                return Response(
-                    {'error': 'Not the intended recipient'},
-                    status=status.HTTP_400_BAD_REQUEST
+            follow_status = str(data.get('status', 'pending')).lower()
+            
+            # PENDING
+            if follow_status in ('pending', ''):
+
+                if object_id.rstrip('/') != author.id.rstrip('/'):
+                    return Response(
+                        {'error': 'Not the intended recipient'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                actor = get_or_create_author(actor_data)
+                if not actor:
+                    return Response({'error': 'Invalid actor'}, status=status.HTTP_400_BAD_REQUEST)
+
+                follow_request, created = FollowRequest.objects.get_or_create(
+                    actor=actor,
+                    object=author,
+                    defaults={
+                        'summary': data.get('summary', f'{actor.displayName} wants to follow {author.displayName}'),
+                        'status': FollowRequest.Status.PENDING
+                    }
                 )
 
-            actor = get_or_create_author(actor_data)
-            if not actor:
-                return Response({'error': 'Invalid actor'}, status=status.HTTP_400_BAD_REQUEST)
+                if not created and follow_request.status == FollowRequest.Status.PENDING:
+                    return Response({'status': 'follow request already exists'}, status=status.HTTP_200_OK)
 
-            follow_request, created = FollowRequest.objects.get_or_create(
-                actor=actor,
-                object=author,
-                defaults={
-                    'summary': data.get('summary', f'{actor.displayName} wants to follow {author.displayName}'),
-                    'status': FollowRequest.Status.PENDING
-                }
-            )
+                if follow_request.status != FollowRequest.Status.PENDING:
+                    follow_request.status = FollowRequest.Status.PENDING
+                    follow_request.save()
 
-            if not created and follow_request.status == FollowRequest.Status.PENDING:
-                return Response({'status': 'follow request already exists'}, status=status.HTTP_200_OK)
-
-            if follow_request.status != FollowRequest.Status.PENDING:
-                follow_request.status = FollowRequest.Status.PENDING
-                follow_request.save()
-
-            return Response({'status': 'follow request received'}, status=status.HTTP_201_CREATED)
-
+                return Response({'status': 'follow request received'}, status=status.HTTP_201_CREATED)
+                        
+        # POST ENTRY (ALSO UPDATE AND SOFT DELETE)
         elif msg_type == 'entry':
             entry_id = data.get('id')
             remote_author_data = data.get('author', {})
-
+            
             if not entry_id:
                 return Response({'error': 'Missing entry id'}, status=status.HTTP_400_BAD_REQUEST)
-
+            
+            # get or create the remote author
             remote_author = get_or_create_author(remote_author_data)
             if not remote_author:
                 return Response({'error': 'Invalid author'}, status=status.HTTP_400_BAD_REQUEST)
-
+            
             content_type = data.get('contentType', 'text/plain')
             content = data.get('content', '')
             image_file = None
-
+            
+            # HANDLE IMAGE
             if content_type and "base64" in content_type:
                 import base64
                 from django.core.files.base import ContentFile
+
                 image_file = ContentFile(
                     base64.b64decode(content),
                     name="remote_image.png"
                 )
-
+            
+            # create, update, or soft delete based on visibility
             entry, created = Entry.objects.update_or_create(
                 fqid=entry_id,
                 defaults={
@@ -642,50 +621,39 @@ class InboxView(APIView):
                     'content': data.get('content', ''),
                     'content_type': data.get('contentType', 'text/plain'),
                     'visibility': data.get('visibility', 'PUBLIC'),
-                    'image': image_file,
+                    'image': image_file 
                 }
             )
-            return Response(
-                {'status': 'entry received'},
-                status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
-            )
+            return Response({'status': 'entry received'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
-        # Fixed: was 'entry' in both versions (dead code) — correctly 'like' here
-        elif msg_type == 'like':
+        elif msg_type == 'entry':
             actor = get_or_create_author(data.get('author', {}))
             obj_url = str(data.get('object', ''))
             if actor and obj_url:
-                entry = (
-                    Entry.objects.filter(id=obj_url.rstrip('/').split('/')[-1]).first()
-                    or Entry.objects.filter(fqid=obj_url).first()
-                )
+                entry = Entry.objects.filter(id=obj_url.rstrip('/').split('/')[-1]).first() or Entry.objects.filter(fqid=obj_url).first()
                 if entry:
                     Like.objects.get_or_create(author=actor, entry=entry)
             return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
-
+            
         elif msg_type == 'comment':
             actor = get_or_create_author(data.get('author', {}))
             content = data.get('comment', 'remote comment')
-            # Spec says comments are usually sent to POST /api/authors/{id}/posts/{id}/comments
-            # but we accept them here generically if routed to the inbox.
+            # Spec states comments are often sent directly to POST /api/authors/{id}/posts/{id}/comments
+            # If inbox router catches it, we accept it generically.
             return Response({'status': 'comment received'}, status=status.HTTP_201_CREATED)
 
-        return Response({'error': f'Unknown message type: {msg_type}'}, status=status.HTTP_400_BAD_REQUEST)
-
-
-# ---------- UI Views ---------- #
-
+# UI views
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden
-
-
 @approved_author_required
 def authors_list(request):
     """Show all authors on the node."""
     if request.user.is_authenticated and request.user.is_superuser:
+        # Admin sees all authors
         authors = Author.objects.all()
     else:
+        # Everyone else sees only approved authors
         authors = Author.objects.filter(is_approved=True)
 
     current_user_author = None
@@ -694,7 +662,7 @@ def authors_list(request):
             current_user_author = request.user.author
         except Author.DoesNotExist:
             pass
-
+    
     return render(request, 'accounts/authors_list.html', {
         'authors': authors,
         'current_user_author': current_user_author,
@@ -706,55 +674,63 @@ def follow_remote_author(request):
     """Follow a remote author by their FQID."""
     if request.method != 'POST':
         return redirect('authors-list')
-
+    
     try:
         current_author = request.user.author
     except Author.DoesNotExist:
         messages.error(request, 'You must have an approved author profile to follow others.')
         return redirect('authors-list')
-
+    
     remote_fqid = request.POST.get('remote_author_fqid', '').strip()
+    
     if not remote_fqid:
         messages.error(request, 'Please enter an author URL.')
         return redirect('authors-list')
-
+    
+    # Validate it's a proper FQID format
     if not remote_fqid.startswith('http'):
         messages.error(request, 'Please enter a valid author URL (e.g., https://other-node.com/api/authors/123/).')
         return redirect('authors-list')
-
+    
+    # Check if it's a local author
     if is_local_author(remote_fqid):
         messages.error(request, 'To follow local authors, use the Follow button on their profile.')
         return redirect('authors-list')
-
-    # Pre-validate the remote author exists before creating a local stub
+    
+    # Check if the requested author exists
     author_data = verify_remote_author_exists(remote_fqid)
     if not author_data:
         messages.error(request, 'Could not find that author on their node. Please check the URL and try again.')
         return redirect('authors-list')
-
+    
     try:
-        remote_author, created = get_or_create_remote_author(remote_fqid, author_data)
+        # Get or create the remote author
+        remote_author, created = get_or_create_remote_author(remote_fqid)
 
+        # Check if already following
         if current_author.is_following(remote_author):
             messages.info(request, f'You are already following {remote_author.displayName}.')
             return redirect('authors-list')
-
+        
+        # Check if there's already a pending request
         existing_request = FollowRequest.objects.filter(
             actor=current_author,
             object=remote_author,
             status=FollowRequest.Status.PENDING
         ).first()
-
+        
         if existing_request:
             messages.info(request, f'You already have a pending follow request to {remote_author.displayName}.')
             return redirect('authors-list')
-
+        
+        # Create the follow request
         follow_request, state = create_follow_request(current_author, remote_author)
-
-        # Create Follow immediately for remote authors per spec
+        
+        # For remote authors, create Follow object immediately so stream can fetch posts
+        # Per spec: "A's node can assume that A is following B, even before author B accepts"
         if not remote_author.user:
             Follow.objects.get_or_create(follower=current_author, followee=remote_author)
-
+        
         if state == 'pending':
             messages.info(request, f'You already have a pending follow request to {remote_author.displayName}.')
         elif state == 'accepted':
@@ -768,9 +744,9 @@ def follow_remote_author(request):
                     request,
                     f'Could not deliver follow request to {remote_author.displayName}. {error}'
                 )
-
+                
         return redirect('authors-list')
-
+        
     except Exception as e:
         messages.error(request, f'Could not follow author: {str(e)}')
         return redirect('authors-list')
@@ -783,20 +759,19 @@ def author_followers(request, author_id):
         author_id += '/'
     author = get_object_or_404(Author, id=author_id)
     followers = [f.follower for f in author.followers.all()]
-
+    
     current_user_author = None
     if request.user.is_authenticated:
         try:
             current_user_author = request.user.author
         except Author.DoesNotExist:
             pass
-
+    
     return render(request, 'accounts/authors_list.html', {
         'authors': followers,
         'current_user_author': current_user_author,
         'page_title': f"{author.displayName.capitalize()}'s Followers",
     })
-
 
 @approved_author_required
 def author_following(request, author_id):
@@ -805,20 +780,19 @@ def author_following(request, author_id):
         author_id += '/'
     author = get_object_or_404(Author, id=author_id)
     following = [f.followee for f in author.following.all()]
-
+    
     current_user_author = None
     if request.user.is_authenticated:
         try:
             current_user_author = request.user.author
         except Author.DoesNotExist:
             pass
-
+    
     return render(request, 'accounts/authors_list.html', {
         'authors': following,
         'current_user_author': current_user_author,
         'page_title': f"{author.displayName.capitalize()} is Following",
     })
-
 
 @approved_author_required
 def author_friends(request, author_id):
@@ -827,27 +801,25 @@ def author_friends(request, author_id):
         author_id += '/'
     author = get_object_or_404(Author, id=author_id)
     friends = list(author.get_friends())
-
+    
     current_user_author = None
     if request.user.is_authenticated:
         try:
             current_user_author = request.user.author
         except Author.DoesNotExist:
             pass
-
+    
     return render(request, 'accounts/authors_list.html', {
         'authors': friends,
         'current_user_author': current_user_author,
         'page_title': f"{author.displayName.capitalize()}'s Friends",
     })
 
-
 @approved_author_required
 def author_profile(request, author_id):
     """Show an author's profile along with their posts."""
     if not author_id.endswith('/'):
         author_id += '/'
-
     author = get_object_or_404(Author, id=author_id)
 
     current_user_author = None
@@ -866,69 +838,32 @@ def author_profile(request, author_id):
         except Author.DoesNotExist:
             pass
 
+    # For local authors, get their posts
     posts = []
-
-    if author.user:
-        # Local author — filter posts by viewer's relationship
+    if author.user:  # only if this author has a local User
         if current_user_author == author:
+            # Viewing your own profile → show all except deleted
             posts = Entry.objects.filter(
                 author=author.user
-            ).exclude(visibility="DELETED").order_by('-published_at')
+            ).exclude(visibility="DELETED")
         elif current_user_author and current_user_author.is_friend(author):
+            # Mutual followers (friends) can see public, unlisted, and friends posts
             posts = Entry.objects.filter(
                 author=author.user,
                 visibility__in=["PUBLIC", "UNLISTED", "FRIENDS"]
-            ).order_by('-published_at')
+            )
         elif is_following:
+            # One-way followers can see public and unlisted posts
             posts = Entry.objects.filter(
                 author=author.user,
                 visibility__in=["PUBLIC", "UNLISTED"]
-            ).order_by('-published_at')
+            )
         else:
+            # Viewing someone else's profile → only public
             posts = Entry.objects.filter(
                 author=author.user,
                 visibility="PUBLIC"
-            ).order_by('-published_at')
-
-    else:
-        # Remote author — sync their data, then fetch and filter their posts
-        fresh_data = verify_remote_author_exists(author.id)
-        if fresh_data:
-            get_or_create_remote_author(author.id, fresh_data)
-            author.refresh_from_db()
-
-        try:
-            remote_posts = fetch_remote_author_posts(author)
-
-            # Extract IDs first — can't call .filter() directly on a union queryset
-            stored_ids = list(remote_posts.values_list('id', flat=True))
-
-            if current_user_author and current_user_author.is_friend(author):
-                posts = Entry.objects.filter(
-                    id__in=stored_ids,
-                    visibility__in=["PUBLIC", "UNLISTED", "FRIENDS"]
-                ).order_by('-published_at')
-            elif is_following:
-                posts = Entry.objects.filter(
-                    id__in=stored_ids,
-                    visibility__in=["PUBLIC", "UNLISTED"]
-                ).order_by('-published_at')
-            else:
-                posts = Entry.objects.filter(
-                    id__in=stored_ids,
-                    visibility="PUBLIC"
-                ).order_by('-published_at')
-
-        except Exception as e:
-            print(f"ERROR fetching remote posts: {e}")
-            import traceback
-            traceback.print_exc()
-            # Fall back to whatever we have cached locally
-            posts = Entry.objects.filter(
-                remote_author=author,
-                visibility="PUBLIC"
-            ).order_by('-published_at')
-
+            )
     return render(request, 'accounts/profile.html', {
         'profile_author': author,
         'current_user_author': current_user_author,
@@ -937,42 +872,40 @@ def author_profile(request, author_id):
         'posts': posts,
     })
 
-
 @approved_author_required
 @login_required
 def follow_author(request, author_id):
     author_id = unquote(author_id)
-
+    
     try:
         current_author = request.user.author
     except Author.DoesNotExist:
         return redirect('authors-list')
-
+    
+    # Check if they are local or remote, and create if remote
     if is_local_author(author_id):
         try:
             target_author = get_author_by_id(author_id)
         except Author.DoesNotExist:
             return redirect('authors-list')
     else:
-        author_data = verify_remote_author_exists(author_id)
-        target_author, _ = get_or_create_remote_author(author_id, author_data)
-
+        target_author, _ = get_or_create_remote_author(author_id)
+    
     if current_author == target_author:
         return redirect('author-profile', author_id=author_id)
-
+    
     if current_author.is_following(target_author):
         return redirect('author-profile', author_id=author_id)
-
+    
     request_result, state = create_follow_request(current_author, target_author)
-
+    
     if state in ('pending', 'accepted'):
         return redirect('author-profile', author_id=author_id)
-
+    
     success, error = send_follow_to_remote(current_author, target_author)
     if not success:
         messages.error(request, f'Could not deliver follow request. {error}')
     return redirect('author-profile', author_id=author_id)
-
 
 @approved_author_required
 @login_required
@@ -981,33 +914,32 @@ def unfollow_author(request, author_id):
     author_id = unquote(author_id)
     if not author_id.endswith('/'):
         author_id += '/'
-
+    
     try:
         current_author = request.user.author
     except Author.DoesNotExist:
         return redirect('authors-list')
-
+    
     try:
         target_author = Author.objects.get(id=author_id)
     except Author.DoesNotExist:
         return redirect('authors-list')
-
+    
     Follow.objects.filter(follower=current_author, followee=target_author).delete()
     FollowRequest.objects.filter(actor=current_author, object=target_author).delete()
-
+    
     return redirect('author-profile', author_id=author_id)
-
 
 @login_required
 def cancel_follow_request(request, author_id):
     """Cancel a pending follow request (withdraw request)."""
     author_id = unquote(author_id)
-
+    
     try:
         current_author = request.user.author
     except Author.DoesNotExist:
         return redirect('authors-list')
-
+    
     try:
         target_author = Author.objects.get(id=author_id)
     except Author.DoesNotExist:
@@ -1015,15 +947,14 @@ def cancel_follow_request(request, author_id):
             target_author = Author.objects.get(id__endswith=f'{author_id}/')
         except Author.DoesNotExist:
             return redirect('authors-list')
-
+    
     FollowRequest.objects.filter(
         actor=current_author,
         object=target_author,
         status=FollowRequest.Status.PENDING
     ).delete()
-
+    
     return redirect('author-profile', author_id=author_id)
-
 
 @approved_author_required
 @login_required
@@ -1033,61 +964,58 @@ def follow_requests(request):
         current_author = request.user.author
     except Author.DoesNotExist:
         return redirect('authors-list')
-
+    
     pending_requests = FollowRequest.objects.filter(
         object=current_author,
         status=FollowRequest.Status.PENDING
     )
-
+    
     return render(request, 'accounts/follow_requests.html', {
         'pending_requests': pending_requests,
     })
-
 
 @approved_author_required
 @login_required
 def accept_follow_request(request, request_id):
     """Accept a follow request."""
     follow_request = get_object_or_404(FollowRequest, id=request_id)
-
+    
     try:
         current_author = request.user.author
     except Author.DoesNotExist:
         return redirect('follow-requests')
-
+    
     if follow_request.object != current_author:
         return HttpResponseForbidden()
-
+    
     follow_request.status = FollowRequest.Status.ACCEPTED
     follow_request.save()
-
+    
     Follow.objects.get_or_create(
         follower=follow_request.actor,
         followee=current_author
     )
-
+    
     return redirect('follow-requests')
-
 
 @approved_author_required
 @login_required
 def reject_follow_request(request, request_id):
     """Reject a follow request."""
     follow_request = get_object_or_404(FollowRequest, id=request_id)
-
+    
     try:
         current_author = request.user.author
     except Author.DoesNotExist:
         return redirect('follow-requests')
-
+    
     if follow_request.object != current_author:
         return HttpResponseForbidden()
-
+    
     follow_request.status = FollowRequest.Status.REJECTED
     follow_request.save()
-
+    
     return redirect('follow-requests')
-
 
 @approved_author_required
 @login_required
@@ -1099,37 +1027,40 @@ def my_profile(request):
     except Author.DoesNotExist:
         return redirect('authors-list')
 
-
 from .forms import AuthorUpdateForm
 
 
 @approved_author_required
 @login_required
 def edit_profile(request, author_id=None):
+    # Admin editing someone OR direct URL
     if author_id:
         author_id = normalize_fqid(author_id)
         author = get_object_or_404(Author, id=author_id)
     else:
+        # Normal user editing themselves
         try:
             author = request.user.author
         except Author.DoesNotExist:
             return redirect('authors-list')
 
+    # Permission check
     if not request.user.is_superuser:
         if author != getattr(request.user, "author", None):
             return redirect('author-profile', author_id=author.id)
 
+    # Prevent editing remote authors
     if not author.is_local:
         return redirect('author-profile', author_id=author.id)
 
-    current_user_author = getattr(request.user, "author", None)
 
+    current_user_author = getattr(request.user, "author", None)
     if request.method == "POST":
         form = AuthorUpdateForm(
             request.POST,
             request.FILES,
             instance=author,
-            user=request.user
+            user=request.user   # needed for is_approved
         )
         if form.is_valid():
             form.save()
@@ -1142,17 +1073,15 @@ def edit_profile(request, author_id=None):
         "author": author,
         "current_user_author": current_user_author,
     })
-
-
 from django.contrib.auth import logout
-
+from django.contrib.auth.decorators import login_required
 
 def logout_view(request):
     if request.method != "POST":
         return redirect("login")
+
     logout(request)
     return redirect("login")
-
 
 def signup_view(request):
     if request.method == "POST":
@@ -1163,17 +1092,18 @@ def signup_view(request):
                 email=form.cleaned_data["email"],
                 password=form.cleaned_data["password"]
             )
+
             author = user.author
             author.displayName = form.cleaned_data["display_name"]
             author.is_approved = False
             author.save()
+
             login(request, user)
             return redirect("pending-approval")
     else:
         form = SignUpForm()
 
     return render(request, "accounts/signup.html", {"form": form})
-
 
 @login_required
 def pending_approval(request):
@@ -1186,7 +1116,6 @@ def pending_approval(request):
         return redirect("home")
 
     return render(request, "accounts/pending_approval.html")
-
 
 @approved_author_required
 @login_required
@@ -1203,7 +1132,6 @@ def pending_authors(request):
         "pending_authors_admin": pending_authors
     })
 
-
 @approved_author_required
 @staff_member_required
 def pending_authors_admin(request):
@@ -1215,7 +1143,6 @@ def pending_authors_admin(request):
     return render(request, "accounts/pending_authors_admin.html", {
         "pending_authors": pending_authors
     })
-
 
 @approved_author_required
 @login_required
@@ -1230,7 +1157,6 @@ def approve_author(request, author_id):
     author.save()
 
     return redirect("pending-authors-admin")
-
 
 @approved_author_required
 @login_required
@@ -1248,7 +1174,6 @@ def reject_author(request, author_id):
         author.delete()
 
     return redirect("pending-authors-admin")
-
 
 def login_view(request):
     if request.method == "POST":
