@@ -318,6 +318,7 @@ def get_entry_by_id(entry_id):
 
     if entry_id.startswith("http"):
         entry_id = normalize_fqid(entry_id)
+        print(f"normalized entry_id: {entry_id}")
         return get_object_or_404(Entry, fqid=entry_id)
 
     return get_object_or_404(Entry, id=entry_id)
