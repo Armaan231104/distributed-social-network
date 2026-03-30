@@ -161,7 +161,6 @@ def send_like_to_remote_inbox(sender, recipient, object_url, like):
     print(f"Found node: {node.url}")
 
     payload = {
-        "summary": summary,
         "type": "Like",
         "id": like.fqid.rstrip('/'),
         "author": {
