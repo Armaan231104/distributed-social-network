@@ -15,6 +15,7 @@ class Comment(models.Model):
     entry = models.ForeignKey(Entry, on_delete=models.CASCADE, related_name='comments')
     author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name='comments')
     content = models.TextField()
+    contentType = models.CharField(max_length=50, default='text/plain')
     created_at = models.DateTimeField(auto_now_add=True)
     fqid = models.URLField(max_length=500, unique=True, null=True, blank=True)
 
@@ -23,8 +24,9 @@ class Comment(models.Model):
 
         if not self.fqid:
             host = get_host_url()
-            author_id = self.author.id
-            self.fqid = f"{host}/api/authors/{author_id}/commented/{self.id}"
+            # Extract serial from author FQID (e.g., http://host/api/authors/1/ -> 1)
+            author_serial = str(self.author.id).rstrip('/').split('/')[-1]
+            self.fqid = f"{host}/api/authors/{author_serial}/commented/{self.id}"
             super().save(update_fields=["fqid"])
 
     class Meta:
@@ -56,8 +58,9 @@ class Like(models.Model):
 
         if not self.fqid:
             host = get_host_url()
-            author_id = self.author.id
-            self.fqid = f"{host}/api/authors/{author_id}/liked/{self.id}"
+            # Extract serial from author FQID (e.g., http://host/api/authors/1/ -> 1)
+            author_serial = str(self.author.id).rstrip('/').split('/')[-1]
+            self.fqid = f"{host}/api/authors/{author_serial}/liked/{self.id}"
             super().save(update_fields=["fqid"])
 
     class Meta:

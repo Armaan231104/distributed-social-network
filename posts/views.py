@@ -387,6 +387,11 @@ def get_stream_entries_for_user(user):
         if a.user and a.is_following(current_author)
     ]
 
+    remote_friend_authors = [
+        f.followee for f in remote_following
+        if Follow.objects.filter(follower=f.followee, followee=current_author).exists()
+    ]
+
     print("Friend users count:", len(friend_users))
 
     print("Building local entries query...")
@@ -394,7 +399,8 @@ def get_stream_entries_for_user(user):
         Q(author=user) |
         Q(visibility="PUBLIC") |
         Q(author__in=followed_users, visibility="UNLISTED") |
-        Q(author__in=friend_users, visibility="FRIENDS")
+        Q(author__in=friend_users, visibility="FRIENDS") |
+        Q(remote_author__in=remote_friend_authors, visibility="FRIENDS") 
     )
 
     remote_entry_ids = []

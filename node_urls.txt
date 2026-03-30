@@ -33,3 +33,5 @@ NODE_PASSWORD: aaron5432
 
 Sean
 https://cmput404-crimson-swcarson-55711a031595.herokuapp.com
+node-sean
+$ecretcode123
