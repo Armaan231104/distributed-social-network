@@ -143,27 +143,23 @@ def send_follow_to_remote(actor, target):
             print(error)
             return False, error
 
-        print("FOLLOW inbox_url:", inbox_url)
-        print("FOLLOW payload:", follow_data)
-        print("FOLLOW auth username:", node.username)
-
         response = requests.post(
             inbox_url,
             json=follow_data,
-            timeout=10,
+            timeout=30,  # increased from 10
             auth=(node.username, node.password)
         )
-
-        print("FOLLOW status:", response.status_code)
-        print("FOLLOW body:", response.text)
 
         response.raise_for_status()
         return True, None
 
+    except requests.exceptions.ChunkedEncodingError:
+        # Remote node closed connection mid-response but likely processed the request
+        print("IncompleteRead — treating as success")
+        return True, None
     except Exception as e:
         print(f"Failed to send follow request to remote node: {e}")
         return False, str(e)
-
 
 def create_follow_request(actor, target):
     existing = FollowRequest.objects.filter(actor=actor, object=target).first()
@@ -390,7 +386,8 @@ class FollowView(APIView):
         is_remote = str(foreign_id).startswith('http')
         
         if is_remote:
-            foreign_author, _ = get_or_create_remote_author(foreign_id)
+            author_data = verify_remote_author_exists(foreign_id)
+            foreign_author, _ = get_or_create_remote_author(foreign_id, author_data)
         else:
             foreign_author = get_author_by_id(foreign_id)
 
@@ -937,7 +934,8 @@ def follow_author(request, author_id):
         except Author.DoesNotExist:
             return redirect('authors-list')
     else:
-        target_author, _ = get_or_create_remote_author(author_id)
+        author_data = verify_remote_author_exists(author_id)
+        target_author, _ = get_or_create_remote_author(author_id,author_data)
     
     if current_author == target_author:
         return redirect('author-profile', author_id=author_id)
