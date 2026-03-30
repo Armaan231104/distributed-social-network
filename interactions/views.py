@@ -75,14 +75,40 @@ def toggle_like(request, object_type, object_id):
 
     elif object_type == 'comment':
         obj = get_object_or_404(Comment, id=object_id)
+
         if not user_can_access_entry(request.user, obj.entry):
             return JsonResponse({'error': 'Forbidden'}, status=403)
 
-        target_author = obj.author
-        # Fixed: include the entry segment in the comment URL
-        object_url = f"{target_author.id.rstrip('/')}/posts/{obj.entry.id}/comments/{obj.id}"
+        entry_author = obj.entry.get_author
+        if not entry_author:
+            return JsonResponse({'error': 'Entry author not found'}, status=400)
 
-        like, created = Like.objects.get_or_create(author=liking_author, entry=None, comment=obj)
+        base_author_url = entry_author.id.rstrip('/')
+        entry_id = str(obj.entry.id).strip('/')
+        comment_id = str(obj.id).strip('/')
+
+        entries_url = f"{base_author_url}/entries/{entry_id}/comments/{comment_id}/"
+        posts_url = f"{base_author_url}/posts/{entry_id}/comments/{comment_id}/"
+
+        # Prefer the format already stored on the comment/entry if available
+        existing_comment_url = getattr(obj, "fqid", None) or getattr(obj, "id_url", None)
+        entry_fqid = getattr(obj.entry, "fqid", None)
+
+        if existing_comment_url:
+            if "/posts/" in existing_comment_url:
+                object_url = posts_url
+            else:
+                object_url = entries_url
+        elif entry_fqid and "/posts/" in entry_fqid:
+            object_url = posts_url
+        else:
+            object_url = entries_url
+
+        like, created = Like.objects.get_or_create(
+            author=liking_author,
+            entry=None,
+            comment=obj,
+        )
 
     else:
         return JsonResponse({'error': 'invalid type'}, status=400)
