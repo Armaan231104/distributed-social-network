@@ -681,14 +681,22 @@ class InboxView(APIView):
 
             if actor and obj_url:
                 try:
-                    entry = get_entry_by_id(obj_url)
-                    if entry:
-                        Like.objects.get_or_create(author=actor, entry=entry)
-                        return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
+                    if '/comments/' in obj_url:
+                        comment = Comment.objects.filter(fqid=obj_url).first()
+                        if comment:
+                            Like.objects.get_or_create(author=actor, comment=comment, entry=None)
+                            return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
+                        return Response({'status': 'Comment not found for like'}, status=status.HTTP_404_NOT_FOUND)
+                    else:   
+                        entry = get_entry_by_id(obj_url)
+                        if entry:
+                            Like.objects.get_or_create(author=actor, entry=entry)
+                            return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
                 except Exception as e:
                     print(f"Error processing like: {e}")
+                    return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            return Response({'status': 'Entry not found for like'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'status': 'No object found for like'}, status=status.HTTP_404_NOT_FOUND)
 
         # ====================== COMMENT ======================
         elif msg_type == 'comment':
