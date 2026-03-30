@@ -683,7 +683,11 @@ class InboxView(APIView):
             if actor and obj_url:
                 try:
                     if '/comments/' in obj_url:
+                        print(f"Looking up comment by fqid: {obj_url}")
                         comment = Comment.objects.filter(fqid=obj_url).first()
+                        print(f"Comment found: {comment}")
+                        if not comment:
+                            print(f"Existing comment fqids: {list(Comment.objects.values_list('fqid', flat=True)[:10])}")
                         if comment:
                             Like.objects.get_or_create(author=actor, comment=comment, entry=None)
                             return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
