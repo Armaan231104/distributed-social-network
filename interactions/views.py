@@ -100,6 +100,7 @@ def toggle_like(request, object_type, object_id):
             return JsonResponse({'error': 'Forbidden'}, status=403)
 
         entry_author = obj.entry.get_author
+        target_author = obj.author
         if not entry_author:
             print("Entry author not found")
             return JsonResponse({'error': 'Entry author not found'}, status=400)
