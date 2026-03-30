@@ -887,7 +887,6 @@ def author_friends(request, author_id):
         'current_user_author': current_user_author,
         'page_title': f"{author.displayName.capitalize()}'s Friends",
     })
-
 @approved_author_required
 def author_profile(request, author_id):
     """Show an author's profile along with their posts."""
@@ -903,12 +902,14 @@ def author_profile(request, author_id):
 
     current_user_author = None
     is_following = False
+    is_friend = False
     has_pending_request = False
 
     if request.user.is_authenticated:
         try:
             current_user_author = request.user.author
             is_following = current_user_author.is_following(author)
+            is_friend = current_user_author.is_friend(author)
             has_pending_request = FollowRequest.objects.filter(
                 actor=current_user_author,
                 object=author,
@@ -917,32 +918,49 @@ def author_profile(request, author_id):
         except Author.DoesNotExist:
             pass
 
-    # For local authors, get their posts
     posts = []
-    if author.user:  # only if this author has a local User
-        if current_user_author == author:
-            # Viewing your own profile → show all except deleted
-            posts = Entry.objects.filter(
-                author=author.user
-            ).exclude(visibility="DELETED")
-        elif current_user_author and current_user_author.is_friend(author):
-            # Mutual followers (friends) can see public, unlisted, and friends posts
-            posts = Entry.objects.filter(
-                author=author.user,
-                visibility__in=["PUBLIC", "UNLISTED", "FRIENDS"]
-            )
+
+    if author.user:
+        # Local author
+        qs = Entry.objects.exclude(visibility="DELETED")
+        qs = qs.filter(author=author.user)
+
+        if current_user_author and current_user_author.id == author.id:
+            posts = qs  # own profile, see everything
+        elif is_friend:
+            posts = qs.filter(visibility__in=["PUBLIC", "UNLISTED", "FRIENDS"])
         elif is_following:
-            # One-way followers can see public and unlisted posts
-            posts = Entry.objects.filter(
-                author=author.user,
-                visibility__in=["PUBLIC", "UNLISTED"]
-            )
+            posts = qs.filter(visibility__in=["PUBLIC", "UNLISTED"])
         else:
-            # Viewing someone else's profile → only public
+            posts = qs.filter(visibility="PUBLIC")
+
+        posts = posts.order_by('-published_at')
+
+    else:
+        # Remote author — fetch from their node
+        from posts.views import fetch_remote_author_posts
+        try:
+            remote_posts = fetch_remote_author_posts(author)
+            stored_ids = list(remote_posts.values_list('id', flat=True))
+
+            qs = Entry.objects.filter(id__in=stored_ids).exclude(visibility="DELETED")
+
+            if is_friend:
+                posts = qs.filter(visibility__in=["PUBLIC", "UNLISTED", "FRIENDS"])
+            elif is_following:
+                posts = qs.filter(visibility__in=["PUBLIC", "UNLISTED"])
+            else:
+                posts = qs.filter(visibility="PUBLIC")
+
+            posts = posts.order_by('-published_at')
+
+        except Exception as e:
+            print(f"Error fetching remote posts: {e}")
             posts = Entry.objects.filter(
-                author=author.user,
+                remote_author=author,
                 visibility="PUBLIC"
-            )
+            ).order_by('-published_at')
+
     return render(request, 'accounts/profile.html', {
         'profile_author': author,
         'current_user_author': current_user_author,
@@ -950,7 +968,6 @@ def author_profile(request, author_id):
         'has_pending_request': has_pending_request,
         'posts': posts,
     })
-
 @approved_author_required
 @login_required
 def follow_author(request, author_id):
