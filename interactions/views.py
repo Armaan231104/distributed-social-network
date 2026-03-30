@@ -195,6 +195,8 @@ def send_like_to_remote_inbox(sender, recipient, object_url):
         "object": object_url
     }
 
+    print(f"PAYLOAD: {payload}")
+
     try:
         response = requests.post(
             inbox_url,
