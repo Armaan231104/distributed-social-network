@@ -150,17 +150,17 @@ def toggle_like(request, object_type, object_id):
         print(f"target_author: {target_author.id}")
         if created:
             print(f"Sending NEW like to remote...")
-            send_like_to_remote_inbox(liking_author, target_author, object_url)
+            send_like_to_remote_inbox(liking_author, target_author, object_url, like)
         else:
             print(f"Sending UNDO like to remote...")
-            send_undo_like_to_remote_inbox(liking_author, target_author, object_url)
+            send_undo_like_to_remote_inbox(liking_author, target_author, object_url, like)
     else:
         print(f"=== LOCAL AUTHOR - NOT SENDING TO REMOTE ===")
 
     return JsonResponse({'liked': liked, 'like_count': obj.likes.count()})
 
 
-def send_like_to_remote_inbox(sender, recipient, object_url):
+def send_like_to_remote_inbox(sender, recipient, object_url, like):
     """
     Sends a standard 'Like' activity to the recipient's inbox.
     Uses the same node lookup pattern as the rest of the codebase.
@@ -182,7 +182,7 @@ def send_like_to_remote_inbox(sender, recipient, object_url):
 
     payload = {
         "type": "Like",
-        "id": f"{sender.id.rstrip('/')}/liked/{object_url}",
+        "id": like.fqid,
         "author": {
             "type": "author",
             "id": sender.id,
@@ -211,7 +211,8 @@ def send_like_to_remote_inbox(sender, recipient, object_url):
         return None
 
 
-def send_undo_like_to_remote_inbox(sender, recipient, object_url):
+# why do we have this? shouldn't need it
+def send_undo_like_to_remote_inbox(sender, recipient, object_url, like):
     """
     Sends an 'Undo' wrapping a 'Like' to the recipient's inbox when a user unlikes.
     """
