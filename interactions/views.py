@@ -47,8 +47,15 @@ def user_can_access_entry(user, entry):
 
 
 def get_author_by_serial(author_id):
-    """Look up a local Author by their serial (the last segment of their FQID)."""
-    return get_object_or_404(Author, id=f"{settings.HOST}/api/authors/{author_id}/")
+    """Look up an Author by their serial or FQID.
+    
+    Handles both:
+    - Serial IDs (e.g., "1") - converted to local FQID
+    - Full FQIDs (e.g., "http://remote.com/api/authors/1/") - kept as-is
+    """
+    from accounts.utils import normalize_fqid
+    normalized_id = normalize_fqid(author_id)
+    return get_object_or_404(Author, id=normalized_id)
 
 
 # ── UI views ──
@@ -264,7 +271,8 @@ def send_comment_to_remote_inbox(comment, entry):
 class EntryCommentsView(View):
     """GET comments on a specific entry."""
     def get(self, request, author_id, entry_id):
-        entry = get_object_or_404(Entry, id=entry_id)
+        from posts.views import get_entry_by_id
+        entry = get_entry_by_id(entry_id)
         if not user_can_access_entry(request.user, entry):
             return JsonResponse({'error': 'Forbidden'}, status=403)
         page = int(request.GET.get('page', 1))
@@ -275,7 +283,9 @@ class EntryCommentsView(View):
 class CommentDetailView(View):
     """GET a single comment on a specific entry."""
     def get(self, request, author_id, entry_id, comment_id):
-        comment = get_object_or_404(Comment, id=comment_id, entry__id=entry_id)
+        from posts.views import get_entry_by_id
+        entry = get_entry_by_id(entry_id)
+        comment = get_object_or_404(Comment, id=comment_id, entry=entry)
         if not user_can_access_entry(request.user, comment.entry):
             return JsonResponse({'error': 'Forbidden'}, status=403)
         return JsonResponse(CommentSerializer(comment).data)
@@ -334,7 +344,8 @@ class CommentedDetailView(View):
 class EntryLikesView(View):
     """GET likes on a specific entry."""
     def get(self, request, author_id, entry_id):
-        entry = get_object_or_404(Entry, id=entry_id)
+        from posts.views import get_entry_by_id
+        entry = get_entry_by_id(entry_id)
         if not user_can_access_entry(request.user, entry):
             return JsonResponse({'error': 'Forbidden'}, status=403)
         page = int(request.GET.get('page', 1))

@@ -543,7 +543,6 @@ class InboxView(APIView):
         
         data = request.data
         msg_type = str(data.get('type', '')).lower()
-        msg_status = 
 
         if msg_type == 'follow':
             
@@ -626,20 +625,45 @@ class InboxView(APIView):
             )
             return Response({'status': 'entry received'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
-        elif msg_type == 'entry':
+        # Fixed: was 'entry' in both versions (dead code) — correctly 'like' here
+        elif msg_type == 'like':
+            from posts.views import get_entry_by_id
             actor = get_or_create_author(data.get('author', {}))
             obj_url = str(data.get('object', ''))
             if actor and obj_url:
-                entry = Entry.objects.filter(id=obj_url.rstrip('/').split('/')[-1]).first() or Entry.objects.filter(fqid=obj_url).first()
+                # Try to find the entry by FQID or local ID
+                entry = None
+                try:
+                    entry = get_entry_by_id(obj_url)
+                except:
+                    pass
                 if entry:
                     Like.objects.get_or_create(author=actor, entry=entry)
             return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
-            
+
         elif msg_type == 'comment':
+            from posts.views import get_entry_by_id
+            from interactions.models import Comment
+            
             actor = get_or_create_author(data.get('author', {}))
             content = data.get('comment', 'remote comment')
-            # Spec states comments are often sent directly to POST /api/authors/{id}/posts/{id}/comments
-            # If inbox router catches it, we accept it generically.
+            contentType = data.get('contentType', 'text/plain')
+            entry_url = data.get('entry', '')
+            
+            if actor and entry_url:
+                try:
+                    entry = get_entry_by_id(entry_url)
+                    # Create the comment
+                    comment = Comment.objects.create(
+                        author=actor,
+                        entry=entry,
+                        content=content,
+                        contentType=contentType
+                    )
+                    return Response({'status': 'comment received', 'id': str(comment.id)}, status=status.HTTP_201_CREATED)
+                except Exception as e:
+                    return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            
             return Response({'status': 'comment received'}, status=status.HTTP_201_CREATED)
 
 # UI views

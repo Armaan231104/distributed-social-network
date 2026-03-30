@@ -339,6 +339,7 @@ class RemoteNodeValidationTest(TestCase):
             password='secret123'
         )
         
+        User.objects.create_superuser(username='admin', password='adminpass', email='admin@example.com')
         self.client.login(username='admin', password='adminpass')
         response = self.client.delete(reverse('node-detail-api', args=[node.id]))
         
