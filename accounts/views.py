@@ -23,6 +23,22 @@ from .serializers import (
 )
 from .utils import get_host_url, is_local_author, normalize_fqid
 from nodes.utils import find_remote_node_for_url, get_remote_inbox_url
+def resolve_profile_image(profile_image_val, host):
+    """Normalize a profileImage value to a usable URL or None."""
+    if not profile_image_val or not isinstance(profile_image_val, str):
+        return None
+    
+    # base64 image — can't store as URL, skip
+    if profile_image_val.startswith('data:'):
+        return None
+    
+    # relative URL — prepend host
+    if profile_image_val.startswith('/'):
+        base = host.rstrip('/').replace('/api/', '').replace('/api', '')
+        return base + profile_image_val
+    
+    # absolute URL — use as-is
+    return profile_image_val
 
 def build_local_author_id(user):
     host = get_host_url()
@@ -41,7 +57,8 @@ def get_or_create_author(author_data):
         return existing
     
     profile_image_val = author_data.get('profileImage')
-    
+    resolved_url = resolve_profile_image(profile_image_val, author_data.get('host', ''))
+
     return Author.objects.create(
         id=author_id,
         user=None,
@@ -49,7 +66,7 @@ def get_or_create_author(author_data):
         displayName=author_data.get('displayName', 'Unknown'),
         github=author_data.get('github'),
         profileImage=profile_image_val if not isinstance(profile_image_val, str) else None,
-        profileImageUrl=profile_image_val if isinstance(profile_image_val, str) else None,
+        profileImageUrl=resolved_url,
         web=author_data.get('web'),
         is_approved=True,
     )
@@ -90,31 +107,6 @@ def verify_remote_author_exists(foreign_id):
     except Exception as e:
         print(f"Could not verify remote author at {foreign_id}: {e}")
         return None
-def get_or_create_author(author_data):
-    """Create or retrieve an author from remote data (e.g., from another node)."""
-    author_id = author_data.get('id')
-    if not author_id:
-        return None
-
-    author_id = normalize_fqid(author_id)
-    
-    existing = Author.objects.filter(id=author_id).first()
-    if existing:
-        return existing
-    
-    profile_image_val = author_data.get('profileImage')
-    
-    return Author.objects.create(
-        id=author_id,
-        user=None,
-        host=author_data.get('host', ''),
-        displayName=author_data.get('displayName', 'Unknown'),
-        github=author_data.get('github'),
-        profileImage=profile_image_val if not isinstance(profile_image_val, str) else None,
-        profileImageUrl=profile_image_val if isinstance(profile_image_val, str) else None,
-        web=author_data.get('web'),
-        is_approved=True,
-    )
 
 
 def get_or_create_remote_author(foreign_id, remote_author=None):
@@ -147,10 +139,10 @@ def get_or_create_remote_author(foreign_id, remote_author=None):
 
         # Handle profileImage separately — remote nodes send it as a string URL
         profile_image_val = remote_author.get('profileImage')
-        if profile_image_val and isinstance(profile_image_val, str):
-            if author.profileImageUrl != profile_image_val:
-                author.profileImageUrl = profile_image_val
-                updated = True
+        resolved_url = resolve_profile_image(profile_image_val, remote_author.get('host', ''))
+        if resolved_url and author.profileImageUrl != resolved_url:
+            author.profileImageUrl = resolved_url
+            updated = True
 
         if updated:
             author.save()
@@ -902,6 +894,12 @@ def author_profile(request, author_id):
     if not author_id.endswith('/'):
         author_id += '/'
     author = get_object_or_404(Author, id=author_id)
+
+    # Refresh remote author data on profile visit
+    if not author.user:
+        fresh_data = verify_remote_author_exists(author.id)
+        if fresh_data:
+            author, _ = get_or_create_remote_author(author.id, fresh_data)
 
     current_user_author = None
     is_following = False

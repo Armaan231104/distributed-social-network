@@ -13,19 +13,8 @@ from functools import wraps
 import requests
 from accounts.serializers import AuthorSerializer
 from accounts.utils import normalize_fqid
-from nodes.utils import find_remote_node_for_url
+from nodes.utils import find_remote_node_for_url, get_remote_author_entries_url
 
-def get_image_url(entry, request):
-    if not entry.image:
-        return None
-    try:
-        url = entry.image.url
-        if url.startswith('http'):
-            return url  # Cloudinary or remote URL
-        return request.build_absolute_uri(url)  # local file
-    except (ValueError, AttributeError):
-        return None
-    
 def fetch_remote_author_posts(remote_author):
     print("\n--- ENTER fetch_remote_author_posts ---")
     print("Remote author:", remote_author)
@@ -33,191 +22,96 @@ def fetch_remote_author_posts(remote_author):
     if remote_author.user:
         print("Remote author is actually local → skipping")
         return Entry.objects.none()
+    author_url = remote_author.id  # this SHOULD already be a full URL
 
-    author_url = normalize_fqid(remote_author.id)
-    print("Author URL:", author_url)
-
-    if not author_url or not author_url.startswith("http"):
+    if not author_url.startswith("http"):
         print("⚠️ Invalid remote author ID:", author_url)
         return Entry.objects.none()
 
-    node = find_remote_node_for_url(author_url) or find_remote_node_for_url(remote_author.host)
+    posts_url = get_remote_author_entries_url(remote_author)
+    print("Posts URL:", posts_url)
+
+    node = find_remote_node_for_url(remote_author.id) or find_remote_node_for_url(remote_author.host)
+
     print("Node found:", node)
 
     if not node:
         print("No node found → returning empty")
         return Entry.objects.none()
 
-    def _extract_posts(payload):
-        if isinstance(payload, list):
-            return payload
-
-        if not isinstance(payload, dict):
-            return []
-
-        for key in ("src", "items", "entries", "posts"):
-            value = payload.get(key)
-            if isinstance(value, list):
-                return value
-
-        return []
-
-    def _candidate_posts_urls(author_payload, fallback_author_url):
-        urls = []
-
-        if isinstance(author_payload, dict):
-            for key in ("posts", "entries", "items"):
-                value = author_payload.get(key)
-                if isinstance(value, str) and value.startswith("http"):
-                    urls.append(value.rstrip("/") + "/")
-
-        base = fallback_author_url.rstrip("/")
-        urls.extend([
-            f"{base}/posts/",
-            f"{base}/entries/",
-        ])
-
-        seen = set()
-        deduped = []
-        for url in urls:
-            if url not in seen:
-                deduped.append(url)
-                seen.add(url)
-
-        return deduped
-
     try:
-        print("Fetching remote author object...")
-        author_response = requests.get(
-            author_url,
+        print("Making request...")
+        response = requests.get(
+            posts_url,
             auth=(node.username, node.password),
-            timeout=10,
+            timeout=10
         )
 
-        print("Author response status:", author_response.status_code)
+        print("Response status:", response.status_code)
 
-        if author_response.status_code != 200:
-            print("Could not fetch remote author → skipping")
+        if response.status_code != 200:
+            print("Bad response → skipping")
             return Entry.objects.none()
 
-        author_data = author_response.json()
-        if isinstance(author_data, dict):
-            print("Author JSON keys:", author_data.keys())
-        else:
-            print("Author JSON type:", type(author_data))
+        data = response.json()
+        print("Response JSON keys:", data.keys())
 
-        candidate_urls = _candidate_posts_urls(author_data, author_url)
-        print("Candidate posts URLs:", candidate_urls)
-
-        posts = []
-        posts_url_used = None
-
-        for posts_url in candidate_urls:
-            print("Trying posts URL:", posts_url)
-
-            response = requests.get(
-                posts_url,
-                auth=(node.username, node.password),
-                timeout=10,
-            )
-
-            print("Posts response status:", response.status_code)
-
-            if response.status_code != 200:
-                print("Not usable, trying next URL...")
-                continue
-
-            data = response.json()
-            if isinstance(data, dict):
-                print("Posts JSON keys:", data.keys())
-            else:
-                print("Posts JSON type:", type(data))
-
-            posts = _extract_posts(data)
-            posts_url_used = posts_url
-            print("Posts received:", len(posts))
-            break
-
-        if posts_url_used is None:
-            print("No working posts endpoint found")
-            return Entry.objects.none()
-
-        print("Using posts URL:", posts_url_used)
+        posts = data.get('src', [])
+        print("Posts received:", len(posts))
 
         stored_entries = []
 
         for i, post in enumerate(posts):
             print(f"\nProcessing post {i}")
 
-            if not isinstance(post, dict):
-                print("Skipping non-dict post payload")
-                continue
-
-            visibility = post.get("visibility", "PUBLIC")
-            if visibility == "DELETED":
+            visibility = post.get('visibility', 'PUBLIC')
+            if visibility == 'DELETED':
                 print("Skipping deleted post")
                 continue
 
-            fqid = normalize_fqid(post.get("id"))
+            fqid = normalize_fqid(post.get('id'))
             if not fqid:
                 print("Skipping post without ID")
                 continue
 
             entry, created = Entry.objects.get_or_create(
-            fqid=fqid,
-            defaults={
-                    "title": post.get("title", ""),
-                    "content": post.get("content", ""),
-                    "content_type": post.get("contentType", "text/plain"),
-                    "visibility": visibility,
-                    "remote_author": remote_author,
-                    "image_url": post.get("image") if isinstance(post.get("image"), str) and (post.get("image", "").startswith("http") or post.get("image", "").startswith("data:")) else None,
-                },
+                fqid=fqid,
+                defaults={
+                    'title': post.get('title', ''),
+                    'content': post.get('content', ''),
+                    'content_type': post.get('contentType', 'text/plain'),
+                    'visibility': visibility,
+                    'remote_author': remote_author,
+                }
             )
 
             print("Entry:", entry.id, "| Created:", created)
 
-            update_fields = []
+            if created or entry.published_at is None:
+                published = post.get('published')
+                print("Published raw:", published)
 
-            if not created:
-                if entry.remote_author_id != remote_author.id:
-                    entry.remote_author = remote_author
-                    update_fields.append("remote_author")
-                if entry.title != post.get("title", ""):
-                    entry.title = post.get("title", "")
-                    update_fields.append("title")
-                if entry.content != post.get("content", ""):
-                    entry.content = post.get("content", "")
-                    update_fields.append("content")
-                if entry.content_type != post.get("contentType", "text/plain"):
-                    entry.content_type = post.get("contentType", "text/plain")
-                    update_fields.append("content_type")
-                if entry.visibility != visibility:
-                    entry.visibility = visibility
-                    update_fields.append("visibility")
-                
-                # sync remote image URL
+                if published:
+                    from django.utils.dateparse import parse_datetime
+                    dt = parse_datetime(published)
 
-                incoming_image_url = post.get("image")
-                if not isinstance(incoming_image_url, str) or not (incoming_image_url.startswith("http") or incoming_image_url.startswith("data:")):
-                    incoming_image_url = None
-                if entry.image_url != incoming_image_url:
-                    entry.image_url = incoming_image_url
-                    update_fields.append("image_url")
+                    print("Parsed datetime:", dt)
 
-            if update_fields:
-                entry.save(update_fields=list(set(update_fields)))
+                    if dt:
+                        entry.published_at = dt
+                        entry.save(update_fields=['published_at'])
 
-            stored_entries.append(entry.id) 
+            stored_entries.append(entry.id)
 
         result = Entry.objects.filter(id__in=stored_entries)
         print("Returning stored entries:", result.count())
+
         print("--- EXIT fetch_remote_author_posts ---\n")
         return result
 
     except Exception as e:
         print("🔥 ERROR in fetch_remote_author_posts:", str(e))
-        raise
+        raise  # IMPORTANT: re-raise so you see full traceback
 
 def serialize_entry(entry, request=None):
     """Serialize an Entry into the spec-style API shape used for federation."""
@@ -318,18 +212,7 @@ def get_entry_by_id(entry_id):
 
     if entry_id.startswith("http"):
         entry_id = normalize_fqid(entry_id)
-
-        obj = None
-        try:
-            obj = get_object_or_404(Entry, fqid=entry_id)
-        except:
-            pass
-
-        if not obj:
-            obj = get_object_or_404(Entry, fqid=entry_id.rstrip('/'))
-
-        print(f"entry. (with retry) : {obj}")
-        return obj
+        return get_object_or_404(Entry, fqid=entry_id)
 
     return get_object_or_404(Entry, id=entry_id)
 def approved_author_required(view_func):
@@ -386,11 +269,6 @@ def get_stream_entries_for_user(user):
         followee__user__isnull=False
     ).select_related('followee__user')
 
-    remote_following = Follow.objects.filter(
-        follower=current_author,
-        followee__user__isnull=True
-    ).select_related('followee')
-
     print("Following count:", following_qs.count())
 
     followed_authors = [f.followee for f in following_qs]
@@ -415,21 +293,13 @@ def get_stream_entries_for_user(user):
 
     print("Local entries count:", local_entries.count())
 
-    print("Remote follows count:", remote_following.count())
-    
-    # Remote friends (mutual follow with remote authors)
-    remote_friend_authors = [
-        f.followee for f in remote_following
-        if Follow.objects.filter(follower=f.followee, followee=current_author).exists()
-    ]
+    print("Fetching remote follows...")
+    remote_following = Follow.objects.filter(
+        follower=current_author,
+        followee__user__isnull=True
+    ).select_related('followee')
 
-    # Add remote friends' FRIENDS entries to query
-    if remote_friend_authors:
-        remote_friends_entries = base_qs.filter(
-            remote_author__in=remote_friend_authors,
-            visibility="FRIENDS"
-        )
-        local_entries = local_entries | remote_friends_entries
+    print("Remote follows count:", remote_following.count())
 
     remote_entries = Entry.objects.none()
 
@@ -489,7 +359,13 @@ def serialize_entry_for_stream(request, entry):
     Converts an entry into JSON format for the stream API.
     """
 
-    image_url = entry.image_url or get_image_url(entry, requests)
+    image_url = None
+
+    if entry.image:
+        try:
+            image_url = request.build_absolute_uri(entry.image.url)
+        except ValueError:
+            image_url = None
 
     author_obj = None
 
@@ -717,8 +593,18 @@ def entry_detail_api(request, entry_id):
                 if not viewer_author.is_friend(entry_author):
                     return JsonResponse({"error": "Forbidden"}, status=403)
 
-        image_url = entry.image_url or get_image_url(entry, request)
-    
+        image_url = None
+        if entry.image:
+            try:
+                image_url = request.build_absolute_uri(entry.image.url)
+            except ValueError:
+                image_url = None
+        image_url = None
+        if entry.image:
+            try:
+                image_url = request.build_absolute_uri(entry.image.url)
+            except ValueError:
+                image_url = None
 
         return JsonResponse({
             "id": entry.fqid,
@@ -773,6 +659,15 @@ def entry_detail_api(request, entry_id):
         fanout_entry_to_remote_followers(entry, request.user)
         
         return JsonResponse({"deleted": True})
+        return JsonResponse({
+            "id": entry.fqid,
+            "title": entry.title,
+            "content": entry.content,
+            "contentType": entry.content_type,
+            "visibility": entry.visibility,
+            "published": entry.published_at.isoformat(),
+            "image": image_url,
+        })
     
     # PATCH - Partial update (only author)
     if request.method == "PATCH":
@@ -860,7 +755,14 @@ def my_entries(request):
 
     def entry_to_dict(e):
 
-        image_url = e.image_url or get_image_url(e, request)
+        image_url = None
+
+        if getattr(e, "image", None):
+            try:
+                image_url = request.build_absolute_uri(e.image.url)
+            except ValueError:
+                image_url = None
+
         return {
             "id": e.fqid,
             "title": e.title,
@@ -886,6 +788,7 @@ def edit_entry(request, entry_id):
     """
 
     entry = get_entry_by_id(entry_id)
+    entry = get_entry_by_id(entry_id)
 
     if entry.author != request.user:
         return HttpResponseForbidden()
@@ -896,7 +799,7 @@ def edit_entry(request, entry_id):
     if request.method != "PUT":
         return JsonResponse({"error": "PUT required"}, status=400)
 
-    # A multipart/form-data => editing image/caption/title, optionally replace image
+    # A) multipart/form-data => editing image/caption/title, optionally replace image
     if request.content_type and request.content_type.startswith("multipart/form-data"):
 
         entry.title = request.POST.get("title", entry.title)
@@ -918,7 +821,7 @@ def edit_entry(request, entry_id):
 
         return JsonResponse({"updated": True}, status=200)
     
-    # B JSON => editing title/content/contentType for text posts
+    # B) JSON => editing title/content/contentType for text posts
     try:
         data = json.loads(request.body.decode("utf-8") or "{}")
     except json.JSONDecodeError:
@@ -940,6 +843,8 @@ def edit_entry(request, entry_id):
         entry.content_type = ct
 
     entry.save()
+
+    fanout_entry_to_remote_followers(entry, request.user)
 
     fanout_entry_to_remote_followers(entry, request.user)
 
@@ -1029,8 +934,6 @@ def send_entry_to_inbox(entry, author, inbox_url, node):
         )
     except requests.RequestException as e:
         print("Fanout failed:", e)
-
-
 def fanout_entry_to_remote_followers(entry, user):
     """Send entry to all remote followers' inboxes."""
     try:
