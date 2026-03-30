@@ -88,51 +88,48 @@
                     </a>
                 </div>
 
-                <!--
-                  Buttons area:
-                  - If you're viewing your own profile: show Edit Profile + Create Post
-                  - If you're viewing someone else: show Follow/Unfollow/Cancel Request
-                -->
-                {%if current_user_author.host == profile_author.host%}
+                <!-- Buttons area -->
                 <div class="profile-actions">
                     {% if current_user_author %}
-                        {% if current_user_author == profile_author%}
+                        
+                        {# === Own Profile === #}
+                        {% if current_user_author == profile_author %}
                             <a href="{% url 'edit-my-profile' %}" class="btn btn-primary">
-                                <i class="fa-solid fa-pen-to-square"></i> Edit
+                                <i class="fa-solid fa-pen-to-square"></i> Edit Profile
                             </a>
-
                             <button id="open-create-post" class="btn btn-secondary" type="button">
-                                <i class="fa-solid fa-plus"></i> Create
+                                <i class="fa-solid fa-plus"></i> Create Post
                             </button>
+
+                        {# === Someone else's profile (local OR remote) === #}
                         {% else %}
-                            {% if current_user_author.user.is_superuser %}
+                            {% if current_user_author.user.is_superuser and profile_author.user %}
                                 <a href="{% url 'edit-profile' profile_author.id %}" class="btn btn-primary">
                                     <i class="fa-solid fa-pen-to-square"></i> Edit
                                 </a>
                             {% endif %}
 
-                        {% if is_following %}
-                            <a href="{% url 'unfollow-author' author_id=profile_author.id %}"
-                            class="btn btn-secondary"
-                            onclick="return confirm('Unfollow alert! °(°¯᷄◠¯᷅°)°\n{{ profile_author.displayName|capfirst}} will lose 1 cool follower (you).');">
-                                Unfollow
-                            </a>
-                        {% elif has_pending_request %}
-                            <a href="{% url 'cancel-follow-request' author_id=profile_author.id %}"
-                            class="btn btn-secondary">
-                                Cancel Request
-                            </a>
-                        {% else %}
-                            <a href="{% url 'follow-author' author_id=profile_author.id %}"
-                            class="btn btn-primary">
-                                Follow
-                            </a>
+                            {% if is_following %}
+                                <a href="{% url 'unfollow-author' author_id=profile_author.id %}"
+                                class="btn btn-secondary"
+                                onclick="return confirm('Unfollow {{ profile_author.displayName|capfirst }}?');">
+                                    Unfollow
+                                </a>
+                            {% elif has_pending_request %}
+                                <a href="{% url 'cancel-follow-request' author_id=profile_author.id %}"
+                                class="btn btn-secondary">
+                                    Cancel Request
+                                </a>
+                            {% else %}
+                                <a href="{% url 'follow-author' author_id=profile_author.id %}"
+                                class="btn btn-primary">
+                                    Follow
+                                </a>
+                            {% endif %}
                         {% endif %}
-                    {% endif %}
+
                     {% endif %}
                 </div>
-
-                {%endif%}
 
             </div>
         </div>
