@@ -318,8 +318,18 @@ def get_entry_by_id(entry_id):
 
     if entry_id.startswith("http"):
         entry_id = normalize_fqid(entry_id)
-        print(f"normalized entry_id: {entry_id}")
-        return get_object_or_404(Entry, fqid=entry_id)
+
+        obj = None
+        try:
+            obj = get_object_or_404(Entry, fqid=entry_id)
+        except:
+            pass
+
+        if not obj:
+            obj = get_object_or_404(Entry, fqid=entry_id.rstrip('/'))
+
+        print(f"entry. (with retry) : {obj}")
+        return obj
 
     return get_object_or_404(Entry, id=entry_id)
 def approved_author_required(view_func):
