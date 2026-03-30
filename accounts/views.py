@@ -973,6 +973,7 @@ def author_profile(request, author_id):
         'has_pending_request': has_pending_request,
         'posts': posts,
     })
+
 @approved_author_required
 @login_required
 def follow_author(request, author_id):

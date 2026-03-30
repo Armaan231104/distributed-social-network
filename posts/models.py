@@ -7,26 +7,16 @@ from accounts.models import Author
 from django.conf import settings
 from cloudinary_storage.storage import MediaCloudinaryStorage
 
-# The following class edited by Open AI, Chat GPT 5.2, "please adjust this class to properly handle image, plaintext, and commonmark input", 2026-02-26 
 class Entry(models.Model):
     """
-    Represents a post created by a local user on this node.
-
-    Supports: Plain text posts, Markdown posts, Image posts
-
-    Visibility Levels:
-    - PUBLIC: Visible to everyone.
-    - UNLISTED: Accessible via direct link.
-    - FRIENDS: Restricted to mutual followers (friends).
-    - DELETED: Soft-deleted entry. Hidden from all users except node admins.
-
-    Soft deletion keeps the entry in the database but changes its visibility to DELETED.
+    Represents a post (text, markdown, or image).
+    Local posts use 'author' + 'image' field.
+    Remote posts use 'remote_author' + 'image_url' or base64 in 'content'.
     """
-
     if not settings.DEBUG:
         image_storage = MediaCloudinaryStorage()
     else:
-        image_storage = None  # uses default local storage
+        image_storage = None
 
     VISIBILITY_CHOICES = [
         ("PUBLIC", "Public"),
@@ -43,34 +33,58 @@ class Entry(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     fqid = models.URLField(max_length=500, null=True, blank=True, unique=True)
-    github_event_id = models.CharField(
-        max_length=255,
-        null=True,
+
+    # Local author (linked to Django User)
+    author = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='posts', 
+        null=True, 
         blank=True
     )
-    # local user, null if remote entry
-    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts', null=True, blank=True)
-    # remote author
-    remote_author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name='remote_posts', null=True, blank=True)
-    title = models.CharField(max_length=200)
-    content = models.TextField(blank=True)
-    visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default="PUBLIC", db_index=True)
-    published_at = models.DateTimeField(auto_now_add=True, db_index=True)
-
-    updated_at = models.DateTimeField(auto_now=True)
     
-    content_type = models.CharField(
-        max_length = 20,
-        choices=CONTENT_TYPES,
-        default = "text/plain"
+    # Remote author
+    remote_author = models.ForeignKey(
+        Author, 
+        on_delete=models.CASCADE, 
+        related_name='remote_posts', 
+        null=True, 
+        blank=True
+    )
+
+    title = models.CharField(max_length=200, blank=True)
+    content = models.TextField(blank=True)
+    
+    visibility = models.CharField(
+        max_length=10, 
+        choices=VISIBILITY_CHOICES, 
+        default="PUBLIC", 
+        db_index=True
     )
     
-    image = models.ImageField(upload_to="entries/", blank=True, null=True, storage=image_storage)
-    image_url = models.TextField(blank=True, null=True)
+    published_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    content_type = models.CharField(
+        max_length=20,
+        choices=CONTENT_TYPES,
+        default="text/plain"
+    )
+
+    # Main image field for locally uploaded images
+    image = models.ImageField(
+        upload_to="entries/", 
+        blank=True, 
+        null=True, 
+        storage=image_storage
+    )
+
+    # For remote images or external URLs
+    image_url = models.URLField(max_length=1000, blank=True, null=True)
+
+    github_event_id = models.CharField(max_length=255, null=True, blank=True)
+
     class Meta:
-        """
-        Default ordering: newest entries first.
-        """
         ordering = ['-published_at']
 
     def __str__(self):
@@ -79,45 +93,34 @@ class Entry(models.Model):
         return f"{self.title} by {name}"
 
     def soft_delete(self):
-        """
-        Performs a soft delete by setting visibility to DELETED.
-
-        The entry remains in the database but becomes inaccessible
-        to non-admin users.
-        """
         self.visibility = "DELETED"
         self.save()
 
     def save(self, *args, **kwargs):
+        # Generate fqid for local entries only
+        if not self.fqid and self.author:
+            try:
+                author_obj = self.author.author  # local Author
+                base = author_obj.id.rstrip('/')
+                self.fqid = f"{base}/entries/{self.id}/"
+            except Exception:
+                pass  # remote entries don't need auto fqid here
+
         super().save(*args, **kwargs)
-
-        if not self.fqid:
-            host = get_host_url()
-
-            if hasattr(self.author, "author"):
-                author_obj = self.author.author
-                author_id = author_obj.id
-            else:
-                return  # remote entries skip fqid generation — correct
-
-            author_id = author_obj.id.rstrip("/")  # remove trailing /
-
-            self.fqid = f"{author_id}/entries/{self.id}"
-            super().save(update_fields=["fqid"])
 
     @property
     def is_edited(self):
         return (self.updated_at - self.published_at) > timedelta(seconds=1)
+
     @property
     def get_author(self):
-        """Returns the Author object for this post. Prefer local author over remote."""
+        """Return the Author object - prefer local over remote."""
         if self.author:
             try:
-                return self.author.author  # The local Author linked to the Django User
+                return self.author.author
             except Exception:
                 pass
         return self.remote_author
-    
 class HostedImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="hosted_images")
