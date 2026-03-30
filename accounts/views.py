@@ -14,6 +14,7 @@ from django.contrib.auth.forms import AuthenticationForm
 
 from .models import Author, FollowRequest, Follow
 from posts.models import Entry
+from posts.views import get_entry_by_id
 from interactions.models import Like, Comment
 from .forms import SignUpForm
 from functools import wraps
@@ -700,8 +701,6 @@ class InboxView(APIView):
 
         # ====================== COMMENT ======================
         elif msg_type == 'comment':
-            from posts.views import get_entry_by_id
-            from interactions.models import Comment
 
             actor = get_or_create_author(data.get('author', {}))
             content = data.get('comment', 'remote comment')
