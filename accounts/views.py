@@ -28,7 +28,6 @@ def build_local_author_id(user):
     host = get_host_url()
     return f"{host}/api/authors/{user.id}/"
 
-
 def get_or_create_author(author_data):
     """Create or retrieve an author from remote data (e.g., from another node)."""
     author_id = author_data.get('id')
@@ -41,14 +40,16 @@ def get_or_create_author(author_data):
     if existing:
         return existing
     
+    profile_image_val = author_data.get('profileImage')
+    
     return Author.objects.create(
         id=author_id,
         user=None,
         host=author_data.get('host', ''),
         displayName=author_data.get('displayName', 'Unknown'),
         github=author_data.get('github'),
-        # if string URL set to None, since we can't import images yet.  fix in future
-        profileImage=author_data.get('profileImage') if not isinstance(author_data.get('profileImage'), str) else None,
+        profileImage=profile_image_val if not isinstance(profile_image_val, str) else None,
+        profileImageUrl=profile_image_val if isinstance(profile_image_val, str) else None,
         web=author_data.get('web'),
         is_approved=True,
     )
@@ -89,6 +90,32 @@ def verify_remote_author_exists(foreign_id):
     except Exception as e:
         print(f"Could not verify remote author at {foreign_id}: {e}")
         return None
+def get_or_create_author(author_data):
+    """Create or retrieve an author from remote data (e.g., from another node)."""
+    author_id = author_data.get('id')
+    if not author_id:
+        return None
+
+    author_id = normalize_fqid(author_id)
+    
+    existing = Author.objects.filter(id=author_id).first()
+    if existing:
+        return existing
+    
+    profile_image_val = author_data.get('profileImage')
+    
+    return Author.objects.create(
+        id=author_id,
+        user=None,
+        host=author_data.get('host', ''),
+        displayName=author_data.get('displayName', 'Unknown'),
+        github=author_data.get('github'),
+        profileImage=profile_image_val if not isinstance(profile_image_val, str) else None,
+        profileImageUrl=profile_image_val if isinstance(profile_image_val, str) else None,
+        web=author_data.get('web'),
+        is_approved=True,
+    )
+
 
 def get_or_create_remote_author(foreign_id, remote_author=None):
     foreign_id = normalize_fqid(foreign_id)
@@ -104,18 +131,27 @@ def get_or_create_remote_author(foreign_id, remote_author=None):
 
     if remote_author:
         updated = False
+
         field_map = {
             "displayName": "displayName",
             "github": "github",
-            "profileImage": "profileImage",
             "web": "web",
             "host": "host",
         }
+
         for api_field, model_field in field_map.items():
             new_val = remote_author.get(api_field)
             if new_val and getattr(author, model_field) != new_val:
                 setattr(author, model_field, new_val)
                 updated = True
+
+        # Handle profileImage separately — remote nodes send it as a string URL
+        profile_image_val = remote_author.get('profileImage')
+        if profile_image_val and isinstance(profile_image_val, str):
+            if author.profileImageUrl != profile_image_val:
+                author.profileImageUrl = profile_image_val
+                updated = True
+
         if updated:
             author.save()
 
