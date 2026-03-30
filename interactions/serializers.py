@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Comment, Like
 from accounts.serializers import AuthorSerializer
+from accounts.utils import get_host_url
 
 
 class LikeSerializer(serializers.ModelSerializer):
@@ -8,6 +9,8 @@ class LikeSerializer(serializers.ModelSerializer):
     author = AuthorSerializer(read_only=True)
     object = serializers.SerializerMethodField()
     published = serializers.DateTimeField(source='created_at')
+    # Use fqid for API (spec requires FQID format)
+    id = serializers.SerializerMethodField()
 
     class Meta:
         model = Like
@@ -15,6 +18,15 @@ class LikeSerializer(serializers.ModelSerializer):
 
     def get_type(self, obj):
         return 'like'
+
+    def get_id(self, obj):
+        # Return FQID: http://host/api/authors/{author_serial}/liked/{like_id}
+        if obj.fqid:
+            return obj.fqid
+        # Fallback: construct from author and like id
+        host = get_host_url()
+        author_serial = str(obj.author.id).rstrip('/').split('/')[-1]
+        return f"{host}/api/authors/{author_serial}/liked/{obj.id}/"
 
     def get_object(self, obj):
         if obj.entry:
@@ -30,6 +42,8 @@ class CommentSerializer(serializers.ModelSerializer):
     published = serializers.DateTimeField(source='created_at')
     author = AuthorSerializer(read_only=True)
     entry = serializers.SerializerMethodField()
+    # Use fqid for API (spec requires FQID format)
+    id = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
@@ -37,6 +51,15 @@ class CommentSerializer(serializers.ModelSerializer):
 
     def get_type(self, obj):
         return 'comment'
+
+    def get_id(self, obj):
+        # Return FQID: http://host/api/authors/{author_serial}/commented/{comment_id}
+        if obj.fqid:
+            return obj.fqid
+        # Fallback: construct from author and comment id
+        host = get_host_url()
+        author_serial = str(obj.author.id).rstrip('/').split('/')[-1]
+        return f"{host}/api/authors/{author_serial}/commented/{obj.id}/"
 
     def get_entry(self, obj):
         return str(obj.entry.id)

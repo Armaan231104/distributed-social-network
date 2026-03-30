@@ -1,6 +1,7 @@
-from django.urls import path, re_path
+from django.urls import path, re_path, include
 import accounts.views as views
 import posts.views
+import interactions.views as interaction_views
 
 apiurlpatterns = [
     path('api/authors/', views.AuthorListView.as_view(), name='author-list'),
@@ -12,6 +13,15 @@ apiurlpatterns = [
     path('api/authors/<path:author_id>/followers/<path:foreign_id>/', views.AcceptFollowView.as_view(), name='author-followers-manage-api'),
     path('api/authors/<path:author_id>/friends/', views.FriendsListView.as_view(), name='author-friends-api'),
     path('api/authors/<path:author_id>/follow_requests/', views.FollowRequestListView.as_view(), name='author-follow-requests'),
+    # Interactions API - comments (required by spec)
+    path('api/authors/<str:author_id>/entries/<str:entry_id>/comments/', interaction_views.EntryCommentsView.as_view()),
+    path('api/authors/<str:author_id>/entries/<str:entry_id>/comments/<uuid:comment_id>/', interaction_views.CommentDetailView.as_view()),
+    path('api/authors/<str:author_id>/commented/', interaction_views.AuthorCommentedView.as_view()),
+    path('api/authors/<str:author_id>/commented/<uuid:comment_id>/', interaction_views.CommentedDetailView.as_view()),
+    # Interactions API - likes (required by spec)
+    path('api/authors/<str:author_id>/entries/<str:entry_id>/likes/', interaction_views.EntryLikesView.as_view()),
+    path('api/authors/<str:author_id>/liked/', interaction_views.AuthorLikedView.as_view()),
+    path('api/authors/<str:author_id>/liked/<uuid:like_id>/', interaction_views.LikeDetailView.as_view()),
     # ugly but helps to avoid regex matching things it is not supposed to
     re_path(r'^api/authors/(?P<author_id>(?:https?://[^/]+.*/api/authors/[^/]+/?|[^/]+))/$', views.AuthorDetailView.as_view(), name='author-detail'),
 ]
