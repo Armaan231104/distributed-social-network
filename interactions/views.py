@@ -233,6 +233,7 @@ def send_undo_like_to_remote_inbox(sender, recipient, object_url, like):
 
     payload = {
         "type": "Undo",
+        "id": like.fqid,
         "actor": {
             "type": "author",
             "id": sender.id,

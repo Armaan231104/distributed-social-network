@@ -886,7 +886,6 @@ def edit_entry(request, entry_id):
     """
 
     entry = get_entry_by_id(entry_id)
-    entry = get_entry_by_id(entry_id)
 
     if entry.author != request.user:
         return HttpResponseForbidden()
@@ -941,8 +940,6 @@ def edit_entry(request, entry_id):
         entry.content_type = ct
 
     entry.save()
-
-    fanout_entry_to_remote_followers(entry, request.user)
 
     fanout_entry_to_remote_followers(entry, request.user)
 
@@ -1032,6 +1029,8 @@ def send_entry_to_inbox(entry, author, inbox_url, node):
         )
     except requests.RequestException as e:
         print("Fanout failed:", e)
+
+
 def fanout_entry_to_remote_followers(entry, user):
     """Send entry to all remote followers' inboxes."""
     try:
