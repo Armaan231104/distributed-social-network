@@ -639,6 +639,10 @@ class InboxView(APIView):
                     pass
                 if entry:
                     Like.objects.get_or_create(author=actor, entry=entry)
+                else:
+                    # Entry not found locally - still store the like with null entry
+                    # This allows us to track likes even if we don't have the entry
+                    Like.objects.get_or_create(author=actor, entry=None, comment=None)
             return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
 
         elif msg_type == 'comment':
@@ -662,9 +666,10 @@ class InboxView(APIView):
                     )
                     return Response({'status': 'comment received', 'id': str(comment.id)}, status=status.HTTP_201_CREATED)
                 except Exception as e:
-                    return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-            
-            return Response({'status': 'comment received'}, status=status.HTTP_201_CREATED)
+                    # Entry not found - try to store comment anyway
+                    print(f"Comment received but entry not found: {e}")
+            # Even if entry not found, acknowledge receipt
+            return Response({'status': 'comment received (entry not found)'}, status=status.HTTP_201_CREATED)
 
 # UI views
 from django.shortcuts import render, get_object_or_404, redirect

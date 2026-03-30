@@ -67,6 +67,11 @@ def toggle_like(request, object_type, object_id):
     Checks if the object (comment or entry) has been liked by the user, then
     either adds or deletes a like depending on current status.
     """
+    print(f"\n=== TOGGLE LIKE START ===")
+    print(f"User: {request.user.username}")
+    print(f"Object type: {object_type}")
+    print(f"Object ID: {object_id}")
+    
     liking_author = request.user.author
     target_author = None
 
@@ -77,6 +82,13 @@ def toggle_like(request, object_type, object_id):
 
         target_author = obj.get_author
         object_url = obj.fqid
+        
+        print(f"Entry title: {obj.title}")
+        print(f"Entry author: {obj.author}")
+        print(f"Entry remote_author: {obj.remote_author}")
+        print(f"target_author (via get_author): {target_author}")
+        print(f"target_author.is_local: {target_author.is_local}")
+        print(f"object_url (FQID): {object_url}")
 
         like, created = Like.objects.get_or_create(author=liking_author, entry=obj, comment=None)
 
@@ -101,10 +113,16 @@ def toggle_like(request, object_type, object_id):
         liked = True
 
     if target_author and not target_author.is_local:
+        print(f"=== REMOTE DETECTED - SENDING TO REMOTE ===")
+        print(f"target_author: {target_author.id}")
         if created:
+            print(f"Sending NEW like to remote...")
             send_like_to_remote_inbox(liking_author, target_author, object_url)
         else:
+            print(f"Sending UNDO like to remote...")
             send_undo_like_to_remote_inbox(liking_author, target_author, object_url)
+    else:
+        print(f"=== LOCAL AUTHOR - NOT SENDING TO REMOTE ===")
 
     return JsonResponse({'liked': liked, 'like_count': obj.likes.count()})
 
@@ -114,12 +132,20 @@ def send_like_to_remote_inbox(sender, recipient, object_url):
     Sends a standard 'Like' activity to the recipient's inbox.
     Uses the same node lookup pattern as the rest of the codebase.
     """
+    print(f"\n=== SEND LIKE TO REMOTE ===")
+    print(f"sender: {sender.id}")
+    print(f"recipient: {recipient.id}")
+    print(f"object_url: {object_url}")
+    
     inbox_url = recipient.id.rstrip('/') + '/inbox/'
+    print(f"inbox_url: {inbox_url}")
 
     node = find_remote_node_for_url(recipient.id) or find_remote_node_for_url(recipient.host)
     if not node:
-        print(f"No credentials found for host: {recipient.host}")
+        print(f"ERROR: No credentials found for host: {recipient.host}")
         return None
+
+    print(f"Found node: {node.url}")
 
     payload = {
         "type": "Like",
@@ -153,12 +179,20 @@ def send_undo_like_to_remote_inbox(sender, recipient, object_url):
     """
     Sends an 'Undo' wrapping a 'Like' to the recipient's inbox when a user unlikes.
     """
+    print(f"\n=== SEND UNDO LIKE TO REMOTE ===")
+    print(f"sender: {sender.id}")
+    print(f"recipient: {recipient.id}")
+    print(f"object_url: {object_url}")
+    
     inbox_url = recipient.id.rstrip('/') + '/inbox/'
+    print(f"inbox_url: {inbox_url}")
 
     node = find_remote_node_for_url(recipient.id) or find_remote_node_for_url(recipient.host)
     if not node:
-        print(f"No credentials found for host: {recipient.host}")
+        print(f"ERROR: No credentials found for host: {recipient.host}")
         return None
+
+    print(f"Found node: {node.url}")
 
     payload = {
         "type": "Undo",
@@ -205,33 +239,66 @@ def add_comment(request, entry_id):
     """
     UI view — create a comment and redirect back to the entry page.
     """
+    print(f"\n=== ADD COMMENT START ===")
+    print(f"User: {request.user.username}")
+    print(f"Entry ID: {entry_id}")
+    
     entry = get_object_or_404(Entry, id=entry_id)
+    print(f"Entry title: {entry.title}")
+    print(f"Entry author: {entry.author}")
+    print(f"Entry remote_author: {entry.remote_author}")
+    
     if not user_can_access_entry(request.user, entry):
         return JsonResponse({'error': 'Forbidden'}, status=403)
     if request.method == 'POST':
         content = request.POST.get('content')
+        print(f"Comment content: {content}")
         if content:
             comment = Comment.objects.create(
                 entry=entry,
                 author=request.user.author,
                 content=content,
             )
+            print(f"Comment created: {comment.id}")
 
-            if comment.fqid:
+            # Check if we should send to remote
+            target_author = entry.get_author
+            print(f"Comment target_author (via get_author): {target_author}")
+            if target_author:
+                print(f"target_author.is_local: {target_author.is_local}")
+            
+            if target_author and not target_author.is_local:
+                print(f"=== REMOTE DETECTED - SENDING COMMENT TO REMOTE ===")
                 send_comment_to_remote_inbox(comment, entry)
+            else:
+                print(f"=== LOCAL AUTHOR - NOT SENDING COMMENT TO REMOTE ===")
 
     return redirect('entry_detail', entry_id=entry_id)
 
 
 def send_comment_to_remote_inbox(comment, entry):
     """Send a comment to the remote entry author's inbox."""
+    print(f"\n=== SEND COMMENT TO REMOTE ===")
+    print(f"Comment ID: {comment.id}")
+    print(f"Comment FQID: {comment.fqid}")
+    print(f"Entry: {entry.title}")
+    
     remote_author = entry.remote_author
+    print(f"remote_author: {remote_author}")
+    
     if not remote_author or remote_author.is_local:
+        print("NOT SENDING: remote_author is local or None")
         return
 
     node = find_remote_node_for_url(remote_author.id) or find_remote_node_for_url(remote_author.host)
     if not node:
+        print(f"ERROR: No credentials found for host: {remote_author.host}")
         return
+
+    print(f"Found node: {node.url}")
+    
+    inbox_url = f"{remote_author.id.rstrip('/')}/inbox/"
+    print(f"inbox_url: {inbox_url}")
 
     payload = {
         'type': 'comment',
