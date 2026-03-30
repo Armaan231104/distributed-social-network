@@ -1098,6 +1098,8 @@ def accept_follow_request(request, request_id):
     
     return redirect('follow-requests')
 
+
+
 @approved_author_required
 @login_required
 def reject_follow_request(request, request_id):
