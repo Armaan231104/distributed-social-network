@@ -90,28 +90,36 @@ def verify_remote_author_exists(foreign_id):
         print(f"Could not verify remote author at {foreign_id}: {e}")
         return None
 
-def get_or_create_remote_author(foreign_id):
+def get_or_create_remote_author(foreign_id, remote_author=None):
     foreign_id = normalize_fqid(foreign_id)
-    host = foreign_id.split('/api/authors/')[0] + '/api/'
 
-    # Try to get the remote author JSON
-    display_name = "Remote Author"  # fallback
-    try:
-        resp = requests.get(foreign_id, timeout=5)
-        if resp.status_code == 200:
-            data = resp.json()
-            display_name = data.get('displayName', display_name)
-    except Exception as e:
-        print("Error fetching remote author info:", e)
-
-    return Author.objects.get_or_create(
+    author, created = Author.objects.get_or_create(
         id=foreign_id,
         defaults={
-            'host': host,
-            'displayName': display_name,
+            'host': foreign_id.split('/api/authors/')[0] + '/api/',
+            'displayName': 'Remote Author',
             'is_approved': True,
         }
     )
+
+    if remote_author:
+        updated = False
+        field_map = {
+            "displayName": "displayName",
+            "github": "github",
+            "profileImage": "profileImage",
+            "web": "web",
+            "host": "host",
+        }
+        for api_field, model_field in field_map.items():
+            new_val = remote_author.get(api_field)
+            if new_val and getattr(author, model_field) != new_val:
+                setattr(author, model_field, new_val)
+                updated = True
+        if updated:
+            author.save()
+
+    return author, created
 
 def send_follow_to_remote(actor, target):
     if target.is_local:
@@ -745,7 +753,7 @@ def follow_remote_author(request):
     
     try:
         # Get or create the remote author
-        remote_author, created = get_or_create_remote_author(remote_fqid)
+        remote_author, created = get_or_create_remote_author(remote_fqid, author_data)
 
         # Check if already following
         if current_author.is_following(remote_author):
