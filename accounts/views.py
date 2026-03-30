@@ -14,7 +14,6 @@ from django.contrib.auth.forms import AuthenticationForm
 
 from .models import Author, FollowRequest, Follow
 from posts.models import Entry
-from posts.views import get_entry_by_id
 from interactions.models import Like, Comment
 from .forms import SignUpForm
 from functools import wraps
@@ -681,25 +680,49 @@ class InboxView(APIView):
             obj_url = str(data.get('object', '')).strip()
 
             if actor and obj_url:
+                entry = None
+                comment = None
+                
                 try:
-                    if '/comments/' in obj_url:
-                        print(f"Looking up comment by fqid: {obj_url}")
-                        comment = Comment.objects.filter(fqid=obj_url).first()
-                        print(f"Comment found: {comment}")
-                        if not comment:
-                            print(f"Existing comment fqids: {list(Comment.objects.values_list('fqid', flat=True)[:10])}")
-                        if comment:
-                            Like.objects.get_or_create(author=actor, comment=comment, entry=None)
-                            return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
-                        return Response({'status': 'Comment not found for like'}, status=status.HTTP_404_NOT_FOUND)
-                    else:   
-                        entry = get_entry_by_id(obj_url)
-                        if entry:
-                            Like.objects.get_or_create(author=actor, entry=entry)
-                            return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
-                except Exception as e:
-                    print(f"Error processing like: {e}")
-                    return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    entry = get_entry_by_id(obj_url)
+                except:
+                    pass
+                
+                # If not found as entry, try robust comment parsing
+                if not entry:
+                    try:
+                        comment_parts = obj_url.rstrip('/').split('/')
+                        
+                        if any(x in obj_url for x in ['comments', 'commented', 'posts']):
+                            for i, part in enumerate(comment_parts):
+                                if part in ('comments', 'commented') and i + 1 < len(comment_parts):
+                                    comment_id = comment_parts[i + 1]
+                                    import uuid
+                                    try:
+                                        # Try casting to UUID
+                                        comment = Comment.objects.get(id=uuid.UUID(comment_id))
+                                    except (ValueError, Comment.DoesNotExist):
+                                        pass
+                                    break
+                        else:
+                            # Try as plain UUID
+                            import uuid
+                            try:
+                                comment = Comment.objects.get(id=uuid.UUID(obj_url))
+                            except:
+                                pass
+                    except Exception as e:
+                        print(f"Comment lookup failed: {e}")
+                
+                if entry:
+                    Like.objects.get_or_create(author=actor, entry=entry, comment=None)
+                    return Response({'status': 'like on entry received'}, status=status.HTTP_201_CREATED)
+                elif comment:
+                    Like.objects.get_or_create(author=actor, entry=None, comment=comment)
+                    return Response({'status': 'like on comment received'}, status=status.HTTP_201_CREATED)
+                else:
+                    print(f"Entry or comment not found for URL: {obj_url}")
+                    return Response({'status': 'Entry or comment not found'}, status=status.HTTP_404_NOT_FOUND)
 
             return Response({'status': 'No object found for like'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -713,6 +736,7 @@ class InboxView(APIView):
 
             if actor and entry_url:
                 try:
+                    from posts.views import get_entry_by_id
                     entry = get_entry_by_id(entry_url)
                     comment = Comment.objects.create(
                         author=actor,
@@ -1389,7 +1413,7 @@ def unfollow_author(request, author_id):
         if success:
             messages.success(request, f"Successfully unfollowed {target_author.displayName}.")
         else:
-            messages.warning(request, f"Unfollowed locally. Could not notify remote node (they may still send posts).")
+            messages.warning(request, "Unfollowed locally. Could not notify remote node (they may still send posts).")
     else:
         messages.success(request, f"Successfully unfollowed {target_author.displayName}.")
 

@@ -3,14 +3,12 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from django.views import View
-from django.conf import settings
 import json
 import requests
 
 from posts.models import Entry
 from accounts.models import Author
 from .models import Like, Comment
-from nodes.models import RemoteNode
 from nodes.utils import find_remote_node_for_url
 from .serializers import (
     LikeSerializer, CommentSerializer,
@@ -67,13 +65,14 @@ def toggle_like(request, object_type, object_id):
     Checks if the object (comment or entry) has been liked by the user, then
     either adds or deletes a like depending on current status.
     """
-    print(f"\n=== TOGGLE LIKE START ===")
+    print("\n=== TOGGLE LIKE START ===")
     print(f"User: {request.user.username}")
     print(f"Object type: {object_type}")
     print(f"Object ID: {object_id}")
     
     liking_author = request.user.author
     target_author = None
+    object_url = None
 
     if object_type == 'entry':
         obj = get_object_or_404(Entry, id=object_id)
@@ -84,10 +83,8 @@ def toggle_like(request, object_type, object_id):
         object_url = obj.fqid
         
         print(f"Entry title: {obj.title}")
-        print(f"Entry author: {obj.author}")
-        print(f"Entry remote_author: {obj.remote_author}")
         print(f"target_author (via get_author): {target_author}")
-        print(f"target_author.is_local: {target_author.is_local}")
+        print(f"target_author.is_local: {target_author.is_local if target_author else 'None'}")
         print(f"object_url (FQID): {object_url}")
 
         like, created = Like.objects.get_or_create(author=liking_author, entry=obj, comment=None)
@@ -99,37 +96,19 @@ def toggle_like(request, object_type, object_id):
         if not user_can_access_entry(request.user, obj.entry):
             return JsonResponse({'error': 'Forbidden'}, status=403)
 
-        entry_author = obj.entry.get_author
+        # The target author is the author of the comment
         target_author = obj.author
-        if not entry_author:
-            print("Entry author not found")
-            return JsonResponse({'error': 'Entry author not found'}, status=400)
 
-        base_author_url = entry_author.id.rstrip('/')
-        entry_id = str(obj.entry.id).strip('/')
-        comment_id = str(obj.id).strip('/')
+        # Use the comment's actual remote FQID
+        object_url = getattr(obj, "fqid", None) or getattr(obj, "id_url", None)
+        
+        if not object_url:
+            base_author_url = target_author.id.rstrip('/') if target_author else ""
+            comment_id = str(obj.id).strip('/')
+            object_url = f"{base_author_url}/commented/{comment_id}"
 
-        entries_url = f"{base_author_url}/entries/{entry_id}/comments/{comment_id}/"
-        posts_url = f"{base_author_url}/posts/{entry_id}/comments/{comment_id}/"
-
-        # Prefer the format already stored on the comment/entry if available
-        existing_comment_url = getattr(obj, "fqid", None) or getattr(obj, "id_url", None)
-        entry_fqid = getattr(obj.entry, "fqid", None)
-
-        print(f"existing_comment_url: {existing_comment_url}")
-        print(f"entry_fqid: {entry_fqid}")
-        print(f"entries_url: {entries_url}")
-        print(f"posts_url: {posts_url}")
-
-        if existing_comment_url:
-            if "/posts/" in existing_comment_url:
-                object_url = posts_url
-            else:
-                object_url = entries_url
-        elif entry_fqid and "/posts/" in entry_fqid:
-            object_url = posts_url
-        else:
-            object_url = entries_url
+        print(f"Comment target_author: {target_author}")
+        print(f"Comment object_url: {object_url}")
 
         like, created = Like.objects.get_or_create(
             author=liking_author,
@@ -147,16 +126,16 @@ def toggle_like(request, object_type, object_id):
         liked = True
 
     if target_author and not target_author.is_local:
-        print(f"=== REMOTE DETECTED - SENDING TO REMOTE ===")
+        print("=== REMOTE DETECTED - SENDING TO REMOTE ===")
         print(f"target_author: {target_author.id}")
         if created:
-            print(f"Sending NEW like to remote...")
+            print("Sending NEW like to remote...")
             send_like_to_remote_inbox(liking_author, target_author, object_url, like)
         else:
-            print(f"Sending UNDO like to remote...")
+            print("Sending UNDO like to remote...")
             send_undo_like_to_remote_inbox(liking_author, target_author, object_url, like)
     else:
-        print(f"=== LOCAL AUTHOR - NOT SENDING TO REMOTE ===")
+        print("=== LOCAL AUTHOR - NOT SENDING TO REMOTE ===")
 
     return JsonResponse({'liked': liked, 'like_count': obj.likes.count()})
 
@@ -166,7 +145,7 @@ def send_like_to_remote_inbox(sender, recipient, object_url, like):
     Sends a standard 'Like' activity to the recipient's inbox.
     Uses the same node lookup pattern as the rest of the codebase.
     """
-    print(f"\n=== SEND LIKE TO REMOTE ===")
+    print("\n=== SEND LIKE TO REMOTE ===")
     print(f"sender: {sender.id}")
     print(f"recipient: {recipient.id}")
     print(f"object_url: {object_url}")
@@ -182,6 +161,7 @@ def send_like_to_remote_inbox(sender, recipient, object_url, like):
     print(f"Found node: {node.url}")
 
     payload = {
+        "summary": summary,
         "type": "Like",
         "id": like.fqid,
         "author": {
@@ -217,7 +197,7 @@ def send_undo_like_to_remote_inbox(sender, recipient, object_url, like):
     """
     Sends an 'Undo' wrapping a 'Like' to the recipient's inbox when a user unlikes.
     """
-    print(f"\n=== SEND UNDO LIKE TO REMOTE ===")
+    print("\n=== SEND UNDO LIKE TO REMOTE ===")
     print(f"sender: {sender.id}")
     print(f"recipient: {recipient.id}")
     print(f"object_url: {object_url}")
@@ -278,7 +258,7 @@ def add_comment(request, entry_id):
     """
     UI view — create a comment and redirect back to the entry page.
     """
-    print(f"\n=== ADD COMMENT START ===")
+    print("\n=== ADD COMMENT START ===")
     print(f"User: {request.user.username}")
     print(f"Entry ID: {entry_id}")
     
@@ -307,17 +287,17 @@ def add_comment(request, entry_id):
                 print(f"target_author.is_local: {target_author.is_local}")
             
             if target_author and not target_author.is_local:
-                print(f"=== REMOTE DETECTED - SENDING COMMENT TO REMOTE ===")
+                print("=== REMOTE DETECTED - SENDING COMMENT TO REMOTE ===")
                 send_comment_to_remote_inbox(comment, entry)
             else:
-                print(f"=== LOCAL AUTHOR - NOT SENDING COMMENT TO REMOTE ===")
+                print("=== LOCAL AUTHOR - NOT SENDING COMMENT TO REMOTE ===")
 
     return redirect('entry_detail', entry_id=entry_id)
 
 
 def send_comment_to_remote_inbox(comment, entry):
     """Send a comment to the remote entry author's inbox."""
-    print(f"\n=== SEND COMMENT TO REMOTE ===")
+    print("\n=== SEND COMMENT TO REMOTE ===")
     print(f"Comment ID: {comment.id}")
     print(f"Comment FQID: {comment.fqid}")
     print(f"Entry: {entry.title}")
