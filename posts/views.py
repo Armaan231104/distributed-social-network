@@ -375,6 +375,11 @@ def get_stream_entries_for_user(user):
         followee__user__isnull=False
     ).select_related('followee__user')
 
+    remote_following = Follow.objects.filter(
+        follower=current_author,
+        followee__user__isnull=True
+    ).select_related('followee')
+
     print("Following count:", following_qs.count())
 
     followed_authors = [f.followee for f in following_qs]
@@ -387,8 +392,6 @@ def get_stream_entries_for_user(user):
         if a.user and a.is_following(current_author)
     ]
 
-=======
->>>>>>> c90e62147ca3e93f64609ba7bf718241d1e4c1bd
     print("Friend users count:", len(friend_users))
 
     print("Building local entries query...")
@@ -399,7 +402,6 @@ def get_stream_entries_for_user(user):
         Q(author__in=friend_users, visibility="FRIENDS")
     )
 
->>>>>>> c90e62147ca3e93f64609ba7bf718241d1e4c1bd
     print("Local entries count:", local_entries.count())
 
     print("Remote follows count:", remote_following.count())
