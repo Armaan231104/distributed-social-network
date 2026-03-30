@@ -446,22 +446,22 @@ class FollowView(APIView):
         return Response({'status': 'follow request sent'}, status=status.HTTP_201_CREATED)
 
     def delete(self, request, author_id, foreign_id):
-        """Unfollow an author."""
         current_author = get_current_author(request)
-        
-        # Normalize author_id to FQID for comparison
         author_id = normalize_fqid(author_id)
-        
         if current_author.id != author_id:
-            return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'Unauthorized'}, status=403)
 
-        foreign_author = get_author_by_id(foreign_id)
+        foreign_id = normalize_fqid(foreign_id)
+        foreign_author = get_author_by_id(foreign_id)   # or get_or_create_remote_author if needed
 
         Follow.objects.filter(follower=current_author, followee=foreign_author).delete()
         FollowRequest.objects.filter(actor=current_author, object=foreign_author).delete()
 
-        return Response({'status': 'unfollowed'}, status=status.HTTP_200_OK)
+        # Optional: send rejected to remote (good for consistency)
+        if not foreign_author.user:
+            send_reject_unfollow_to_remote(current_author, foreign_author)
 
+        return Response({'status': 'unfollowed'}, status=200)
 
 class AcceptFollowView(APIView):
     """
@@ -556,49 +556,60 @@ class FollowRequestListView(APIView):
         })
 
 # ---------- INBOX ---------- #
-
 class InboxView(APIView):
     """
-    Receive follow requests from remote nodes.
-    
-    When a remote author wants to follow you, their node contacts this endpoint
-    to create a follow request in your inbox.
+    Handle incoming messages from remote nodes:
+    - Follow requests
+    - Unfollow notifications (status=rejected)
+    - New/updated/deleted entries (posts)
+    - Likes
+    - Comments
     """
     authentication_classes = [RemoteNodeAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request, author_id):
         author_id = normalize_fqid(author_id)
+
         try:
             author = Author.objects.get(id=author_id)
         except Author.DoesNotExist:
             return Response({'error': 'Author not found'}, status=status.HTTP_404_NOT_FOUND)
-        
+
         data = request.data
         msg_type = str(data.get('type', '')).lower()
+        follow_status = str(data.get('status', 'pending')).lower()
 
+        # ====================== FOLLOW / UNFOLLOW ======================
         if msg_type == 'follow':
-            
             print("FOLLOW REQUEST RECEIVED")
+
             actor_data = data.get('actor', {})
             object_data = data.get('object', {})
             object_id = object_data.get('id', '')
 
-            follow_status = str(data.get('status', 'pending')).lower()
-            
-            # PENDING
+            # Security check: ensure this message is for the correct author
+            if object_id.rstrip('/') != author.id.rstrip('/'):
+                return Response(
+                    {'error': 'Not the intended recipient'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            actor = get_or_create_author(actor_data)
+            if not actor:
+                return Response({'error': 'Invalid actor'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Handle UNFOLLOW (status=rejected)
+            if follow_status == 'rejected':
+                # Remote author unfollowed us → clean up the reverse Follow
+                Follow.objects.filter(follower=actor, followee=author).delete()
+                # Optionally clean up FollowRequest too
+                FollowRequest.objects.filter(actor=actor, object=author).delete()
+                print(f"Received unfollow (rejected) from {actor.displayName}")
+                return Response({'status': 'unfollow processed'}, status=status.HTTP_200_OK)
+
+            # Handle normal FOLLOW request (pending)
             if follow_status in ('pending', ''):
-
-                if object_id.rstrip('/') != author.id.rstrip('/'):
-                    return Response(
-                        {'error': 'Not the intended recipient'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-
-                actor = get_or_create_author(actor_data)
-                if not actor:
-                    return Response({'error': 'Invalid actor'}, status=status.HTTP_400_BAD_REQUEST)
-
                 follow_request, created = FollowRequest.objects.get_or_create(
                     actor=actor,
                     object=author,
@@ -611,113 +622,104 @@ class InboxView(APIView):
                 if not created and follow_request.status == FollowRequest.Status.PENDING:
                     return Response({'status': 'follow request already exists'}, status=status.HTTP_200_OK)
 
+                # Reset to pending if it was previously rejected/accepted
                 if follow_request.status != FollowRequest.Status.PENDING:
                     follow_request.status = FollowRequest.Status.PENDING
                     follow_request.save()
 
                 return Response({'status': 'follow request received'}, status=status.HTTP_201_CREATED)
-                        
-        # POST ENTRY (ALSO UPDATE AND SOFT DELETE)
+
+        # ====================== ENTRY (Post) ======================
         elif msg_type == 'entry':
             entry_id = data.get('id')
-            remote_author_data = data.get('author', {})
-            
             if not entry_id:
                 return Response({'error': 'Missing entry id'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            # get or create the remote author
+
+            remote_author_data = data.get('author', {})
             remote_author = get_or_create_author(remote_author_data)
             if not remote_author:
                 return Response({'error': 'Invalid author'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            content_type = data.get('contentType', 'text/plain')
-            content = data.get('content', '')
-            image_file = None
-            
-            # HANDLE IMAGE
-            if content_type and "base64" in content_type:
-                import base64
-                from django.core.files.base import ContentFile
 
-                image_file = ContentFile(
-                    base64.b64decode(content),
-                    name="remote_image.png"
-                )
-            
-            # create, update, or soft delete based on visibility
+            # Handle base64 image if present
+            image_file = None
+            content_type = data.get('contentType', 'text/plain')
+            if content_type and "base64" in content_type:
+                try:
+                    import base64
+                    from django.core.files.base import ContentFile
+                    image_file = ContentFile(
+                        base64.b64decode(data.get('content', '')),
+                        name="remote_image.png"
+                    )
+                except Exception as e:
+                    print(f"Failed to decode base64 image: {e}")
+
+            # Create or update the entry
             entry, created = Entry.objects.update_or_create(
                 fqid=entry_id,
                 defaults={
                     'remote_author': remote_author,
                     'title': data.get('title', ''),
                     'content': data.get('content', ''),
-                    'content_type': data.get('contentType', 'text/plain'),
+                    'content_type': content_type,
                     'visibility': data.get('visibility', 'PUBLIC'),
-                    'image': image_file 
+                    'image': image_file
                 }
             )
-            print (f"entry {entry}")
-            print (f"created {created}")
-            return Response({'status': 'entry received'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
-        # Fixed: was 'entry' in both versions (dead code) — correctly 'like' here
+            return Response(
+                {'status': 'entry received'},
+                status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+            )
+
+        # ====================== LIKE ======================
         elif msg_type == 'like':
             from posts.views import get_entry_by_id
-            actor = get_or_create_author(data.get('author', {}))
-            obj_url = str(data.get('object', ''))
 
-            print(f"actor: {actor}")
-            print(f"obj_url: {obj_url}")
+            actor = get_or_create_author(data.get('author', {}))
+            obj_url = str(data.get('object', '')).strip()
 
             if actor and obj_url:
-                # Try to find the entry by FQID or local ID
-                entry = None
                 try:
                     entry = get_entry_by_id(obj_url)
-                except:
-                    pass
-                if entry:
-                    print(f"entry {entry}")
-                    Like.objects.get_or_create(author=actor, entry=entry)
-                else:
-                    return Response({'status': 'Entry not found'}, status=status.HTTP_404_NOT_FOUND)
-            return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
+                    if entry:
+                        Like.objects.get_or_create(author=actor, entry=entry)
+                        return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
+                except Exception as e:
+                    print(f"Error processing like: {e}")
 
+            return Response({'status': 'Entry not found for like'}, status=status.HTTP_404_NOT_FOUND)
+
+        # ====================== COMMENT ======================
         elif msg_type == 'comment':
             from posts.views import get_entry_by_id
             from interactions.models import Comment
-            
+
             actor = get_or_create_author(data.get('author', {}))
             content = data.get('comment', 'remote comment')
             contentType = data.get('contentType', 'text/plain')
-            entry_url = data.get('entry', '')
+            entry_url = str(data.get('entry', '')).strip()
 
-            print(f"actor: {actor}")
-            print(f"content: {content}")
-            print(f"contentType: {contentType}")
-            print(f"entry_url: {entry_url}")
-            
             if actor and entry_url:
                 try:
                     entry = get_entry_by_id(entry_url)
-                    # Create the comment
                     comment = Comment.objects.create(
                         author=actor,
                         entry=entry,
                         content=content,
                         contentType=contentType
                     )
-                    print(f"entry {entry}")
                     return Response({'status': 'comment received', 'id': str(comment.id)}, status=status.HTTP_201_CREATED)
                 except Exception as e:
-                    # Entry not found - try to store comment anyway
                     print(f"Comment received but entry not found: {e}")
-            # Even if entry not found, acknowledge receipt
-            return Response({'status': 'comment received (entry not found)'}, status=status.HTTP_201_CREATED)
-        
-        else:
-            return Response({'error': f'Unknown type: {msg_type}'}, status=status.HTTP_400_BAD_REQUEST)
+                    # Still acknowledge receipt (important for federation)
+                    return Response({'status': 'comment received (entry not found)'}, status=status.HTTP_201_CREATED)
 
+            return Response({'error': 'Invalid comment data'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Unknown message type
+        return Response({'error': f'Unknown message type: {msg_type}'}, status=status.HTTP_400_BAD_REQUEST)
+    
 # UI views
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
@@ -1300,3 +1302,83 @@ def login_view(request):
         form = AuthenticationForm()
 
     return render(request, "accounts/login.html", {"form": form})
+
+
+#TESTING
+
+def send_reject_unfollow_to_remote(actor, target):
+    """Send unfollow notification as status=rejected (simple & matches your request)."""
+    if target.is_local or not target.id:
+        return True
+
+    try:
+        inbox_url = get_remote_inbox_url(target.id)
+
+        data = {
+            'type': 'Follow',
+            'summary': f'{actor.displayName} unfollowed {target.displayName}',
+            'actor': AuthorSerializer(actor).data,
+            'object': AuthorSerializer(target).data,
+            'status': 'rejected'   # <--- what you asked for
+        }
+
+        node = find_remote_node_for_url(target.id) or find_remote_node_for_url(target.host)
+        if not node:
+            print(f"Warning: No remote node credentials for {target.host}")
+            return False
+
+        response = requests.post(
+            inbox_url,
+            json=data,
+            timeout=15,
+            auth=(node.username, node.password)
+        )
+        response.raise_for_status()
+        print(f"Sent unfollow (status=rejected) to {inbox_url}")
+        return True
+
+    except requests.exceptions.ChunkedEncodingError:
+        print("ChunkedEncodingError - treated as success")
+        return True
+    except Exception as e:
+        print(f"Failed to send unfollow notification: {e}")
+        return False
+@approved_author_required
+@login_required
+def unfollow_author(request, author_id):
+    """Unfollow an author (local or remote) - cleans local data + notifies remote."""
+    author_id = unquote(author_id).strip()
+    if not author_id.endswith('/'):
+        author_id += '/'
+
+    try:
+        current_author = request.user.author
+    except Author.DoesNotExist:
+        messages.error(request, "You must be logged in as an approved author.")
+        return redirect('authors-list')
+
+    try:
+        target_author = Author.objects.get(id=author_id)
+    except Author.DoesNotExist:
+        messages.error(request, "Author not found.")
+        return redirect('author-profile', author_id=author_id)
+
+    if current_author.id == target_author.id:
+        messages.error(request, "You cannot unfollow yourself.")
+        return redirect('author-profile', author_id=author_id)
+
+    # Clean up local relationship (this is the most important part)
+    Follow.objects.filter(follower=current_author, followee=target_author).delete()
+    FollowRequest.objects.filter(actor=current_author, object=target_author).delete()
+
+    # Notify remote node (simple "rejected" status as you wanted)
+    if not target_author.user:  # remote author
+        success = send_reject_unfollow_to_remote(current_author, target_author)
+        if success:
+            messages.success(request, f"Successfully unfollowed {target_author.displayName}.")
+        else:
+            messages.warning(request, f"Unfollowed locally. Could not notify remote node (they may still send posts).")
+    else:
+        messages.success(request, f"Successfully unfollowed {target_author.displayName}.")
+
+    return redirect('author-profile', author_id=author_id)
