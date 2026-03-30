@@ -623,6 +623,8 @@ class InboxView(APIView):
                     'image': image_file 
                 }
             )
+            print (f"entry {entry}")
+            print (f"created {created}")
             return Response({'status': 'entry received'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
         # Fixed: was 'entry' in both versions (dead code) — correctly 'like' here
@@ -633,6 +635,7 @@ class InboxView(APIView):
 
             print(f"actor: {actor}")
             print(f"obj_url: {obj_url}")
+
             if actor and obj_url:
                 # Try to find the entry by FQID or local ID
                 entry = None
@@ -641,12 +644,10 @@ class InboxView(APIView):
                 except:
                     pass
                 if entry:
+                    print(f"entry {entry}")
                     Like.objects.get_or_create(author=actor, entry=entry)
                 else:
-                    # Entry not found locally - still store the like with null entry
-                    # This allows us to track likes even if we don't have the entry
-                    Like.objects.get_or_create(author=actor, entry=None, comment=None)
-                print(f"entry {entry}")
+                    return Response({'status': 'Entry not found'}, status=status.HTTP_404_NOT_FOUND)
             return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
 
         elif msg_type == 'comment':
