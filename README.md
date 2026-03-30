@@ -246,6 +246,11 @@ heroku open -a your-app-name
 
 ---
 
+### X. Logs:
+```bash
+heroku logs --tail --app your-app-name
+```
+
 ### Create a new superuser
 After deploying your Heroku app and new database, you need to create a superuser (node admin)
 

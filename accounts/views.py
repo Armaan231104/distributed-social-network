@@ -714,6 +714,9 @@ class InboxView(APIView):
                     print(f"Comment received but entry not found: {e}")
             # Even if entry not found, acknowledge receipt
             return Response({'status': 'comment received (entry not found)'}, status=status.HTTP_201_CREATED)
+        
+        else:
+            return Response({'error': f'Unknown type: {msg_type}'}, status=status.HTTP_400_BAD_REQUEST)
 
 # UI views
 from django.shortcuts import render, get_object_or_404, redirect
