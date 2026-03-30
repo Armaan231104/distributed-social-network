@@ -734,16 +734,20 @@ class InboxView(APIView):
             content = data.get('comment', 'remote comment')
             contentType = data.get('contentType', 'text/plain')
             entry_url = str(data.get('entry', '')).strip()
+            comment_fqid = str(data.get('id', '')).strip()
 
             if actor and entry_url:
                 try:
                     from posts.views import get_entry_by_id
                     entry = get_entry_by_id(entry_url)
-                    comment = Comment.objects.create(
-                        author=actor,
-                        entry=entry,
-                        content=content,
-                        contentType=contentType
+                    comment, created = Comment.objects.get_or_create(
+                        fqid=comment_fqid,
+                        defaults={
+                            'author': actor,
+                            'entry': entry,
+                            'content': content,
+                            'contentType': contentType,
+                        }
                     )
                     return Response({'status': 'comment received', 'id': str(comment.id)}, status=status.HTTP_201_CREATED)
                 except Exception as e:
