@@ -630,6 +630,9 @@ class InboxView(APIView):
             from posts.views import get_entry_by_id
             actor = get_or_create_author(data.get('author', {}))
             obj_url = str(data.get('object', ''))
+
+            print(f"actor: {actor}")
+            print(f"obj_url: {obj_url}")
             if actor and obj_url:
                 # Try to find the entry by FQID or local ID
                 entry = None
@@ -643,6 +646,7 @@ class InboxView(APIView):
                     # Entry not found locally - still store the like with null entry
                     # This allows us to track likes even if we don't have the entry
                     Like.objects.get_or_create(author=actor, entry=None, comment=None)
+                print(f"entry {entry}")
             return Response({'status': 'like received'}, status=status.HTTP_201_CREATED)
 
         elif msg_type == 'comment':
@@ -653,6 +657,11 @@ class InboxView(APIView):
             content = data.get('comment', 'remote comment')
             contentType = data.get('contentType', 'text/plain')
             entry_url = data.get('entry', '')
+
+            print(f"actor: {actor}")
+            print(f"content: {content}")
+            print(f"contentType: {contentType}")
+            print(f"entry_url: {entry_url}")
             
             if actor and entry_url:
                 try:
@@ -664,6 +673,7 @@ class InboxView(APIView):
                         content=content,
                         contentType=contentType
                     )
+                    print(f"entry {entry}")
                     return Response({'status': 'comment received', 'id': str(comment.id)}, status=status.HTTP_201_CREATED)
                 except Exception as e:
                     # Entry not found - try to store comment anyway

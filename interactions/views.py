@@ -94,12 +94,14 @@ def toggle_like(request, object_type, object_id):
 
     elif object_type == 'comment':
         obj = get_object_or_404(Comment, id=object_id)
+        print(f"Comment obj: {obj}")
 
         if not user_can_access_entry(request.user, obj.entry):
             return JsonResponse({'error': 'Forbidden'}, status=403)
 
         entry_author = obj.entry.get_author
         if not entry_author:
+            print("Entry author not found")
             return JsonResponse({'error': 'Entry author not found'}, status=400)
 
         base_author_url = entry_author.id.rstrip('/')
@@ -112,6 +114,11 @@ def toggle_like(request, object_type, object_id):
         # Prefer the format already stored on the comment/entry if available
         existing_comment_url = getattr(obj, "fqid", None) or getattr(obj, "id_url", None)
         entry_fqid = getattr(obj.entry, "fqid", None)
+
+        print(f"existing_comment_url: {existing_comment_url}")
+        print(f"entry_fqid: {entry_fqid}")
+        print(f"entries_url: {entries_url}")
+        print(f"posts_url: {posts_url}")
 
         if existing_comment_url:
             if "/posts/" in existing_comment_url:
