@@ -674,10 +674,12 @@ class InboxView(APIView):
 
         # ====================== LIKE ======================
         elif msg_type == 'like':
+            print(f"LIKE RECEIVED: {data}")  # see the full payload
             from posts.views import get_entry_by_id
 
             actor = get_or_create_author(data.get('author', {}))
             obj_url = str(data.get('object', '')).strip()
+            print(f"obj_url: {obj_url}")
 
             if actor and obj_url:
                 entry = None
