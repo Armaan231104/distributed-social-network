@@ -73,15 +73,20 @@ Friends (mutual followers) are not stored at all — they are computed at query 
 
 *"As an author, I want to like comments that I can access..."*
 
-- See Interactions UI docs
+- Implemented via `POST /interactions/like/comment/{comment_id}/`
+- Remote comment likes are sent to the comment author's inbox
+- See INTERACTIONS_UI.md and INTERACTIONS_API.md
 
 *"As an author, I want to unfriend other authors by unfollowing them..."*
 
-- See Authors docs
+- Implemented via `DELETE /api/authors/{author_id}/following/{foreign_id}/`
+- See AUTHORS.md
 
 *"As an author, I want to like entries that I can access..."*
 
-- See Interactions UI docs
+- Implemented via `POST /interactions/like/entry/{entry_id}/`
+- Remote entry likes are sent to the entry author's inbox
+- See INTERACTIONS_UI.md and INTERACTIONS_API.md
 
 *"As an author, when someone sends me a public entry I want to see the likes..."*
 
@@ -89,4 +94,39 @@ Friends (mutual followers) are not stored at all — they are computed at query 
 
 *"As an author, I want to comment on entries that I can access..."*
 
-- See Interactions UI docs
+- Implemented via `POST /posts/entry/{entry_id}/comment/`
+- Remote comments are received via inbox and stored with FQID
+- See INTERACTIONS_UI.md and INTERACTIONS_API.md
+
+*"As an author, I want to be able to post to my friends..."*
+
+- FRIENDS visibility restricts posts to mutual followers only
+- See posts.md
+
+*"As an author, I want to handle incoming friend requests..."*
+
+- Implemented via `GET /api/authors/{author_id}/follow_requests/`
+- Approve: `PUT /api/authors/{author_id}/followers/{foreign_id}/`
+- Deny: `DELETE /api/authors/{author_id}/followers/{foreign_id}/`
+- See AUTHORS.md
+
+*"As an author, I want to unfollow authors..."*
+
+- Implemented via `DELETE /api/authors/{author_id}/following/{foreign_id}/`
+- See AUTHORS.md
+
+## Remote Interactions (Federation)
+
+The system supports bidirectional federation with remote nodes:
+
+### Sending to Remote
+- Entry creation/edit/deletion triggers fanout to remote followers
+- Likes on remote entries/comments sent to remote author's inbox
+- Comments on remote entries sent to remote author's inbox
+
+### Receiving from Remote
+- Inbox handles: `entry`, `like`, `comment`, `follow` types
+- Likes can target entries or comments (parsed from object URL)
+- Remote authors are created on-demand
+
+See INTERACTIONS_API.md for full inbox documentation.

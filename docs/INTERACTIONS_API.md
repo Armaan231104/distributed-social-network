@@ -617,6 +617,151 @@ The inbox ensures consistency across nodes:
 
 ---
 
+## Inbox: Receiving Remote Likes
+
+The inbox endpoint handles likes sent from remote nodes. Likes can target either entries or comments.
+
+### Endpoint
+
+```
+POST /api/authors/{author_id}/inbox/
+```
+
+### Like on Entry
+
+```json
+{
+  "type": "like",
+  "id": "http://remote-node.com/api/authors/999/liked/abc123/",
+  "author": {
+    "type": "author",
+    "id": "http://remote-node.com/api/authors/999",
+    "host": "http://remote-node.com/api/",
+    "displayName": "Remote Author"
+  },
+  "object": "http://localhost/api/authors/1/entries/550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+### Like on Comment
+
+```json
+{
+  "type": "like",
+  "id": "http://remote-node.com/api/authors/999/liked/abc123/",
+  "author": {
+    "type": "author",
+    "id": "http://remote-node.com/api/authors/999",
+    "host": "http://remote-node.com/api/",
+    "displayName": "Remote Author"
+  },
+  "object": "http://localhost/api/authors/1/entries/550e8400-e29b-41d4-a716-446655440000/comments/f47ac10b-58cc-4372-a567-0e02b2c3d479/"
+}
+```
+
+### Object URL Formats
+
+The inbox supports multiple object URL formats:
+
+| Format | Example |
+|--------|---------|
+| Entry FQID | `http://host/api/authors/{id}/entries/{entry_id}` |
+| Comments URL | `http://host/api/authors/{id}/entries/{entry_id}/comments/{comment_id}/` |
+| Commented URL | `http://host/api/authors/{id}/commented/{comment_id}/` |
+| Plain UUID | `f47ac10b-58cc-4372-a567-0e02b2c3d479` |
+
+### Behavior
+
+- The inbox parses the `object` field to determine if the like is on an entry or comment
+- For entry likes: looks up the entry by FQID or UUID and creates a `Like` with `entry` set
+- For comment likes: parses the URL to extract the comment ID and creates a `Like` with `comment` set
+- If the entry/comment is not found locally, returns `404 Not Found`
+- Duplicate likes are prevented by database constraints
+
+### Response Codes
+
+- `201 Created` — like created successfully
+- `200 OK` — like already exists (duplicate)
+- `404 Not Found` — entry or comment not found
+- `400 Bad Request` — invalid request format
+
+---
+
+## Inbox: Receiving Remote Comments
+
+The inbox endpoint handles comments sent from remote nodes.
+
+### Endpoint
+
+```
+POST /api/authors/{author_id}/inbox/
+```
+
+### Example Request
+
+```json
+{
+  "type": "comment",
+  "id": "http://remote-node.com/api/authors/999/commented/abc123/",
+  "author": {
+    "type": "author",
+    "id": "http://remote-node.com/api/authors/999",
+    "host": "http://remote-node.com/api/",
+    "displayName": "Remote Author"
+  },
+  "comment": "Great post!",
+  "contentType": "text/plain",
+  "published": "2026-03-16T04:00:00+00:00",
+  "entry": "http://localhost/api/authors/1/entries/550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+### Behavior
+
+- Creates a `Comment` object linked to the specified entry
+- If entry is not found locally, still returns `201 Created` (important for federation)
+- The comment's FQID is set to the provided `id` field
+
+---
+
+## Inbox: Receiving Remote Follow Requests
+
+The inbox endpoint handles follow requests from remote nodes.
+
+### Endpoint
+
+```
+POST /api/authors/{author_id}/inbox/
+```
+
+### Example Request
+
+```json
+{
+  "type": "follow",
+  "summary": "Remote Author wants to follow Local Author",
+  "actor": {
+    "type": "author",
+    "id": "http://remote-node.com/api/authors/999",
+    "host": "http://remote-node.com/api/",
+    "displayName": "Remote Author"
+  },
+  "object": {
+    "type": "author",
+    "id": "http://localhost/api/authors/1/",
+    "host": "http://localhost/api/"
+  }
+}
+```
+
+### Behavior
+
+- Creates a `FollowRequest` with status `pending`
+- If the remote author doesn't exist locally, they are created
+- Local author can approve/deny via the follow request endpoints
+
+---
+
 ### Fan-out Behavior
 
 When a local entry is created:
@@ -633,6 +778,67 @@ Local followers do NOT trigger remote requests.
 - Runs automatically in the background at regular intervals (~20 seconds)  
 - Can also be triggered manually via the endpoint above  
 - Does not block normal API requests or user interactions  
+
+---
+
+## Sending Likes to Remote Nodes
+
+When a local user likes a remote author's entry or comment, the system sends the like to the remote node's inbox.
+
+### Like on Entry
+
+When you like a remote entry:
+- The `object` field contains the entry's FQID
+- Like is sent to the entry author's inbox
+- Format: `http://remote-host/api/authors/{author_id}/entries/{entry_id}`
+
+### Like on Comment
+
+When you like a remote comment:
+- The `object` field contains the comment's FQID
+- Like is sent to the **comment author's** inbox (not the entry author)
+- Format: `http://remote-host/api/authors/{author_id}/commented/{comment_id}/`
+
+### Payload Example
+
+```json
+{
+  "type": "Like",
+  "id": "http://localhost/api/authors/1/liked/abc123/",
+  "author": {
+    "type": "author",
+    "id": "http://localhost/api/authors/1/",
+    "host": "http://localhost/api/",
+    "displayName": "Local Author"
+  },
+  "object": "http://remote-host/api/authors/999/commented/xyz789/"
+}
+```
+
+---
+
+## Sending Comments to Remote Nodes
+
+When a local user comments on a remote entry, the comment is sent to the entry author's inbox.
+
+### Payload Example
+
+```json
+{
+  "type": "comment",
+  "id": "http://localhost/api/authors/1/commented/abc123/",
+  "author": {
+    "type": "author",
+    "id": "http://localhost/api/authors/1/",
+    "host": "http://localhost/api/",
+    "displayName": "Local Author"
+  },
+  "comment": "Great post!",
+  "contentType": "text/plain",
+  "published": "2026-03-16T04:00:00+00:00",
+  "entry": "http://remote-host/api/authors/999/entries/xyz789/"
+}
+```
 
 ---
 
