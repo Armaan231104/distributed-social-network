@@ -17,7 +17,32 @@ from accounts.utils import normalize_fqid
 from nodes.utils import find_remote_node_for_url
 import uuid
 import base64
+def extract_remote_image(post: dict):
+    """
+    Parse incoming federated post and return the image as a URL or data URI.
+    Handles three cases:
+      - plain URL in "image" field
+      - data: URI in "image" field  
+      - base64 in "content" with contentType ending in ";base64"
+    """
+    image_field = post.get("image", "")
+    content = post.get("content", "")
+    content_type = post.get("contentType", "")
 
+    # Case 1: base64 packed into content field
+    if content_type.endswith(";base64") and content:
+        base_ct = content_type.replace(";base64", "").strip()
+        return f"data:{base_ct};base64,{content}"
+
+    # Case 2: data URI already in image field
+    if isinstance(image_field, str) and image_field.startswith("data:"):
+        return image_field
+
+    # Case 3: plain URL
+    if isinstance(image_field, str) and image_field.startswith("http"):
+        return image_field
+
+    return None
 def get_image_url(entry, request):
     if not entry.image:
         return None
@@ -161,7 +186,7 @@ def fetch_remote_author_posts(remote_author):
                 continue
 
             # Parse image once, cleanly
-            incoming_image_url, _ = extract_remote_image(post)
+            incoming_image_url = extract_remote_image(post)
 
             # Normalise contentType — strip ;base64 suffix before storing
             content_type = post.get("contentType", "text/plain")
