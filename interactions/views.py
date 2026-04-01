@@ -162,10 +162,10 @@ def send_like_to_remote_inbox(sender, recipient, object_url, like):
 
     payload = {
         "type": "Like",
-        "id": like.fqid,
+        "id": like.fqid.rstrip('/'),
         "author": {
             "type": "author",
-            "id": sender.id,
+            "id": sender.id.rstrip('/'),
             "host": sender.host,
             "displayName": sender.displayName,
             "url": sender.id,
