@@ -569,6 +569,7 @@ class InboxView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, author_id):
+        print(f"INBOX HIT: author_id={author_id}, data={request.data}")  # ADD THIS
         author_id = normalize_fqid(author_id)
 
         try:
