@@ -186,7 +186,7 @@ def fetch_remote_author_posts(remote_author):
                 continue
 
             # Parse image once, cleanly
-            incoming_image_url, _ = extract_remote_image(post)
+            incoming_image_url = extract_remote_image(post)
 
             # Normalise contentType — strip ;base64 suffix before storing
             content_type = post.get("contentType", "text/plain")
