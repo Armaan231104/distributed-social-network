@@ -64,13 +64,22 @@
             
 
             <!-- POST CONTENT -->
-            {% if post.content_type == "image" and post.image %}
-                <figure class="stream-post-media">
-                    <img src="{{post.image.url}}" class="post-content-image">
-                    {% if post.content %}
-                        <figcaption>{{ post.content }}</figcaption>
-                    {% endif %}
-                </figure>
+            {% if post.content_type == "image" %}
+                {% if post.image %}
+                    <figure class="stream-post-media">
+                        <img src="{{ post.image.url }}" class="post-content-image">
+                        {% if post.content %}
+                            <figcaption>{{ post.content }}</figcaption>
+                        {% endif %}
+                    </figure>
+                {% elif post.image_url %}
+                    <figure class="stream-post-media">
+                        <img src="{{ post.image_url }}" class="post-content-image">
+                        {% if post.content %}
+                            <figcaption>{{ post.content }}</figcaption>
+                        {% endif %}
+                    </figure>
+                {% endif %}
 
             {% elif post.content_type == "text/markdown" %}
                 <section class="stream-post-body">

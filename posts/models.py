@@ -80,7 +80,7 @@ class Entry(models.Model):
     )
 
     # For remote images or external URLs
-    image_url = models.URLField(max_length=1000, blank=True, null=True)
+    image_url = models.TextField(blank=True, null=True)
 
     github_event_id = models.CharField(max_length=255, null=True, blank=True)
 

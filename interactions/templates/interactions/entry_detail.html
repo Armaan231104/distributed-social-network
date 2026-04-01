@@ -60,15 +60,22 @@
         
 
         <h2 class="post-title">{{ entry.title }}</h2>
-{% if entry.content_type == "image" and entry.image %}
-    <figure class="post-figure">
-        <img src="{{ entry.image.url }}" 
-             alt="{{ entry.title }}" 
-             class="post-content-image">
-        {% if entry.content %}
-            <figcaption class="post-figcaption">{{ entry.content }}</figcaption>
-        {% endif %}
-    </figure>
+{% if entry.content_type == "image" %}
+    {% if entry.image %}
+        <figure class="post-figure">
+            <img src="{{ entry.image.url }}" alt="{{ entry.title }}" class="post-content-image">
+            {% if entry.content %}
+                <figcaption class="post-figcaption">{{ entry.content }}</figcaption>
+            {% endif %}
+        </figure>
+    {% elif entry.image_url %}
+        <figure class="post-figure">
+            <img src="{{ entry.image_url }}" alt="{{ entry.title }}" class="post-content-image">
+            {% if entry.content %}
+                <figcaption class="post-figcaption">{{ entry.content }}</figcaption>
+            {% endif %}
+        </figure>
+    {% endif %}
 {% elif entry.content_type == "text/markdown" %}
     <section class="post-content-text">
         {{ entry.content|render_markdown }}
