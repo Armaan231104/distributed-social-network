@@ -148,71 +148,64 @@ def fetch_remote_author_posts(remote_author):
         print("Using posts URL:", posts_url_used)
 
         stored_entries = []
-
         for i, post in enumerate(posts):
-            print(f"\nProcessing post {i}")
-
             if not isinstance(post, dict):
-                print("Skipping non-dict post payload")
                 continue
 
             visibility = post.get("visibility", "PUBLIC")
             if visibility == "DELETED":
-                print("Skipping deleted post")
                 continue
 
             fqid = normalize_fqid(post.get("id"))
             if not fqid:
-                print("Skipping post without ID")
                 continue
 
+            # Parse image once, cleanly
+            incoming_image_url, _ = extract_remote_image(post)
+
+            # Normalise contentType — strip ;base64 suffix before storing
+            content_type = post.get("contentType", "text/plain")
+            stored_content_type = content_type.replace(";base64", "").strip()
+
+            # For base64 posts, content IS the image — don't store raw base64 as text content
+            content = post.get("content", "")
+            if content_type.endswith(";base64"):
+                content = ""  # image is in image_url as data URI, not in content
+
             entry, created = Entry.objects.get_or_create(
-            fqid=fqid,
-            defaults={
+                fqid=fqid,
+                defaults={
                     "title": post.get("title", ""),
-                    "content": post.get("content", ""),
-                    "content_type": post.get("contentType", "text/plain"),
+                    "content": content,
+                    "content_type": stored_content_type,
                     "visibility": visibility,
                     "remote_author": remote_author,
-                    "image_url": post.get("image") if isinstance(post.get("image"), str) and (post.get("image", "").startswith("http") or post.get("image", "").startswith("data:")) else None,
+                    "image_url": incoming_image_url,  # ✅ safe — always a URL or data URI or None
                 },
             )
 
-
-            print("Entry:", entry.id, "| Created:", created)
-
-            update_fields = []
-
             if not created:
+                update_fields = []
+                fields_to_sync = {
+                    "title": post.get("title", ""),
+                    "content": content,
+                    "content_type": stored_content_type,
+                    "visibility": visibility,
+                    "image_url": incoming_image_url,
+                }
                 if entry.remote_author_id != remote_author.id:
                     entry.remote_author = remote_author
                     update_fields.append("remote_author")
-                if entry.title != post.get("title", ""):
-                    entry.title = post.get("title", "")
-                    update_fields.append("title")
-                if entry.content != post.get("content", ""):
-                    entry.content = post.get("content", "")
-                    update_fields.append("content")
-                if entry.content_type != post.get("contentType", "text/plain"):
-                    entry.content_type = post.get("contentType", "text/plain")
-                    update_fields.append("content_type")
-                if entry.visibility != visibility:
-                    entry.visibility = visibility
-                    update_fields.append("visibility")
-                
-                # sync remote image URL
 
-                incoming_image_url = post.get("image")
-                if not isinstance(incoming_image_url, str) or not (incoming_image_url.startswith("http") or incoming_image_url.startswith("data:")):
-                    incoming_image_url = None
-                if entry.image_url != incoming_image_url:
-                    entry.image_url = incoming_image_url
-                    update_fields.append("image_url")
+                for field, value in fields_to_sync.items():
+                    if getattr(entry, field) != value:
+                        setattr(entry, field, value)
+                        update_fields.append(field)
 
-            if update_fields:
-                entry.save(update_fields=list(set(update_fields)))
+                if update_fields:
+                    entry.save(update_fields=list(set(update_fields)))
 
-            stored_entries.append(entry.id) 
+            stored_entries.append(entry.id)
 
         result = Entry.objects.filter(id__in=stored_entries)
         print("Returning stored entries:", result.count())
@@ -494,7 +487,7 @@ def serialize_entry_for_stream(request, entry):
     Converts an entry into JSON format for the stream API.
     """
 
-    image_url = entry.image_url or get_image_url(entry, requests)
+    image_url = entry.image_url or get_image_url(entry, request)
 
     author_obj = None
 
@@ -587,19 +580,21 @@ def entry_detail(request, entry_id):
     except Exception as e:
         print("ERROR:", str(e))
         raise
-
 def entry_image(request, author_id, entry_id):
     entry = get_entry_by_id(entry_id)
 
-    if not entry.image:
+    if not entry.image and not entry.image_url:
         return JsonResponse({"error": "Not an image"}, status=404)
 
-    from interactions.views import user_can_access_entry
     if not user_can_access_entry(request.user, entry):
         return JsonResponse({"error": "Forbidden"}, status=403)
 
-    return HttpResponse(entry.image.read(), content_type="image/png")
+    url = get_image_url(entry, request) or entry.image_url
+    if not url:
+        return JsonResponse({"error": "Image unavailable"}, status=404)
 
+    from django.shortcuts import redirect as http_redirect
+    return http_redirect(url)
 @login_required
 def create_entry(request):
     """
@@ -1004,9 +999,7 @@ def deleted_entries(request):
 
 # ----- REMOTE API ----- #
 
-
 def send_entry_to_inbox(entry, author, inbox_url, node):
-    """Send a spec-compliant entry to a remote inbox with proper image handling."""
     payload = {
         "type": "entry",
         "id": entry.fqid,
@@ -1018,26 +1011,18 @@ def send_entry_to_inbox(entry, author, inbox_url, node):
         "author": AuthorSerializer(author).data,
     }
 
-    # === IMAGE HANDLING ===
-    if entry.image and entry.content_type and "image" in entry.content_type.lower():
+    # Always send as URL — Cloudinary gives us an absolute URL for free
+    if entry.image:
         try:
-            with entry.image.open('rb') as f:
-                image_data = f.read()
-                base64_image = base64.b64encode(image_data).decode('utf-8')
-            
-            # Put base64 in 'content' and mark contentType properly
-            payload["content"] = base64_image
-            payload["contentType"] = f"{entry.content_type};base64"
-            
-            print(f"Sent image as base64 ({len(base64_image)} chars)")
-        except Exception as e:
-            print(f"Failed to base64 encode image: {e}")
-            # fallback: send image URL if possible
-            image_url = get_image_url(entry)
+            image_url = entry.image.url  # Cloudinary returns full https:// URL
+            if not image_url.startswith("http"):
+                # local dev fallback — skip sending image rather than sending a relative URL
+                image_url = None
             if image_url:
                 payload["image"] = image_url
-
-    elif entry.image_url:  # remote-style image URL
+        except Exception as e:
+            print(f"Could not resolve image URL: {e}")
+    elif entry.image_url:
         payload["image"] = entry.image_url
 
     try:
@@ -1051,7 +1036,6 @@ def send_entry_to_inbox(entry, author, inbox_url, node):
         print(f"Entry sent successfully to {inbox_url}")
     except Exception as e:
         print(f"Failed to send entry to {inbox_url}: {e}")
-
 
 def fanout_entry_to_remote_followers(entry, user):
     """Send entry to all remote followers' inboxes."""

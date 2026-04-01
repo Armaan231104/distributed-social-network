@@ -212,15 +212,23 @@
             <h3 class="post-title">{{ post.title }}</h3>
         </div>
     </div>
-
     <!-- POST CONTENT -->
-    {% if post.content_type == "image" and post.image %}
-        <figure class="stream-post-media">
-            <img src="{{ post.image.url }}" class="post-content-image">
-            {% if post.content %}
-                <figcaption>{{ post.content }}</figcaption>
-            {% endif %}
-        </figure>
+    {% if post.content_type == "image" %}
+        {% if post.image %}
+            <figure class="stream-post-media">
+                <img src="{{ post.image.url }}" class="post-content-image">
+                {% if post.content %}
+                    <figcaption>{{ post.content }}</figcaption>
+                {% endif %}
+            </figure>
+        {% elif post.image_url %}
+            <figure class="stream-post-media">
+                <img src="{{ post.image_url }}" class="post-content-image">
+                {% if post.content %}
+                    <figcaption>{{ post.content }}</figcaption>
+                {% endif %}
+            </figure>
+        {% endif %}
     {% elif post.content_type == "text/markdown" %}
         <section class="stream-post-body">
             {{ post.content | render_markdown }}
@@ -228,7 +236,6 @@
     {% else %}
         <p class="stream-post-body">{{ post.content }}</p>
     {% endif %}
-
     <!-- POST DATE -->
     <span class="post-date">
         Published on {{ post.published_at|date:"M d, Y H:i" }}
