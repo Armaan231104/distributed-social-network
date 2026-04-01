@@ -197,7 +197,8 @@ def fetch_remote_author_posts(remote_author):
             # Normalise contentType — strip ;base64 suffix before storing
             content_type = post.get("contentType", "text/plain")
             stored_content_type = content_type.replace(";base64", "").strip()
-
+            if stored_content_type.startswith("image/"):
+                stored_content_type = "image"
             # For base64 posts, content IS the image — don't store raw base64 as text content
             content = post.get("content", "")
             if content_type.endswith(";base64"):
