@@ -184,6 +184,12 @@ def fetch_remote_author_posts(remote_author):
             fqid = normalize_fqid(post.get("id"))
             if not fqid:
                 continue
+            print(f"\nPost {i} raw data:")
+            print(f"  id: {post.get('id')}")
+            print(f"  title: {post.get('title')}")
+            print(f"  contentType: {post.get('contentType')}")
+            print(f"  image: {str(post.get('image', 'NOT PRESENT'))[:200]}")  # truncate in case it's a huge base64
+            print(f"  content (first 100 chars): {str(post.get('content', ''))[:100]}")
 
             # Parse image once, cleanly
             incoming_image_url = extract_remote_image(post)
