@@ -10,7 +10,7 @@ A distributed social media system that enables multiple nodes (servers) to excha
 - Globally unique identifiers (FQIDs) for cross-node consistency
 
 ## My Contributions
-- Implemented REST API endpoints for [replace with what YOU did]
+- Implemented REST API endpoints for authors, posts, comments, and follow requests, and contributed to handling inbox-based communication between nodes
 - Worked on node-to-node communication and inbox handling
 - Contributed to data modeling and visibility logic
 
