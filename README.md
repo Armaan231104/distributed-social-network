@@ -10,9 +10,9 @@ A distributed social media system that enables multiple nodes (servers) to excha
 - Globally unique identifiers (FQIDs) for cross-node consistency
 
 ## My Contributions
-- Implemented REST API endpoints for authors, posts, comments, and follow requests, and contributed to handling inbox-based communication between nodes
-- Worked on node-to-node communication and inbox handling
-- Contributed to data modeling and visibility logic
+- Implemented REST API endpoints for authors, posts, comments, and follow requests, including validation and response handling
+- Contributed to inbox-based communication between nodes for posts, likes, and comments
+- Worked on data modeling and visibility logic (public, unlisted, friends-only)
 
 ## Tech Stack
 - Python, Django
